@@ -1,0 +1,971 @@
+# HyperChat
+
+### Accelerate Your Mind
+Maximum AI
+
+<aside>
+<img src="notion://custom_emoji/7e6cffee-86c0-494d-9b3f-b8b85b4f8be9/205cc5dd-6455-80af-9756-007a1961cbc7" alt="notion://custom_emoji/7e6cffee-86c0-494d-9b3f-b8b85b4f8be9/205cc5dd-6455-80af-9756-007a1961cbc7" width="40px" />
+
+## Product Overview
+
+HyperChat is a native macOS app that provides instant access to multiple LLMs via floating button or global hotkey, enabling real-time comparison of responses across ChatGPT, Claude, Perplexity, and Google in a full-screen overlay interface. Designed for information junkies who want to watch AI responses stream in simultaneously.
+
+</aside>
+
+## Core User Experience
+
+1. **Persistent Floating Button**: 48x48px floating icon with transparent background, follows user across active spaces
+2. **Global Hotkey**: users can use `fn` (configurable) as alternative activation
+3. **One-Click Activation**: Click floating button to invoke prompt window instantly
+4. **Instant Input**: Floating prompt bar appears center screen
+5. **Multi-Service Query**: Enter sends prompt to all configured services simultaneously
+6. **Real-Time Response Streaming**: Full-screen overlay with side-by-side service windows showing live AI responses as they generate
+7. **Interactive Sessions**: Each window functions as a full browser - users can continue conversations, click links, interact naturally
+8. **Session Persistence**: Login state maintained across app sessions - no re-authentication required
+9. **Selective Viewing**: Close individual service windows (e.g., dismiss Google results) to focus on preferred responses
+10. **Browser Handoff**: "Open in [Browser]" button launches any conversation in user's default browser for extended work
+11. **Dynamic Window Management**: Closing individual service windows causes remaining windows to reflow and expand to fill available space
+12. **Keyboard Navigation**: ESC closes overlay, Enter submits prompts, Cmd+1/2/3/4 focuses specific services
+13. **Quick Exit**: ESC closes overlay, returns to previous work with all sessions preserved
+
+## Technical Architecture
+
+### App Structure
+
+```
+HyperChatApp
+├── AppDelegate (app lifecycle, global hotkey registration)
+├── FloatingButtonManager (persistent on-screen activation)
+├── ServiceManager (persistent WKWebView management)
+├── OverlayController (full-screen window management)
+├── PromptWindow (floating input interface)
+├── ServiceWindow (individual AI service containers)
+├── DefaultBrowserManager (browser detection)
+└── SettingsManager (configuration persistence)
+```
+
+### Core Components
+
+#### 1. Floating Button (Primary Activation)
+
+- **Always Visible**: 48x48px transparent background button
+- **Active Space Following**: Moves with user across desktops/Spaces (simplified cross-space behavior)
+- **User Positioning**: Draggable to preferred screen corner/edge
+- **Visual Feedback**: Subtle hover state and click animation
+- **Performance**: <50ms response time from click to prompt window
+
+#### 2. Global Hotkey Manager
+
+- **Framework**: KeyboardShortcuts framework (modern, App Store compatible)
+- **Requirements**: Standard app permissions (no special accessibility needs)
+- **Default**: `fn` key, configurable in settings
+- **Performance**: <100ms response time from hotkey to first UI
+
+#### 3. Service Manager
+
+- **Persistent WKWebViews**: One per configured service, initialized at app launch
+- **Session Management**: Maintain login cookies and session state
+- **Memory Strategy**: Keep services warm in background for instant response
+- **Supported Services**:
+    - ChatGPT: URL parameter activation
+    - Claude: Clipboard paste + enter automation
+    - Perplexity: URL parameter activation
+    - Google: URL parameter activation
+
+#### 4. Overlay Window System
+
+- **Overlay Height**: 80% of screen height (leaves breathing room, less claustrophobic)
+- **Background Blur**: Semi-transparent blur effect over desktop
+- **Child Windows**: Service windows as children of overlay
+- **Z-Order Management**: Ensure proper layering and focus handling
+- **Multi-Display**: Appears on display containing the cursor at activation time
+- **Window Reflow**: Dynamic resizing and repositioning when services are closed
+
+#### 5. Window Layout System
+
+Window layout will be calculated dynamically using SwiftUI's native layout system. The main overlay view will use a GeometryReader to determine the available screen size. A ScrollView(.horizontal) will be used if the total width of the service windows exceeds the screen width.
+
+The width for each ServiceView will be calculated based on the number of active services, the available screen width, and the specified constraints (minWidth: 600, maxWidth: 800, padding: 50). This logic will reside directly within the OverlayView, removing the need for a separate WindowLayoutEngine class and promoting a more direct, maintainable SwiftUI implementation.
+
+## Performance Requirements
+
+### Critical Path Timing
+
+- **Cold Launch**: App launch to floating button visible <500ms
+- **Button Response**: Floating button click to prompt window <50ms
+- **Query Execution**: Prompt submission to first window visible <200ms
+- **URL Services**: ChatGPT, Perplexity, Google response <200ms
+- **Claude Service**: Clipboard paste method 2-3 seconds
+- **Global Hotkey**: Hotkey to prompt window <100ms
+
+### Memory Management
+
+- **Background Footprint**: <400MB when inactive (4 persistent WKWebViews)
+- **Active Footprint**: <600MB with all services loaded and responding
+- **WKWebView Optimization**: Shared process pool, optimized configurations
+
+## Data Architecture
+
+### Service Configuration
+
+```swift
+struct AIService {
+    var id: String
+    var name: String
+    var iconName: String
+    var activationMethod: ServiceActivationMethod
+    var enabled: Bool
+    var order: Int
+}
+```
+
+### Notification System
+
+```swift
+extension Notification.Name {
+    static let showPromptWindow = Notification.Name("showPromptWindow")
+    static let hideOverlay = Notification.Name("hideOverlay")
+    static let serviceWindowClosed = Notification.Name("serviceWindowClosed")
+}
+```
+
+### App Lifecycle Management
+
+```swift
+@main
+struct HyperChatApp: App {
+    @NSApplicationDelegateAdaptor(AppDelegate.self) var appDelegate
+    
+    var body: some Scene {
+        Settings {
+            SettingsView()
+        }
+    }
+}
+
+class AppDelegate: NSObject, NSApplicationDelegate {
+    private var floatingButtonManager: FloatingButtonManager?
+    private var globalHotkeyManager: GlobalHotkeyManager?
+    private var overlayController: OverlayController?
+    
+    func applicationDidFinishLaunching(_ notification: Notification) {
+        setupFloatingButton()
+        setupGlobalHotkey()
+        setupOverlayController()
+        
+        // Hide dock icon for menu bar app behavior
+        NSApp.setActivationPolicy(.accessory)
+    }
+    
+    private func setupFloatingButton() {
+        floatingButtonManager = FloatingButtonManager()
+        floatingButtonManager?.createFloatingButton()
+    }
+    
+    private func setupGlobalHotkey() {
+        globalHotkeyManager = GlobalHotkeyManager()
+        globalHotkeyManager?.setupHotkey()
+    }
+    
+    private func setupOverlayController() {
+        overlayController = OverlayController()
+        
+        NotificationCenter.default.addObserver(
+            forName: .showPromptWindow,
+            object: nil,
+            queue: .main
+        ) { _ in
+            self.overlayController?.showPromptWindow()
+        }
+        
+        NotificationCenter.default.addObserver(
+            forName: .hideOverlay,
+            object: nil,
+            queue: .main
+        ) { _ in
+            self.overlayController?.hideOverlay()
+        }
+    }
+}
+```
+
+### Prompt Window Implementation
+
+```swift
+struct PromptWindow: View {
+    @State private var prompt: String = ""
+    @FocusState private var isTextFieldFocused: Bool
+    let onSubmit: (String) -> Void
+    let onCancel: () -> Void
+    
+    var body: some View {
+        VStack(spacing: 16) {
+            TextField("Ask anything...", text: $prompt)
+                .textFieldStyle(.roundedBorder)
+                .font(.system(size: 16))
+                .focused($isTextFieldFocused)
+                .onSubmit {
+                    if !prompt.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty {
+                        onSubmit(prompt)
+                        prompt = ""
+                    }
+                }
+            
+            HStack {
+                Button("Cancel") {
+                    onCancel()
+                }
+                .keyboardShortcut(.escape)
+                
+                Spacer()
+                
+                Button("Ask All Services") {
+                    if !prompt.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty {
+                        onSubmit(prompt)
+                        prompt = ""
+                    }
+                }
+                .keyboardShortcut(.return)
+                .buttonStyle(.borderedProminent)
+                .disabled(prompt.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty)
+            }
+        }
+        .padding(20)
+        .frame(width: 500)
+        .background(.regularMaterial)
+        .cornerRadius(12)
+        .shadow(radius: 20)
+        .onAppear {
+            isTextFieldFocused = true
+        }
+    }
+}
+```
+
+### Overlay Controller
+
+```swift
+class OverlayController: ObservableObject {
+    private var overlayWindow: NSWindow?
+    private var promptWindow: NSWindow?
+    @Published var isOverlayVisible: Bool = false
+    @Published var isPromptVisible: Bool = false
+    
+    func showPromptWindow() {
+        createPromptWindow()
+        isPromptVisible = true
+    }
+    
+    func hideOverlay() {
+        overlayWindow?.orderOut(nil)
+        promptWindow?.orderOut(nil)
+        isOverlayVisible = false
+        isPromptVisible = false
+    }
+    
+    func showOverlay(with prompt: String) {
+        hidePromptWindow()
+        createOverlayWindow(prompt: prompt)
+        isOverlayVisible = true
+    }
+    
+    private func createPromptWindow() {
+        let screen = NSScreen.screenWithMouse() ?? NSScreen.main!
+        let screenFrame = screen.frame
+        
+        promptWindow = NSWindow(
+            contentRect: NSRect(x: 0, y: 0, width: 540, height: 120),
+            styleMask: [.borderless],
+            backing: .buffered,
+            defer: false
+        )
+        
+        promptWindow?.level = .floating
+        promptWindow?.backgroundColor = NSColor.clear
+        promptWindow?.isOpaque = false
+        promptWindow?.hasShadow = false
+        promptWindow?.center()
+        
+        let promptView = PromptWindow(
+            onSubmit: { [weak self] prompt in
+                self?.showOverlay(with: prompt)
+            },
+            onCancel: { [weak self] in
+                self?.hidePromptWindow()
+            }
+        )
+        
+        promptWindow?.contentView = NSHostingView(rootView: promptView)
+        promptWindow?.makeKeyAndOrderFront(nil)
+    }
+    
+    private func hidePromptWindow() {
+        promptWindow?.orderOut(nil)
+        isPromptVisible = false
+    }
+    
+    private func createOverlayWindow(prompt: String) {
+        let screen = NSScreen.screenWithMouse() ?? NSScreen.main!
+        let screenFrame = screen.frame
+        
+        overlayWindow = NSWindow(
+            contentRect: screenFrame,
+            styleMask: [.borderless],
+            backing: .buffered,
+            defer: false
+        )
+        
+        overlayWindow?.level = .modalPanel
+        overlayWindow?.backgroundColor = NSColor.clear
+        overlayWindow?.isOpaque = false
+        overlayWindow?.hasShadow = false
+        
+        let overlayView = OverlayView(initialPrompt: prompt)
+        overlayWindow?.contentView = NSHostingView(rootView: overlayView)
+        overlayWindow?.makeKeyAndOrderFront(nil)
+    }
+}
+
+extension NSScreen {
+    static func screenWithMouse() -> NSScreen? {
+        let mouseLocation = NSEvent.mouseLocation
+        return NSScreen.screens.first { NSMouseInRect(mouseLocation, $0.frame, false) }
+    }
+}
+```
+
+### Keyboard Shortcuts Implementation
+
+```swift
+struct OverlayView: View {
+    @StateObject private var serviceManager = ServiceManager()
+    @StateObject private var layoutManager = OverlayLayoutManager()
+    @State private var isVisible: Bool = false
+    let initialPrompt: String
+    
+    var body: some View {
+        // ... existing overlay view code ...
+        .onKeyDown { event in
+            switch event.keyCode {
+            case 53: // ESC key
+                NotificationCenter.default.post(name: .hideOverlay, object: nil)
+            case 18: // Cmd+1
+                focusService(at: 0)
+            case 19: // Cmd+2
+                focusService(at: 1)
+            case 20: // Cmd+3
+                focusService(at: 2)
+            case 21: // Cmd+4
+                focusService(at: 3)
+            default:
+                break
+            }
+        }
+    }
+    
+    private func focusService(at index: Int) {
+        guard index < serviceManager.activeServices.count else { return }
+        // Focus implementation for specific service window
+    }
+}
+```
+
+### Resource Cleanup
+
+```swift
+extension ServiceManager {
+    func disableService(_ serviceId: String) {
+        guard let webService = webServices[serviceId] else { return }
+        
+        // Clean up WKWebView resources
+        webService.webView.stopLoading()
+        webService.webView.loadHTMLString("", baseURL: nil)
+        
+        // Remove from active services
+        activeServices.removeAll { $0.id == serviceId }
+        webServices.removeValue(forKey: serviceId)
+        
+        // Trigger layout reflow
+        NotificationCenter.default.post(name: .serviceWindowClosed, object: serviceId)
+    }
+    
+    func enableService(_ service: AIService) {
+        guard webServices[service.id] == nil else { return }
+        
+        let webView = createWebView()
+        let webService: WebService
+        
+        switch service.activationMethod {
+        case .urlParameter:
+            webService = URLParameterService(webView: webView, service: service)
+        case .clipboardPaste:
+            webService = ClaudeService(webView: webView, service: service)
+        }
+        
+        webServices[service.id] = webService
+        activeServices.append(service)
+        activeServices.sort { $0.order < $1.order }
+    }
+}
+
+enum ServiceActivationMethod {
+    case urlParameter(baseURL: String, parameter: String)
+    case clipboardPaste(baseURL: String)
+}
+
+struct AppConfiguration {
+    var floatingButton: FloatingButtonConfig
+    var globalHotkey: GlobalHotkeyConfig
+    var enabledServices: [AIService]
+    var windowLayout: LayoutPreferences
+    var appearance: AppearanceSettings
+}
+
+struct FloatingButtonConfig {
+    var position: CGPoint
+    var isEnabled: Bool = true
+    var cornerPreference: ScreenCorner
+}
+
+struct GlobalHotkeyConfig {
+    var keyCombo: KeyboardShortcuts.Name = .showHyperChat
+    var isEnabled: Bool = true
+}
+```
+
+### Default Service Configuration
+
+```swift
+let defaultServices = [
+    AIService(
+        id: "chatgpt",
+        name: "ChatGPT",
+        iconName: "chatgpt-icon",
+        activationMethod: .urlParameter(
+            baseURL: "https://chat.openai.com",
+            parameter: "q"
+        ),
+        enabled: true,
+        order: 1
+    ),
+    AIService(
+        id: "claude",
+        name: "Claude",
+        iconName: "claude-icon",
+        activationMethod: .clipboardPaste(
+            baseURL: "https://claude.ai"
+        ),
+        enabled: true,
+        order: 2
+    ),
+    AIService(
+        id: "perplexity",
+        name: "Perplexity",
+        iconName: "perplexity-icon",
+        activationMethod: .urlParameter(
+            baseURL: "https://www.perplexity.ai",
+            parameter: "q"
+        ),
+        enabled: true,
+        order: 3
+    ),
+    AIService(
+        id: "google",
+        name: "Google",
+        iconName: "google-icon",
+        activationMethod: .urlParameter(
+            baseURL: "https://www.google.com/search",
+            parameter: "q"
+        ),
+        enabled: true,
+        order: 4
+    )
+]
+```
+
+### Settings Persistence
+
+- **UserDefaults**: For lightweight configuration
+- **Keychain**: For sensitive service tokens (future)
+- **No Backend**: All data stays local
+
+## Security & Privacy
+
+### Sandboxing
+
+- **App Sandbox**: Enable with minimal required entitlements
+- **WKWebView Sandbox**: Isolate web content from app process
+- **Network Access**: Restricted to configured AI service domains
+- **Clipboard Access**: Required for Claude automation
+
+### Required Entitlements
+
+```xml
+<key>com.apple.security.app-sandbox</key>
+<true/>
+<key>com.apple.security.network.client</key>
+<true/>
+<key>com.apple.security.files.user-selected.read-write</key>
+<true/>
+<key>com.apple.security.automation.apple-events</key>
+<true/>
+```
+
+## Implementation Details
+
+### Floating Button Manager
+
+```swift
+import KeyboardShortcuts
+
+class FloatingButtonManager: ObservableObject {
+    private var buttonWindow: NSWindow?
+    
+    func createFloatingButton() {
+        let window = NSWindow(
+            contentRect: NSRect(x: 100, y: 100, width: 48, height: 48),
+            styleMask: [.borderless],
+            backing: .buffered,
+            defer: false
+        )
+        
+        // Simplified cross-space behavior
+        window.level = .floating
+        window.collectionBehavior = [.moveToActiveSpace, .stationary]
+        window.backgroundColor = NSColor.clear
+        window.isOpaque = false
+        window.hasShadow = true
+        
+        let button = NSButton(frame: NSRect(x: 0, y: 0, width: 48, height: 48))
+        button.image = NSImage(named: "HyperChatIcon")
+        button.isBordered = false
+        button.target = self
+        button.action = #selector(buttonClicked)
+        
+        window.contentView = button
+        window.makeKeyAndOrderFront(nil)
+        
+        self.buttonWindow = window
+    }
+    
+    @objc func buttonClicked() {
+        NotificationCenter.default.post(name: .showPromptWindow, object: nil)
+    }
+}
+```
+
+### Global Hotkey Setup
+
+```swift
+import KeyboardShortcuts
+
+extension KeyboardShortcuts.Name {
+    static let showHyperChat = Self("showHyperChat", default: .init(.fn))
+}
+
+class GlobalHotkeyManager {
+    func setupHotkey() {
+        KeyboardShortcuts.onKeyUp(for: .showHyperChat) { [weak self] in
+            self?.showPromptWindow()
+        }
+    }
+    
+    private func showPromptWindow() {
+        NotificationCenter.default.post(name: .showPromptWindow, object: nil)
+    }
+}
+```
+
+### Service Implementation
+
+```swift
+protocol WebService {
+    func executePrompt(_ prompt: String)
+    var webView: WKWebView { get }
+    var service: AIService { get }
+}
+
+class URLParameterService: WebService {
+    let webView: WKWebView
+    let service: AIService
+    
+    func executePrompt(_ prompt: String) {
+        guard case .urlParameter(let baseURL, let parameter) = service.activationMethod else { return }
+        
+        let encodedPrompt = prompt.addingPercentEncoding(withAllowedCharacters: .urlQueryAllowed) ?? ""
+        let urlString = "\(baseURL)?\(parameter)=\(encodedPrompt)"
+        
+        if let url = URL(string: urlString) {
+            webView.load(URLRequest(url: url))
+        }
+    }
+}
+
+class ClaudeService: WebService {
+    let webView: WKWebView
+    let service: AIService
+    
+    func executePrompt(_ prompt: String) {
+        guard case .clipboardPaste(let baseURL) = service.activationMethod else { return }
+        
+        // Store prompt in clipboard
+        let pasteboard = NSPasteboard.general
+        pasteboard.clearContents()
+        pasteboard.setString(prompt, forType: .string)
+        
+        // Load Claude page
+        if let url = URL(string: baseURL) {
+            webView.load(URLRequest(url: url))
+        }
+        
+        // After page loads, paste and submit
+        DispatchQueue.main.asyncAfter(deadline: .now() + 2.0) {
+            self.webView.evaluateJavaScript("""
+                // Ensure something is focused
+                document.body.click();
+                
+                // Paste from clipboard
+                document.execCommand('paste');
+                
+                // Submit with Enter key
+                setTimeout(() => {
+                    const enterEvent = new KeyboardEvent('keydown', {
+                        key: 'Enter', 
+                        keyCode: 13, 
+                        bubbles: true
+                    });
+                    document.dispatchEvent(enterEvent);
+                }, 200);
+            """)
+        }
+    }
+}
+```
+
+### Window Layout Engine
+
+```swift
+struct WindowLayoutEngine {
+    let minWidth: CGFloat = 600
+    let maxWidth: CGFloat = 800
+    let windowPadding: CGFloat = 50
+    let heightRatio: CGFloat = 0.8
+    
+    func calculateLayout(for services: [AIService], screenSize: CGSize) -> LayoutResult {
+        let serviceCount = CGFloat(services.count)
+        guard serviceCount > 0 else { return LayoutResult(frames: [], needsScrolling: false, totalWidth: 0) }
+        
+        // Calculate total padding needed
+        let totalPadding = windowPadding * (serviceCount - 1)
+        let availableWidth = screenSize.width
+        let availableForWindows = availableWidth - totalPadding
+        
+        // Calculate ideal width per window
+        let idealWidth = availableForWindows / serviceCount
+        
+        // Clamp to min/max bounds
+        let windowWidth = min(max(idealWidth, minWidth), maxWidth)
+        
+        // Calculate total layout width
+        let totalLayoutWidth = (windowWidth * serviceCount) + totalPadding
+        
+        // Determine if horizontal scrolling is needed
+        let needsScrolling = totalLayoutWidth > availableWidth
+        
+        // Calculate window height and vertical positioning
+        let windowHeight = screenSize.height * heightRatio
+        let verticalOffset = screenSize.height * (1.0 - heightRatio) / 2.0 // Center vertically
+        
+        // Generate frames
+        var frames: [CGRect] = []
+        var currentX: CGFloat = needsScrolling ? 0 : (availableWidth - totalLayoutWidth) / 2.0 // Center if fits
+        
+        for _ in services {
+            frames.append(CGRect(
+                x: currentX,
+                y: verticalOffset,
+                width: windowWidth,
+                height: windowHeight
+            ))
+            currentX += windowWidth + windowPadding
+        }
+        
+        return LayoutResult(
+            frames: frames,
+            needsScrolling: needsScrolling,
+            totalWidth: totalLayoutWidth
+        )
+    }
+    
+    func calculateScrollViewContentSize(for services: [AIService], screenSize: CGSize) -> CGSize {
+        let result = calculateLayout(for: services, screenSize: screenSize)
+        return CGSize(
+            width: max(result.totalWidth, screenSize.width),
+            height: screenSize.height * heightRatio
+        )
+    }
+}
+
+struct LayoutResult {
+    let frames: [CGRect]
+    let needsScrolling: Bool
+    let totalWidth: CGFloat
+}
+```
+
+### Default Browser Detection
+
+```swift
+class DefaultBrowserManager: ObservableObject {
+    @Published var browserName: String = "Browser"
+    
+    init() {
+        updateDefaultBrowser()
+    }
+    
+    func updateDefaultBrowser() {
+        guard let url = URL(string: "https://example.com"),
+              let browserURL = NSWorkspace.shared.urlForApplication(toOpen: url) else {
+            browserName = "Browser"
+            return
+        }
+        
+        let bundle = Bundle(url: browserURL)
+        let appName = bundle?.localizedInfoDictionary?["CFBundleDisplayName"] as? String ??
+                     bundle?.infoDictionary?["CFBundleDisplayName"] as? String ??
+                     browserURL.deletingPathExtension().lastPathComponent
+        
+        browserName = friendlyBrowserName(from: appName ?? "Browser")
+    }
+    
+    private func friendlyBrowserName(from appName: String) -> String {
+        // Handle common cases
+        switch appName.lowercased() {
+        case let name where name.contains("chrome"):
+            return "Chrome"
+        case let name where name.contains("firefox"):
+            return "Firefox"
+        case let name where name.contains("safari"):
+            return "Safari"
+        case let name where name.contains("edge"):
+            return "Edge"
+        case let name where name.contains("opera"):
+            return "Opera"
+        case let name where name.contains("arc"):
+            return "Arc"
+        case let name where name.contains("brave"):
+            return "Brave"
+        default:
+            return appName
+        }
+    }
+}
+```
+
+### Service Manager
+
+```swift
+class ServiceManager: ObservableObject {
+    @Published var activeServices: [AIService] = []
+    private var webServices: [String: WebService] = [:]
+    
+    init() {
+        setupServices()
+    }
+    
+    private func setupServices() {
+        for service in defaultServices where service.enabled {
+            let webView = createWebView()
+            
+            let webService: WebService
+            switch service.activationMethod {
+            case .urlParameter:
+                webService = URLParameterService(webView: webView, service: service)
+            case .clipboardPaste:
+                webService = ClaudeService(webView: webView, service: service)
+            }
+            
+            webServices[service.id] = webService
+            activeServices.append(service)
+        }
+    }
+    
+    func executePrompt(_ prompt: String) {
+        for service in activeServices {
+            webServices[service.id]?.executePrompt(prompt)
+        }
+    }
+    
+    private func createWebView() -> WKWebView {
+        let configuration = WKWebViewConfiguration()
+        configuration.processPool = WKProcessPool.shared
+        return WKWebView(frame: .zero, configuration: configuration)
+    }
+}
+
+extension WKProcessPool {
+    static let shared = WKProcessPool()
+}
+```
+
+## User Interface Specifications
+
+### Prompt Window
+
+- **Size**: 600x60px, centered on active display
+- **Style**: Floating, rounded corners, subtle shadow
+- **Animation**: Fade in/out, smooth scaling
+- **Focus**: Auto-focus text input, full text selection
+
+### Service Windows
+
+- **Header**: Service name with icon, dynamic browser button, close button
+- **Content**: Full WKWebView for service interaction
+- **Controls**: 
+  - Close button (X) with "Close Service" tooltip - removes service and triggers window reflow
+  - "Open in [Browser]" button showing user's default browser name
+- **Loading States**: Spinner for URL services, extended loading indicator for Claude
+- **Dynamic Layout**: When a service window is closed, remaining windows automatically expand and reposition to fill available space using the Window Layout Engine
+- **Keyboard Focus**: Cmd+1/2/3/4 focuses specific service windows in order
+
+### Service Header Implementation
+
+```swift
+struct ServiceHeader: View {
+    let service: AIService
+    let onClose: () -> Void
+    let onOpenInBrowser: () -> Void
+    @StateObject private var browserManager = DefaultBrowserManager()
+    
+    var body: some View {
+        HStack {
+            Image(service.iconName)
+                .frame(width: 16, height: 16)
+            Text(service.name)
+                .font(.headline)
+            
+            Spacer()
+            
+            Button(action: onOpenInBrowser) {
+                HStack(spacing: 4) {
+                    Image(systemName: "arrow.up.forward.app")
+                    Text(browserManager.browserName)
+                        .font(.caption)
+                }
+            }
+            .help("Open in \(browserManager.browserName)")
+            
+            Button(action: onClose) {
+                Image(systemName: "xmark")
+            }
+            .help("Close Service")
+        }
+        .padding(.horizontal, 12)
+        .padding(.vertical, 8)
+        .background(.regularMaterial)
+        .onAppear {
+            browserManager.updateDefaultBrowser()
+        }
+    }
+}
+```
+
+### Settings Panel
+
+- **Floating Button**: Position preference, enable/disable
+- **Global Hotkey**: Key combination picker using KeyboardShortcuts framework
+- **Service Management**: Enable/disable services (with proper WKWebView cleanup), reorder services
+- **Claude Configuration**: Timing adjustment for paste delay
+- **Appearance**: Dark/light/system theme selection
+- **Keyboard Shortcuts**: Display current shortcuts (ESC to close, Enter to submit, Cmd+1-4 for service focus)
+- **About**: Version, credits, privacy policy
+
+## Error Handling
+
+### Network Issues
+
+- **Timeout Handling**: 30-second timeout per service
+- **Retry Logic**: Automatic retry on network failures
+- **Fallback UI**: Error state with manual retry option
+
+### Service-Specific Failures
+
+- **URL Services**: Standard network error handling
+- **Claude Automation**: Graceful fallback with manual instruction
+- **Auth Issues**: Clear indication when login required
+- **Rate Limiting**: Graceful handling of API limits
+
+### System Integration
+
+- **Clipboard Access**: Handle permission requests gracefully
+- **Low Memory**: Graceful degradation, service prioritization
+- **Multiple Displays**: Proper handling of display changes
+
+## Future Architecture Considerations
+
+### Extensibility Points
+
+- **Plugin System**: For adding new AI services with custom activation methods
+- **Local Model Integration**: Core ML pipeline for local inference
+- **Enhanced Claude Integration**: Better timing detection, DOM monitoring
+- **Advanced Features**: Response comparison, prompt templates, response saving
+
+## Development Milestones
+
+### MVP (v1.0)
+
+- [ ] Persistent floating button with simplified cross-space behavior
+- [ ] Four core services: ChatGPT, Claude, Perplexity, Google
+- [ ] Full-screen overlay interface (80% height) with real-time response streaming
+- [ ] Global hotkey support using KeyboardShortcuts framework
+- [ ] Claude clipboard automation with paste+enter method
+- [ ] Dynamic browser detection for "Open in [Browser]" buttons
+- [ ] SwiftUI-based responsive layout with 50px padding and 600-800px width constraints
+- [ ] Prompt window with auto-focus and keyboard shortcuts
+- [ ] Multi-monitor support (overlay appears on screen with cursor)
+- [ ] Keyboard navigation (ESC to close, Cmd+1-4 for service focus)
+- [ ] Dynamic window management with automatic reflow when services are closed
+- [ ] Proper resource cleanup when services are disabled
+- [ ] Basic settings and configuration
+- [ ] App Store submission
+
+### Enhanced (v1.1)
+
+- [ ] Additional AI services using clipboard method
+- [ ] Improved Claude integration (better timing, fallback handling)
+- [ ] Performance optimizations
+- [ ] Enhanced error handling and user feedback
+- [ ] User onboarding flow
+
+### Advanced (v2.0)
+
+- [ ] Advanced Claude automation with DOM monitoring
+- [ ] Local model integration
+- [ ] Response comparison features
+- [ ] Prompt template system
+- [ ] Export and sharing capabilities
+
+## Technical Dependencies
+
+### macOS Requirements
+
+- **Minimum**: macOS 14.0 (Sonoma)
+- **Recommended**: macOS 15.0 (Sequoia) for optimal performance
+- **Architecture**: Universal binary (Intel + Apple Silicon)
+
+### Frameworks
+
+- **SwiftUI**: Primary UI framework
+- **AppKit**: Window management, floating button
+- **WebKit**: WKWebView for service integration
+- **Combine**: Reactive state management
+- **KeyboardShortcuts**: Global hotkey registration
+
+### Third-Party Dependencies
+
+- **KeyboardShortcuts**: For modern global hotkey handling
+- **Sparkle**: For automatic updates (optional)
+
+---
+
+*This specification defines the technical foundation for HyperChat v1.0, focusing on real-time AI response streaming for information junkies while maintaining architectural flexibility for future enhancements.*
