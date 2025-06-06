@@ -28,18 +28,24 @@ class OverlayController {
         overlayWindow.backgroundColor = .clear
         overlayWindow.isOpaque = false
 
-        // Add a blur effect to the background.
-        let blurView = NSVisualEffectView()
-        blurView.material = .underWindowBackground
+        // Create a container view that will hold our layers.
+        let containerView = NSView(frame: mainScreen.frame)
+        overlayWindow.contentView = containerView
+
+        // Layer 1: The blur effect using the .hudWindow material.
+        let blurView = NSVisualEffectView(frame: containerView.bounds)
+        blurView.material = .hudWindow
         blurView.blendingMode = .behindWindow
         blurView.state = .active
-        overlayWindow.contentView = blurView
+        blurView.autoresizingMask = [.width, .height]
+        containerView.addSubview(blurView)
 
-        // We'll add the web views and other content here later.
-        // For now, a simple text view to confirm it works.
-        let hostingView = NSHostingView(rootView: Text("Overlay Active").font(.largeTitle).foregroundColor(.white))
-        hostingView.frame = mainScreen.frame
-        blurView.addSubview(hostingView)
+        // Layer 2: A subtle black tint on top of the blur.
+        let tintView = NSView(frame: containerView.bounds)
+        tintView.wantsLayer = true
+        tintView.layer?.backgroundColor = NSColor.black.withAlphaComponent(0.8).cgColor
+        tintView.autoresizingMask = [.width, .height]
+        containerView.addSubview(tintView)
 
         overlayWindow.makeKeyAndOrderFront(nil)
     }
