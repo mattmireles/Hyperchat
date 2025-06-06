@@ -257,12 +257,15 @@
 				DEVELOPMENT_TEAM = K39XS6L5PP;
 				ENABLE_HARDENED_RUNTIME = YES;
 				ENABLE_PREVIEWS = YES;
-				GENERATE_INFOPLIST_FILE = YES;
+				GENERATE_INFOPLIST_FILE = NO;
+				INFOPLIST_FILE = HyperChat/Info.plist;
+				INFOPLIST_KEY_CFBundleDisplayName = HyperChat;
 				INFOPLIST_KEY_NSHumanReadableCopyright = "";
 				LD_RUNPATH_SEARCH_PATHS = (
 					"$(inherited)",
 					"@executable_path/../Frameworks",
 				);
+				MACOSX_DEPLOYMENT_TARGET = 14.6;
 				MARKETING_VERSION = 1.0;
 				PRODUCT_BUNDLE_IDENTIFIER = com.Transcendence.HyperChat;
 				PRODUCT_NAME = "$(TARGET_NAME)";
@@ -284,12 +287,15 @@
 				DEVELOPMENT_TEAM = K39XS6L5PP;
 				ENABLE_HARDENED_RUNTIME = YES;
 				ENABLE_PREVIEWS = YES;
-				GENERATE_INFOPLIST_FILE = YES;
+				GENERATE_INFOPLIST_FILE = NO;
+				INFOPLIST_FILE = HyperChat/Info.plist;
+				INFOPLIST_KEY_CFBundleDisplayName = HyperChat;
 				INFOPLIST_KEY_NSHumanReadableCopyright = "";
 				LD_RUNPATH_SEARCH_PATHS = (
 					"$(inherited)",
 					"@executable_path/../Frameworks",
 				);
+				MACOSX_DEPLOYMENT_TARGET = 14.6;
 				MARKETING_VERSION = 1.0;
 				PRODUCT_BUNDLE_IDENTIFIER = com.Transcendence.HyperChat;
 				PRODUCT_NAME = "$(TARGET_NAME)";

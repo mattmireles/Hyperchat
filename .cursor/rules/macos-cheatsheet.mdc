@@ -1,0 +1,1228 @@
+---
+description: 
+globs: 
+alwaysApply: true
+---
+# iOS vs macOS - Developer Cheat Sheet
+
+Remember, we're building a Swift app for  macOS. It's easy to get confused between iOS and macOS Swift methods, so always double-check your work and your thinking! Here's a cheat sheet to make your life as a macOS developer a little easier: 
+
+## Critical Framework Differences
+
+### AppKit vs UIKit vs SwiftUI
+
+| Framework | Platform | Key Classes | Programming Model | Maturity | Event Handling |
+| --- | --- | --- | --- | --- | --- |
+| AppKit | macOS only | NSApplication, NSWindow, NSView, NSViewController, NSMenu | Imperative, verbose, multi-window native | Very Mature (NeXTSTEP roots) | Mouse, Keyboard, Trackpad |
+| UIKit | iOS/Catalyst | UIApplication, UIWindow, UIView, UIViewController | Imperative, touch-first, single-window focus | Mature (iPhoneOS 1) | Touch, Gestures |
+| SwiftUI | Cross-platform | View protocol, WindowGroup, NavigationSplitView | Declarative, platform-adaptive | Maturing (iOS 13/macOS 10.15) | Gesture modifiers, .onHover |
+
+**Critical**: NSWindow is NOT a subclass of NSView (unlike UIWindow/UIView). NS-prefixed classes are NOT direct equivalents of UI-prefixed classes.
+
+### Framework Interoperability
+
+```swift
+// Embed SwiftUI in AppKit
+let hostingView = NSHostingView(rootView: MySwiftUIView())
+parentView.addSubview(hostingView)
+
+// Embed AppKit in SwiftUI
+struct AppKitViewWrapper: NSViewRepresentable {
+    func makeNSView(context: Context) -> NSTextField { NSTextField() }
+    func updateNSView(_ nsView: NSTextField, context: Context) { }
+}
+
+struct AppKitControllerWrapper: NSViewControllerRepresentable {
+    func makeNSViewController(context: Context) -> MyViewController { MyViewController() }
+    func updateNSViewController(_ nsViewController: MyViewController, context: Context) { }
+}
+
+```
+
+### macOS-Specific UI Paradigms
+
+- **Multi-window environment**: Users expect independent, resizable windows
+- **Menu bar centrality**: Primary command discovery via persistent menu bar
+- **Precision input**: Mouse/trackpad precision vs touch targets
+- **Keyboard shortcuts**: Essential for native feel
+- **Window states**: Key vs Main window distinction critical
+
+## Window Management (macOS-Specific)
+
+### NSWindow & NSWindowController
+
+```swift
+// NSWindow is NOT an NSView subclass
+let window = NSWindow(contentRect: rect,
+                     styleMask: [.titled, .resizable, .closable, .miniaturizable],
+                     backing: .buffered, defer: false)
+window.contentView = myRootView
+
+```
+
+**Key NSWindow Properties**:
+
+- `styleMask`: Defines appearance and controls (close, minimize, resize buttons)
+- `backing`: How content is buffered (.buffered, .retained, .nonretained)
+- `contentView`: Root NSView in the window's hierarchy
+
+**NSWindowController**: Manages window lifecycle, loads from NIB/storyboard, coordinates with document model
+
+**Key vs Main Window**:
+
+- **Main Window**: Primary target for app content actions (Save, Close)
+- **Key Window**: Receives keyboard input (can be different from main)
+- **Example**: Inspector panel (NSPanel) receives keyboard input (key window) while document window it inspects handles menu commands (main window)
+
+### Document Architecture
+
+- NSDocument: Handles file I/O, undo/redo (NSUndoManager), autosave, manages NSWindowController(s), tracks edited state (`updateChangeCount(_:)`), printing, versioning
+- NSDocumentController: Manages open documents, "New"/"Open" menu commands, "Open Recent", document types from Info.plist
+- NSWindowController: Manages window lifecycle per document
+
+### Window State Restoration
+
+```swift
+// AppKit - Simple frame autosave
+windowController.windowFrameAutosaveName = "MainWindow"
+window.isRestorable = true
+
+// AppKit - Advanced custom restoration
+window.restorationClass = MyWindowRestoration.self
+
+class MyWindowRestoration: NSObject, NSWindowRestoration {
+    static func restoreWindow(withIdentifier identifier: NSUserInterfaceItemIdentifier,
+                            state: NSCoder, completionHandler: @escaping (NSWindow?, Error?) -> Void) {
+        // Custom window recreation logic
+    }
+}
+
+// SwiftUI
+WindowGroup("Document", id: "main") { DocumentView() }
+
+```
+
+## Event Handling Differences
+
+### Responder Chain (AppKit)
+
+Path: NSView → superview hierarchy → NSViewController (since macOS 10.10) → NSWindow → NSWindowController → NSApplication → NSApplicationDelegate
+
+**Key Event Preprocessing**: NSApplication processes events for global keyboard shortcuts (menu key equivalents) and interface control (Tab focus) BEFORE dispatching to key window
+**Untargeted Actions**: For nil-target actions, system searches both key window and main window responder chains
+
+**Key Methods**:
+
+```swift
+// Raw key events
+override func keyDown(with event: NSEvent)
+override func flagsChanged(with event: NSEvent)
+
+// Text interpretation
+override func interpretKeyEvents(_ eventArray: [NSEvent])
+override func doCommand(by selector: Selector)
+
+```
+
+### Mouse Events
+
+```swift
+override func mouseDown(with event: NSEvent)
+override func rightMouseDown(with event: NSEvent)  // Context menus
+override func mouseMoved(with event: NSEvent)      // Requires tracking areas
+override func mouseEntered(with event: NSEvent)    // Hover effects
+override func mouseExited(with event: NSEvent)
+
+// Required for mouseMoved, mouseEntered, mouseExited
+override func updateTrackingAreas() {
+    super.updateTrackingAreas()
+    trackingAreas.forEach { removeTrackingArea($0) }
+
+    let trackingArea = NSTrackingArea(rect: bounds,
+                                    options: [.activeInKeyWindow, .mouseMoved, .mouseEnteredAndExited],
+                                    owner: self, userInfo: nil)
+    addTrackingArea(trackingArea)
+}
+
+```
+
+### Action Message Signatures
+
+AppKit requires strict signatures: `@IBAction func action(_ sender: Any?)`
+
+## Coordinate Systems
+
+**Critical Difference**: AppKit default origin is bottom-left (Y increases upward)
+
+```swift
+// Fix for iOS developers
+override var isFlipped: Bool { return true }  // Makes origin top-left
+
+```
+
+## Menu Implementation
+
+### Main Menu (AppKit)
+
+```swift
+let menuItem = NSMenuItem(title: "Action", action: #selector(performAction), keyEquivalent: "a")
+menuItem.keyEquivalentModifierMask = .command
+NSApp.mainMenu?.addItem(menuItem)
+
+// Menu Validation (NSUserInterfaceValidations)
+func validateUserInterfaceItem(_ item: NSValidatedUserInterfaceItem) -> Bool {
+    switch item.action {
+    case #selector(performAction):
+        return canPerformAction()
+    default:
+        return true
+    }
+}
+
+```
+
+**Menu Structure**: Standard menus (File, Edit, View, Window, Help) with conventional HIG contents
+
+### SwiftUI Commands
+
+```swift
+@main
+struct MyApp: App {
+    var body: some Scene {
+        WindowGroup { ContentView() }
+        .commands {
+            CommandMenu("Custom") {
+                Button("Action") { performAction() }
+                    .keyboardShortcut("a", modifiers: .command)
+            }
+        }
+## Mac Catalyst Limitations
+
+### Technical Features
+- **"Optimize Interface for Mac"**: Build setting that makes UIKit controls adopt AppKit-like appearance and native Mac scaling
+- **AppKit API Access**: Limited access to some AppKit APIs for deeper macOS integration
+
+### When NOT to Use Catalyst
+- **Performance**: Not optimal for graphics-intensive or complex UIs
+- **Native Integration**: Limited window management, menu customization
+- **API Restrictions**: Some macOS APIs unavailable (Process API, advanced window features)
+- **User Experience**: Feels like "iPad app on Mac" rather than native
+
+### Better Alternatives
+- **SwiftUI**: True cross-platform with native adaptations
+- **Native AppKit**: Full macOS integration and performance
+
+## Background Processing Options
+
+### launchd Agents (Advanced)
+```xml
+<!-- ~/Library/LaunchAgents/com.company.app.agent.plist -->
+<?xml version="1.0" encoding="UTF-8"?>
+<plist version="1.0">
+<dict>
+    <key>Label</key>
+    <string>com.company.app.agent</string>
+    <key>ProgramArguments</key>
+    <array>
+        <string>/path/to/helper</string>
+    </array>
+    <key>RunAtLoad</key>
+    <true/>
+</dict>
+</plist>
+
+```
+
+### BGTaskScheduler (Simpler)
+
+```swift
+import BackgroundTasks
+
+// Register task
+BGTaskScheduler.shared.register(forTaskWithIdentifier: "com.app.refresh", using: nil) { task in
+    handleBackgroundRefresh(task: task as! BGAppRefreshTask)
+}
+
+// Schedule task
+let request = BGAppRefreshTaskRequest(identifier: "com.app.refresh")
+try BGTaskScheduler.shared.submit(request)
+
+```
+
+## App Nap (macOS Energy Management)
+
+### What App Nap Does
+
+- **Throttles CPU usage** and **reduces timer frequency** for inactive, non-visible apps
+- **Automatic**: System determines when apps are eligible (not frontmost, no visible content updates, not audible)
+- **Energy saving**: Extends battery life without user intervention
+
+### App Nap & XPC Interaction
+
+- **Main app napped**: Background processing continues in XPC services
+- **XPC services unaffected**: Managed separately by launchd
+- **Wake on XPC message**: App wakes when receiving XPC communication
+
+### Developer Control
+
+```swift
+// Prevent App Nap during critical tasks
+let activity = ProcessInfo.processInfo.beginActivity(options: [.userInitiated, .idleSystemSleepDisabled],
+                                                   reason: "Processing user data")
+defer { ProcessInfo.processInfo.endActivity(activity) }
+
+// Check if app is napped (in Activity Monitor)
+// Look for "App Nap" column to see current state
+
+```
+
+## Pasteboard Differences
+
+### NSPasteboard vs UIPasteboard
+
+```swift
+// macOS - Multiple specialized pasteboards
+let pasteboard = NSPasteboard.general
+let findPasteboard = NSPasteboard.find  // System find panel
+// Also: NSPasteboard.ruler, NSPasteboard.font, drag-and-drop pasteboards
+
+// Privacy control (macOS 15.4+)
+pasteboard.accessBehavior = .restricted  // .always, .never, .restricted (prompt)
+pasteboard.prepareForNewContents()
+pasteboard.setString("text", forType: .string)
+
+// iOS - Single general pasteboard
+UIPasteboard.general.string = "text"
+
+```
+
+## App Groups & IPC
+
+### Shared Data Between Apps
+
+```swift
+// Enable App Groups capability first
+let sharedDefaults = UserDefaults(suiteName: "group.com.company.shared")
+sharedDefaults?.set("value", forKey: "sharedKey")
+
+// Shared container
+let containerURL = FileManager.default.containerURL(forSecurityApplicationGroupIdentifier: "group.com.company.shared")
+
+// Shared keychain items
+let keychain = Keychain(service: "com.company.app", accessGroup: "group.com.company.shared")
+
+```
+
+### XPC Communication Within App Group
+
+```swift
+// XPC service name with app group prefix
+let serviceName = "group.com.company.shared.XPCService"
+let connection = NSXPCConnection(serviceName: serviceName)
+
+```
+
+**Note**: XPC is preferred for complex/secure IPC on macOS vs URL Schemes (more common on iOS)
+
+```
+
+### Context Menus & Dock Menus
+```swift
+// AppKit Context Menus
+override func menu(for event: NSEvent) -> NSMenu? {
+    let menu = NSMenu()
+    menu.addItem(NSMenuItem(title: "Context Action", action: #selector(contextAction), keyEquivalent: ""))
+    return menu
+}
+
+// Programmatic context menu
+NSMenu.popUpContextMenu(contextMenu, with: event, for: self)
+
+// Dock Menu (NSApplicationDelegate)
+func applicationDockMenu(_ sender: NSApplication) -> NSMenu? {
+    let dockMenu = NSMenu()
+    dockMenu.addItem(NSMenuItem(title: "Quick Action", action: #selector(quickAction), keyEquivalent: ""))
+    return dockMenu
+}
+
+// SwiftUI
+.contextMenu {
+    Button("Context Action") { contextAction() }
+}
+
+```
+
+## Sandboxing & Entitlements
+
+### App Container & Dynamic Access
+
+- **App Container**: `~/Library/Containers/<app-bundle-id>/` - full read/write access by default
+- **Dynamic Sandbox Extensions**: NSOpenPanel/NSSavePanel automatically grant temporary access to user-selected files
+- **Entitlements Required**: Must explicitly declare intent to access resources
+
+### Required Entitlements
+
+```xml
+<!-- File access -->
+<key>com.apple.security.files.user-selected.read-write</key>
+<true/>
+<key>com.apple.security.files.pictures.read-write</key>
+<true/>
+<key>com.apple.security.files.bookmarks.app-scope</key>
+<true/>
+
+<!-- Hardware -->
+<key>com.apple.security.device.audio-input</key>
+<true/>
+<key>com.apple.security.device.camera</key>
+<true/>
+
+<!-- Network -->
+<key>com.apple.security.network.client</key>
+<true/>
+
+```
+
+### Security-Scoped Bookmarks
+
+```swift
+// Create bookmark for persistent access
+let bookmarkData = try url.bookmarkData(options: .withSecurityScope)
+UserDefaults.standard.set(bookmarkData, forKey: "savedPath")
+
+// Restore access - CRITICAL: Must bracket with start/stop
+var isStale = false
+let url = try URL(resolvingBookmarkData: bookmarkData, bookmarkDataIsStale: &isStale)
+guard url.startAccessingSecurityScopedResource() else { return }
+defer { url.stopAccessingSecurityScopedResource() }
+
+// Use url here...
+let data = try Data(contentsOf: url)
+
+```
+
+## File System Access
+
+### Standard Dialogs
+
+```swift
+// Open files/folders
+let openPanel = NSOpenPanel()
+openPanel.allowsMultipleSelection = false
+openPanel.canChooseDirectories = true
+if openPanel.runModal() == .OK {
+    guard let url = openPanel.url else { return }
+    // Automatically grants temporary access for sandboxed apps
+}
+
+// Save files
+let savePanel = NSSavePanel()
+savePanel.allowedContentTypes = [.text]
+savePanel.nameFieldStringValue = "Document.txt"
+if savePanel.runModal() == .OK {
+    guard let url = savePanel.url else { return }
+    // Write to url...
+}
+
+```
+
+## XPC Services (macOS Background Processing)
+
+### Service Architecture
+
+- **Location**: Bundled in `Contents/XPCServices/` within main app
+- **Management**: Launched on-demand by launchd, terminated when idle
+- **Benefits**: Privilege separation, stability (crashes don't affect main app), different entitlements
+
+### Service Setup
+
+1. Add XPC Service target to project
+2. Define protocol in shared framework
+3. Implement service logic with NSXPCListenerDelegate
+
+```swift
+// Shared protocol
+@objc protocol XPCServiceProtocol {
+    func performTask(completion: @escaping (String) -> Void)
+}
+
+// XPC Service implementation (NSXPCListenerDelegate)
+class XPCService: NSObject, NSXPCListenerDelegate, XPCServiceProtocol {
+    func listener(_ listener: NSXPCListener, shouldAcceptNewConnection newConnection: NSXPCConnection) -> Bool {
+        newConnection.exportedInterface = NSXPCInterface(with: XPCServiceProtocol.self)
+        newConnection.exportedObject = self
+        newConnection.resume()
+        return true
+    }
+
+    func performTask(completion: @escaping (String) -> Void) {
+        // Service implementation
+        completion("Task completed")
+    }
+}
+
+// Main app connection
+let connection = NSXPCConnection(serviceName: "com.company.app.XPCService")
+connection.remoteObjectInterface = NSXPCInterface(with: XPCServiceProtocol.self)
+connection.resume()
+
+let service = connection.remoteObjectProxy as? XPCServiceProtocol
+service?.performTask { result in
+    DispatchQueue.main.async {
+        // Handle result
+    }
+}
+
+```
+
+## Application Lifecycle
+
+### iOS vs macOS Lifecycle Comparison
+
+**iOS Evolution**:
+
+- **Pre-iOS 13**: `UIApplicationDelegate` handled all app lifecycle
+- **iOS 13+**: Split responsibility - `UISceneDelegate` manages UI instances, `UIApplicationDelegate` handles process events
+- **Scene States**: Unattached → Foreground (Active/Inactive) → Background → Suspended
+- **System Control**: iOS aggressively suspends/terminates apps for resource management
+
+**macOS Approach**:
+
+- **NSApplicationDelegate**: Monolithic lifecycle management for entire app
+- **Persistent**: Apps can run indefinitely in background without suspension
+- **Window-Centric**: Lifecycle tied to window state rather than app suspension
+
+### NSApplicationDelegate Key Methods
+
+```swift
+func applicationWillFinishLaunching(_ notification: Notification) {
+    // Early initialization before main NIB loaded
+}
+
+func applicationDidFinishLaunching(_ notification: Notification) {
+    // Final setup after launch, before first event
+}
+
+func applicationWillBecomeActive(_ notification: Notification) {
+    // App about to become frontmost
+}
+
+func applicationDidBecomeActive(_ notification: Notification) {
+    // App is now frontmost and receiving events
+}
+
+func applicationWillResignActive(_ notification: Notification) {
+    // App about to lose focus (another app activating)
+}
+
+func applicationDidResignActive(_ notification: Notification) {
+    // App no longer has focus
+}
+
+func applicationWillHide(_ notification: Notification) {
+    // App about to be hidden (Cmd+H)
+}
+
+func applicationDidHide(_ notification: Notification) {
+    // App has been hidden
+}
+
+func applicationShouldTerminateAfterLastWindowClosed(_ sender: NSApplication) -> Bool {
+    return true  // Quit when last window closes (unique to macOS)
+}
+
+func applicationShouldTerminate(_ sender: NSApplication) -> NSApplication.TerminateReply {
+    // .terminateNow, .terminateCancel, or .terminateLater
+    return hasUnsavedChanges ? .terminateCancel : .terminateNow
+}
+
+func applicationShouldHandleReopen(_ sender: NSApplication, hasVisibleWindows flag: Bool) -> Bool {
+    if !flag {
+        // Show window when dock icon clicked with no visible windows
+    }
+    return true
+}
+
+```
+
+## SwiftUI macOS Specifics
+
+### Navigation
+
+```swift
+// Multi-column interface (primary for macOS)
+NavigationSplitView {
+    SidebarView()
+} content: {
+    ContentView()
+} detail: {
+    DetailView()
+}
+
+// Single-column navigation (often used within SplitView columns)
+NavigationStack {
+    ContentView()
+        .navigationDestination(for: Item.self) { item in
+            DetailView(item: item)
+        }
+}
+
+```
+
+### Window Management
+
+```swift
+@main
+struct MyApp: App {
+    var body: some Scene {
+        WindowGroup("Documents") { DocumentView() }        // Multi-instance
+        Window("About", id: "about") { AboutView() }       // Single instance
+        Settings { SettingsView() }                        // Preferences window
+        MenuBarExtra("Status", systemImage: "gear") {     // Menu bar item
+            MenuContent()
+        }
+    }
+}
+
+```
+
+### macOS-Only Modifiers
+
+```swift
+.keyboardShortcut("n", modifiers: .command)
+.hoverEffect(.lift)
+.contextMenu { MenuItems() }
+.focusedSceneValue(\.selectedItem, selectedItem)
+
+// Toolbar in SwiftUI
+.toolbar {
+    ToolbarItemGroup(placement: .navigation) {
+        Button("Back") { goBack() }
+    }
+    ToolbarItemGroup(placement: .primaryAction) {
+        Button("Save") { save() }
+    }
+}
+
+```
+
+**Toolbar Placements**: `.navigation`, `.principal`, `.primaryAction`, `.status`, `.automatic`
+
+## Drag & Drop (macOS-Specific)
+
+### AppKit Implementation
+
+```swift
+// Make view a drag source (NSDraggingSource protocol)
+override func mouseDown(with event: NSEvent) {
+    let item = NSDraggingItem(pasteboardWriter: myData)
+    beginDraggingSession(with: [item], event: event, source: self)
+}
+
+// Make view a drop destination (NSDraggingDestination protocol)
+override func awakeFromNib() {
+    registerForDraggedTypes([.fileURL, .string])
+}
+
+override func performDragOperation(_ sender: NSDraggingInfo) -> Bool {
+    // NSDraggingSession encapsulates drag info, NSPasteboard carries data
+    guard let data = sender.draggingPasteboard.data(forType: .fileURL) else { return false }
+    // Handle dropped data
+    return true
+}
+
+```
+
+### SwiftUI Drag & Drop
+
+```swift
+.onDrag { NSItemProvider(object: dragData) }  // Returns NSItemProvider
+.onDrop(of: [.fileURL], isTargeted: nil) { providers, location in
+    // Handle drop
+    return true
+}
+
+```
+## Alerts & Dialogs
+
+### NSAlert vs UIAlertController
+
+```swift
+// NSAlert (macOS)
+let alert = NSAlert()
+alert.messageText = "Title"
+alert.informativeText = "Message"
+alert.addButton(withTitle: "OK")        // First button = rightmost (default)
+alert.addButton(withTitle: "Cancel")    // Second button = left of first
+alert.showsSuppressionButton = true     // "Don't show again"
+
+// Custom content
+let textField = NSTextField(frame: NSRect(x: 0, y: 0, width: 200, height: 24))
+alert.accessoryView = textField
+
+// Modal presentation
+let response = alert.runModal()
+if response == .alertFirstButtonReturn {
+    // OK pressed
+}
+
+// Sheet presentation
+alert.beginSheetModal(for: window) { response in
+    // Handle response
+}
+
+```
+
+## Toolbars (NSToolbar)
+
+### Implementation
+
+```swift
+class WindowController: NSWindowController, NSToolbarDelegate {
+    override func windowDidLoad() {
+        let toolbar = NSToolbar(identifier: "MainToolbar")
+        toolbar.delegate = self
+        toolbar.allowsUserCustomization = true  // Key desktop feature
+        window?.toolbar = toolbar
+    }
+
+    func toolbar(_ toolbar: NSToolbar, itemForItemIdentifier itemIdentifier: NSToolbarItem.Identifier, willBeInsertedIntoToolbar flag: Bool) -> NSToolbarItem? {
+        switch itemIdentifier {
+        case .search:
+            let item = NSToolbarItem(itemIdentifier: itemIdentifier)
+            item.view = NSSearchField()  // Common custom view
+            return item
+        case .print:
+            return NSToolbarItem(itemIdentifier: .print)  // System-provided item
+        default:
+            return nil
+        }
+    }
+
+    func toolbarDefaultItemIdentifiers(_ toolbar: NSToolbar) -> [NSToolbarItem.Identifier] {
+        return [.flexibleSpace, .search, .print]
+    }
+
+    func toolbarAllowedItemIdentifiers(_ toolbar: NSToolbar) -> [NSToolbarItem.Identifier] {
+        return [.flexibleSpace, .space, .search, .print, .share]  // User can customize
+    }
+}
+
+```
+
+## Auto Layout Considerations
+
+### NSStackView (AppKit equivalent of UIStackView)
+
+```swift
+let stackView = NSStackView(views: [view1, view2, view3])
+stackView.orientation = .vertical
+stackView.distribution = .fillEqually
+stackView.spacing = 10
+
+```
+
+### Advanced Layout Tools
+
+- **NSGridView**: 2D grid layouts for complex structured content
+- **Programmatic Constraints**: `NSLayoutConstraint` and `NSLayoutAnchor` for dynamic layouts
+- **Live Resize Notifications**: `viewWillStartLiveResize()`, `viewDidEndLiveResize()` for optimization
+
+### Coordinate System in Constraints
+
+Remember: AppKit origin is bottom-left unless view.isFlipped = true
+
+## Common LLM Pitfalls
+
+### 1. NS/UI Class Confusion
+
+**WRONG**: Assuming NSButton behaves like UIButton
+**RIGHT**: NSButton has different target-action setup, states, and styling
+
+### 2. Window Management
+
+**WRONG**: Treating NSWindow like UIWindow (a view)
+**RIGHT**: NSWindow contains views, is not a view itself
+
+### 3. Event Handling
+
+**WRONG**: Using UIKit gesture recognizers
+**RIGHT**: Override mouse/key event methods or use NSGestureRecognizer
+
+### 4. Navigation Patterns
+
+**WRONG**: UINavigationController push/pop mentality
+**RIGHT**: Multi-window, tabs, or NavigationSplitView
+
+### 5. Coordinate Systems
+
+**WRONG**: Assuming top-left origin
+**RIGHT**: Bottom-left origin unless isFlipped = true
+
+### 6. Menu Integration
+
+**WRONG**: Putting all actions in UI buttons
+**RIGHT**: Comprehensive menu bar with shortcuts
+
+### 7. Background Processing
+
+**WRONG**: iOS background modes
+**RIGHT**: XPC services, launchd agents, BGTaskScheduler
+
+## Debugging macOS-Specific Issues
+
+### Common Problems
+
+- **Responder chain**: Actions not working → Check target-action connections
+- **Sandbox violations**: Console.app shows sandboxd denials
+- **Memory pressure**: Activity Monitor → Memory tab
+- **App Nap**: Check if background processing stops unexpectedly
+- **XPC failures**: Connection errors, entitlement mismatches
+
+### Tools
+
+- **Instruments**: Time Profiler, Leaks, Energy Impact
+- **Console.app**: System logs, crash reports, **sandbox violations (sandboxd messages)** - critical for debugging entitlement issues
+- **Activity Monitor**: Memory pressure, App Nap status
+
+## Platform-Specific APIs
+
+### macOS Exclusives
+
+- **Cocoa Bindings**: KVC/KVO-based data binding (no iOS equivalent)
+- **NSDocument Architecture**: Built-in document management
+- **AppleScript**: App automation support
+- **Spotlight Integration**: Search indexing for custom documents
+- **Menu Bar Extras**: System-wide status items
+
+### Hardware Integration
+
+- **External Displays**: Handle screen configuration changes
+- **USB/Thunderbolt**: Direct device access with entitlements
+- **Audio Interfaces**: Professional audio hardware support
+- **Bluetooth**: Classic and BLE peripheral support
+
+## App Distribution Differences
+
+### Mac App Store vs Direct
+
+- **Sandboxing**: Required for MAS, optional for direct
+- **Notarization**: Required for distribution outside MAS
+- **Hardened Runtime**: Security feature for distributed apps
+- **Code Signing**: More complex than iOS (developer ID, certificates)
+
+## Memory Management Notes
+
+### ARC Baseline (Same as iOS)
+
+**Identical Principles**: Strong, weak, unowned references and retain cycle prevention work exactly as in iOS. The differences are environmental, not ARC mechanics.
+
+### macOS-Specific Considerations
+
+- **Unified Memory (Apple Silicon)**: CPU/GPU share memory pool
+- **Memory Pressure**: Green/Yellow/Red states affect performance
+- **App Nap**: Throttles inactive apps automatically, affects memory priority
+
+### Memory States Explained
+
+- **Clean Memory**: Can be discarded and refaulted (unmapped files, unused allocations) - "cheap" for system
+- **Dirty Memory**: Written by app (heap allocations, modified data) - must be compressed or swapped under pressure
+- **Swapped Memory**: Dirty pages moved to disk - accessing is much slower
+
+### Monitoring Tools
+
+- **Activity Monitor**: Memory pressure graph, per-process usage, App Nap status
+- **Xcode Memory Report**: App memory footprint over time, spikes
+- **Instruments**: Leaks, Allocations, VM Tracker for detailed analysis
+
+**App Nap & Memory**: Napped apps prioritized for compression/swapping by system
+
+## Implementation Checklist
+
+### Essential macOS Features
+
+- [ ]  Comprehensive menu bar with shortcuts
+- [ ]  Proper window state restoration
+- [ ]  Context menus for major UI elements
+- [ ]  Keyboard navigation support
+- [ ]  Resizable interface with Auto Layout
+- [ ]  Settings/Preferences window
+- [ ]  Document architecture (if applicable)
+- [ ]  Sandbox entitlements configured
+- [ ]  XPC services (for background work)
+- [ ]  Menu bar extra (if applicable)
+_____________________________________________________________________________
+
+# macOS 15 Sequoia - Developer Cheat Sheet
+
+macOS 15 Sequoia introduced many changes to macOS development. Here's a cheat sheet on what changed in macOS 15+.  
+
+## Core Platform Changes
+
+### Xcode 16 & Swift 6
+
+- **Swift 6**: New concurrency safety modes
+- **Predictive Code Completion**: On-device ML for Swift/Apple SDKs
+- **Explicit Module Builds**: Default for C/Objective-C, opt-in for Swift. Better parallelism, faster debugging
+- **DWARF5**: Default debug format for macOS Sequoia + iOS 18 targets, smaller dSYM bundles
+- **Thread Performance Checker**: Detects disk writes, slow launches
+- **Build Timeline**: Shows explicit module phases
+
+### Apple Intelligence APIs
+
+**Privacy Architecture**: On-device processing for most tasks, Private Cloud Compute for complex requests (servers use Apple silicon, data never stored/accessible to Apple, code independently inspectable)
+
+**Writing Tools API**: Automatic in standard text views, custom integration available
+**Image Playground API**: In-app image generation
+**Genmoji**: Image-based personalized emoji
+**Enhanced Siri + App Intents**: Hundreds of new actions, cross-app orchestration
+
+- Use Transferable API, File Representations, Item Providers
+- New error handling, deferred properties, associated enums
+
+**Core ML Updates**:
+
+- Optimized generative AI models on-device
+- Core ML Tools: Granular/composable weight compression for LLMs and diffusion models
+- Multi-function models with state management for flexible LLM/adapter execution
+- New MLTensor type for multi-dimensional arrays
+- Enhanced performance reports with operation cost insights
+
+### StoreKit Enhancements
+
+| Feature | Version | Description |
+| --- | --- | --- |
+| In-App Offer Code Redemption | 15.0 | Support subscription offer codes |
+| SubscriptionStoreView Custom Styles | 15.0 | SubscriptionStoreControlStyle, compactPicker, pagedPicker, SubscriptionOptionGroup, configurable placement |
+| RenewalInfo Enhancements | 15.0 | renewalPrice, currency, offer properties |
+| Finished Consumables History | 15.0 | Include in transaction history via SKInAppPurchaseHistoryIncludesConsumables |
+| Common SubscriptionPeriod Values | 15.0 | Product.SubscriptionPeriod.monthly, .yearly for easier comparison |
+| Advanced Commerce API | 15.4+ | New commerce features |
+| Introductory Offer Eligibility | 15.4+ | introductoryOfferEligibility(compactJWS:) with server-signed JWS |
+| New Transaction Properties | 15.4+ | appTransactionID, originalPlatform, period |
+
+**Breaking Changes**:
+
+- AppStore.Platform moved, watchOS combined with iOS
+- Transaction.currentEntitlement(for:) deprecated (family sharing issues)
+
+### App Distribution
+
+- **Reduced space requirement**: Final install size + buffer (not 2x size)
+- **Notarization**: Must use notarytool or Xcode 14+, altool deprecated (Nov 1, 2023). Required for software built after June 1, 2019
+
+## UI Framework Updates
+
+### SwiftUI Changes
+
+- **TabView**: Root Scene tabs default to toolbar style, use .tabViewStyle(.grouped) for old style
+- **Picker**: Keyboard shortcuts via keyboardShortcut() modifier
+- **Seamless Scrolling**: Extended to Form (default) and ScrollView (.scrollContentBackground(.visible))
+- **Window Sharing**: openWindow accepts sharingBehavior parameter
+- **ObservableObject**: objectWillChange called once per property change per instance
+- **Modal Termination Control**: presentationPreventsAppTermination(*:), dialogPreventsAppTermination(*:)
+
+**Bug Fixes**:
+
+- tint(_:) works in confirmation dialogs/alerts
+- defaultVisibility(.hidden) works for toolbar items
+- NavigationStack/NavigationSplitView environment invalidation fixed
+- .onPreferenceChange no longer requires @Sendable for main actor values
+
+**Swift Charts Fixes**: Rotated labels, blur/shadow effects, LineMark animations, stroke styles, Y domain inference
+
+### AppKit Evolution
+
+**Window Tiling Support**:
+
+- Set appropriate min/max window sizes
+- Use resizeIncrements for gridded content
+- Query cascadingReferenceFrame for new window positioning
+
+**SwiftUI Integration**:
+
+- **NSHostingMenu**: Create menus with SwiftUI views
+- **SwiftUI Animations**: Use with NSAnimationContext (.spring(), .easeInOut)
+
+**Control Enhancements**:
+
+- **Context Menus**: Keyboard access (Control-Return), NSViewContentSelectionInfo protocol
+- **NSTextView**: Text highlighting via .textHighlight, .textHighlightColorScheme
+- **SF Symbols 6**: wiggle, rotate, breathe animations, repeating, dynamic badge/slash
+- **NSSavePanel**: File format picker via showsContentTypes = true, custom display names via delegate method
+- **System Cursors**: NSCursor.frameResize(), .zoomIn, .zoomOut
+
+**NSToolbar Updates**:
+
+- allowsDisplayModeCustomization for display modes
+- isHidden property for conditional items
+- removeItemWithItemIdentifier() method
+- **DEPRECATED**: allowsDuplicatesInToolbar (exception thrown for duplicates)
+
+**NSTextField**: Suggestions via suggestionsDelegate
+
+**Finder Automation**: Silent failure + notification instead of modal dialog
+
+### Other Framework Updates
+
+- **Metal**: Global bindings, ray tracing extensions, Residency sets, unified API
+- **RealityKit 4**: Cross-platform parity, MaterialX shaders, portals, particles, blend shapes, IK
+    - USD files with Catmull-Clark subdivision render with subdivision (<35k patches, may increase memory)
+    - Virtual objects default to Display P3 color gamut
+- **MapKit**: Place ID, new resultTypes, Place Card API
+- **Translation Framework**: In-app translation without external services
+- **Vision Framework**: Redesigned API, image aesthetics, holistic body pose
+- **Natural Language**: Multilingual contextual embeddings
+- **Catalyst**: UIWindowScene.systemFrame changes animatable with UIView.animate() (SDK 15.0+)
+- **WebKit**: WKWebExtension support (15.4+)
+
+## System Extensions & Drivers
+
+### Migration from Kernel Extensions
+
+- **Deadline**: macOS Catalina was last version with full kext support
+- **Apple Silicon**: Requires Reduced Security + explicit approval
+- **Alternatives**: DriverKit, NetworkExtension, EndpointSecurity, FSKit
+
+### FSKit (15.4+)
+
+**Core Components**:
+
+- FSModule with Info.plist attributes + implementation code
+- FileSystemExtension (multi-volume) or UnaryFileSystemExtension (single-volume)
+- FSFileSystem/FSUnaryFileSystem base classes
+- FSVolume subclasses with FSVolume.Operations protocols
+
+**Implementation Pattern**:
+
+```swift
+// Entry point
+UnaryFilesystemExtension -> FSUnaryFileSystem subclass -> FSVolume subclasses
+// Required protocols: FSUnaryFileSystemOperations, FSVolume.Operations
+// Additional protocols: FSVolumeAttributeOperations, FSVolumeDirectoryOperations
+
+```
+
+**Integration**: DiskArbitration, NetFS, mount(8) command
+**Distribution**: Compatible with Mac App Store, replaces kernel extensions
+
+### DriverKit (15.4+)
+
+**Bundled I/O**: Multiple I/O operations in single API call
+**New APIs**:
+
+- UserMapBundledParallelTaskCommandAndResponseBuffers
+- BundledParallelTaskCompletion
+- UserProcessBundledParallelTasks
+- UserCompleteBundledParallelTask
+
+**Shared Memory**: Eliminates RPC copy overhead for parallel tasks
+
+### NetworkExtension & EndpointSecurity
+
+- **NetworkExtension**: Stability improvements, APNs compatibility, firewall + content filter fixes
+    - Known issue: Extensions may get stuck in "activated waiting for user" state
+    - CVE-2025-31218 patched in 15.5 (hostname observation vulnerability)
+- **EndpointSecurity**: TCC events monitoring (15.4+), performance improvements
+    - Requires special restricted entitlement from Apple
+    - VM testing issues on macOS 15-created VMs (use macOS 14 VMs instead)
+- **Enterprise MDM**: NonRemovableSystemExtensions, NonRemovableFromUISystemExtensions keys
+    - Extensions visible in System Settings > General > Login Items & Extensions
+
+## Security & Privacy
+
+### New Privacy Controls
+
+**Local Network**: Permission required for local device discovery/communication
+**Screen Capture**:
+
+- Migrate to ScreenCaptureKit + SCContentSharingPicker
+- Weekly re-auth prompts for deprecated APIs (cannot be suppressed via MDM)
+- Persistent Content Capture Entitlement required for remote access tools
+**Finder Automation**: Notification-based permission flow
+
+**Permission Behavior**:
+
+- Cumulative model: Denying microphone blocks related APIs until `tccutil reset Microphone`
+- Screen recording requires weekly re-authorization in macOS 15
+- Race conditions in TCC framework - use serial queue for multiple permission checks
+
+**Permission Debugging**:
+
+```bash
+# Reset all permissions
+tccutil reset All
+# Check entitlements
+codesign -dv --entitlements :- /path/to/app.app
+# Monitor TCC logs
+log stream --predicate 'subsystem == "com.apple.TCC"'
+
+```
+
+**Common Issues**: Silent denials (entitlement mismatches), zombie permissions (unsigned builds), permission dialogs behind other apps
+
+### Security Changes
+
+**Application Firewall**: No longer uses /Library/Preferences/com.apple.alf.plist, use socketfilterfw
+**xprotect**: New command-line tool for XProtect functionality
+**Gatekeeper**: spctl --master-disable removed
+
+### Deprecated APIs & Migration
+
+| Deprecated | Version | Replacement |
+| --- | --- | --- |
+| AFP Client | 15.5 | SMB/CIFS |
+| libxml2 Custom Allocation | 15.4+ | Standard C allocation (malloc, realloc, free) |
+| Quick Look Generator Plugins | 15.0 | Quick Look Preview/Thumbnail Extensions |
+| CGDisplayStream, CGWindowListCreateImage | 15.0 | ScreenCaptureKit + SCContentSharingPicker |
+| NSToolbarItem.allowsDuplicatesInToolbar | 15.0 | Unique identifiers only |
+| Third-Party DirectoryService Plug-ins | 15.0 | Platform SSO framework |
+| spctl for disabling Gatekeeper | 15.0 | None (keep enabled) |
+| Firewall Payload Logging Keys | 15.0 | Rely on socketfilterfw default logging |
+
+## Voice & Context-Aware Development
+
+### Audio Capture (macOS 14.4+)
+
+```swift
+let audioDevice = AVCaptureDevice.default(for: .audio)
+let session = AVCaptureSession()
+try session.addInput(AVCaptureDeviceInput(device: audioDevice!))
+
+```
+
+**Voice Activity Detection**:
+
+```swift
+AudioObjectAddPropertyListener(deviceID,
+                              &propertyAddress,
+                              voiceActivityCallback,
+                              nil)
+
+```
+
+**Muted Talker Detection**:
+
+```swift
+audioEngine.inputNode.setInputMuteStateChangeHandler { isMuted in
+    DispatchQueue.main.async {
+        showUnmutePromptIfNeeded(isMuted)
+    }
+}
+
+```
+
+### ScreenCaptureKit
+
+```swift
+// Selective capture
+SCContentFilter(desktopIndependentWindow:)
+// Frame rate
+SCStreamConfiguration.minimumFrameInterval = CMTime(value: 1, timescale: 60)
+// Cursor control
+SCStreamConfiguration.showsCursor = false
+
+```
+
+**Audio/Video Sync**:
+
+```swift
+let audioSampleTime = audioBuffer.presentationTimeStamp
+let videoFrameTime = sampleBuffer.presentationTimeStamp
+let drift = CMTimeSubtract(videoFrameTime, audioSampleTime)
+if drift.seconds > 0.1 { adjustBuffers(drift) }
+
+```
+
+### Permission Management
+
+- **Accessibility**: Manual enable required even with MDM
+- **Screen Recording**: Weekly re-auth in macOS 15, persistent entitlement needed
+- **System Audio**: Triggers permission on first capture
+
+### Required Entitlements
+
+```xml
+<key>com.apple.security.device.audio-input</key>
+<true/>
+<key>com.apple.security.screen-recording</key>
+<true/>
+<key>com.apple.security.accessibility.access</key>
+<true/>
+<key>com.apple.developer.screen-capture.persistent</key>
+<true/>
+
+```
+
+**Non-Xcode Projects** (e.g., Tauri):
+
+```json
+"macOS": {
+    "entitlements": "./Entitlements.plist"
+}
+
+```
+
+Failure to properly sign with entitlements results in silent permission failures.
+
+**Voice-Driven UI**:
+
+```swift
+class VoiceResponder: NSResponder {
+    override func voiceActivityDidChange(_ active: Bool) {
+        if active && NSApp.isHidden { NSApp.unhide(nil) }
+    }
+}
+NSApplication.shared.nextResponder = VoiceResponder()
+
+```
+
+### AirPods Integration (macOS 14+)
+
+```swift
+// System-level mute
+var prop = AudioObjectPropertyAddress(
+    mSelector: kAudioHardwarePropertyProcessInputMute,
+    mScope: kAudioObjectPropertyScopeInput,
+    mElement: kAudioObjectPropertyElementMain
+)
+AudioObjectSetPropertyData(kAudioObjectSystemObject, &prop, 0, nil, 4, &muteState)
+
+// App-level mute
+AVAudioApplication.shared.setInputMuted(true)
+
+```
+
+## Migration Checklist
+
+### Breaking Changes to Address
+
+1. Application Firewall plist → socketfilterfw
+2. Finder automation → handle notification workflow
+3. ObservableObject overrides → align with new behavior
+4. AppStore.Platform symbol → update imports
+5. Screen capture APIs → migrate to ScreenCaptureKit
+6. Toolbar duplicate identifiers → ensure uniqueness
+
+### Testing Strategy
+
+- Test on Intel + Apple Silicon variants (M1, M2, M3, M4)
+- Monitor community forums for compatibility issues
+- Consider waiting for .1 release for production
+- Test system extension approval flows
+- Verify permission request workflows
+
+**Known Compatibility Issues**:
+
+- **15.0**: Crashes with Photoshop, Firefox, security software (CrowdStrike, SentinelOne, Microsoft)
+- **15.0.1**: Fixed major security software compatibility
+- **15.4 beta**: VM launch issues on M4 Macs
+- **Migration Assistant**: May require OS update on new Macs before migration
+
+### Feature Adoption Priorities
+
+1. **Apple Intelligence**: App Intents for Siri, Writing Tools integration
+2. **Window Tiling**: Set appropriate size constraints
+3. **SwiftUI Updates**: TabView styles, seamless scrolling
+4. **StoreKit**: New subscription management features
+5. **Privacy**: Handle new permission requirements gracefully
