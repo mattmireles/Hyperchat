@@ -4,7 +4,7 @@ import os.log
 
 class FloatingButtonManager {
     private var buttonWindow: NSWindow?
-    var overlayController: OverlayController?
+    var promptWindowController: PromptWindowController?
     private let logger = Logger(subsystem: Bundle.main.bundleIdentifier ?? "com.transcendence.hyperchat", category: "FloatingButtonManager")
 
     func showFloatingButton() {
@@ -58,7 +58,7 @@ class FloatingButtonManager {
     }
 
     @objc func buttonClicked() {
-        logger.log("🎉 Button clicked! Showing overlay...")
-        overlayController?.showOverlay()
+        logger.log("🎉 Button clicked! Showing prompt window...")
+        promptWindowController?.showWindow(nil)
     }
 } 
