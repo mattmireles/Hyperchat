@@ -2,12 +2,54 @@ import Cocoa
 import SwiftUI
 import os.log
 
+// Custom button that can be dragged
+class DraggableButton: NSButton {
+    private var initialLocation: NSPoint?
+    private let dragCallback: () -> Void
+    
+    init(frame: NSRect, dragCallback: @escaping () -> Void) {
+        self.dragCallback = dragCallback
+        super.init(frame: frame)
+    }
+    
+    required init?(coder: NSCoder) {
+        fatalError("init(coder:) has not been implemented")
+    }
+    
+    override func mouseDown(with event: NSEvent) {
+        initialLocation = event.locationInWindow
+    }
+    
+    override func mouseDragged(with event: NSEvent) {
+        guard let window = self.window,
+              let initialLocation = initialLocation else { return }
+        
+        let currentLocation = event.locationInWindow
+        let windowFrame = window.frame
+        
+        let newOrigin = NSPoint(
+            x: windowFrame.origin.x + (currentLocation.x - initialLocation.x),
+            y: windowFrame.origin.y + (currentLocation.y - initialLocation.y)
+        )
+        
+        window.setFrameOrigin(newOrigin)
+    }
+    
+    override func mouseUp(with event: NSEvent) {
+        if initialLocation != nil {
+            dragCallback()
+            initialLocation = nil
+        }
+    }
+}
+
 class FloatingButtonManager {
     private var buttonWindow: NSWindow?
     var promptWindowController: PromptWindowController?
     private let logger = Logger(subsystem: Bundle.main.bundleIdentifier ?? "com.transcendence.hyperchat", category: "FloatingButtonManager")
     private var screenUpdateTimer: Timer?
     private var lastKnownScreen: NSScreen?
+    private let positionsKey = "HyperChatButtonPositions"
 
     deinit {
         screenUpdateTimer?.invalidate()
@@ -31,10 +73,12 @@ class FloatingButtonManager {
         window.backgroundColor = .clear
         window.isOpaque = false
         window.hasShadow = true
-        window.isMovableByWindowBackground = true
+        window.isMovableByWindowBackground = false // Disable this since we're handling dragging ourselves
         self.buttonWindow = window
 
-        let button = NSButton(frame: NSRect(origin: .zero, size: CGSize(width: buttonSize, height: buttonSize)))
+        let button = DraggableButton(frame: NSRect(origin: .zero, size: CGSize(width: buttonSize, height: buttonSize))) { [weak self] in
+            self?.saveCurrentPosition()
+        }
         button.image = NSImage(named: "HyperChatIcon")
         button.isBordered = false
         button.wantsLayer = true
@@ -90,13 +134,53 @@ class FloatingButtonManager {
             screen = NSScreen.main ?? NSScreen.screens.first!
         }
 
-        let buttonSize: CGFloat = 48
-        let padding: CGFloat = 20
-        let xPos = screen.visibleFrame.minX + padding
-        let yPos = screen.visibleFrame.minY + padding
+        // Try to load saved position for this screen
+        if let savedPosition = loadPosition(for: screen) {
+            logger.log("Loading saved position for screen: x=\(savedPosition.x), y=\(savedPosition.y)")
+            window.setFrameOrigin(savedPosition)
+        } else {
+            // Default position if no saved position exists
+            let buttonSize: CGFloat = 48
+            let padding: CGFloat = 20
+            let xPos = screen.visibleFrame.minX + padding
+            let yPos = screen.visibleFrame.minY + padding
+            
+            logger.log("Using default position: x=\(xPos), y=\(yPos)")
+            
+            window.setFrameOrigin(NSPoint(x: xPos, y: yPos))
+        }
+    }
+    
+    private func saveCurrentPosition() {
+        guard let window = buttonWindow,
+              let screen = lastKnownScreen else { return }
         
-        logger.log("Moving button to position: x=\(xPos), y=\(yPos)")
-        
-        window.setFrameOrigin(NSPoint(x: xPos, y: yPos))
+        let position = window.frame.origin
+        savePosition(position, for: screen)
+        logger.log("Saved position for screen: x=\(position.x), y=\(position.y)")
+    }
+    
+    private func screenIdentifier(for screen: NSScreen) -> String {
+        // Create a unique identifier for the screen based on its frame
+        // This handles the case where screen IDs might change between launches
+        let frame = screen.frame
+        return "\(Int(frame.origin.x)),\(Int(frame.origin.y)),\(Int(frame.size.width)),\(Int(frame.size.height))"
+    }
+    
+    private func savePosition(_ position: NSPoint, for screen: NSScreen) {
+        var positions = UserDefaults.standard.dictionary(forKey: positionsKey) ?? [:]
+        let screenId = screenIdentifier(for: screen)
+        positions[screenId] = ["x": position.x, "y": position.y]
+        UserDefaults.standard.set(positions, forKey: positionsKey)
+    }
+    
+    private func loadPosition(for screen: NSScreen) -> NSPoint? {
+        guard let positions = UserDefaults.standard.dictionary(forKey: positionsKey),
+              let screenData = positions[screenIdentifier(for: screen)] as? [String: Double],
+              let x = screenData["x"],
+              let y = screenData["y"] else {
+            return nil
+        }
+        return NSPoint(x: x, y: y)
     }
 } 
