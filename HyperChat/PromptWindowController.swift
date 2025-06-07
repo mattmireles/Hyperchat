@@ -47,6 +47,10 @@ class PromptWindowController: NSWindowController {
     }
 }
 
+extension Notification.Name {
+    static let showOverlay = Notification.Name("showOverlay")
+}
+
 struct PromptView: View {
     @State private var promptText: String = ""
     @FocusState private var isTextFieldFocused: Bool
@@ -77,15 +81,19 @@ struct PromptView: View {
     }
     
     private func handleSubmit() {
-        guard !promptText.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty else { return }
+        let trimmed = promptText.trimmingCharacters(in: .whitespacesAndNewlines)
+        guard !trimmed.isEmpty else { return }
         
-        // TODO: Send prompt to services
-        print("Submitted prompt: \(promptText)")
+        // Grab a reference to the window *before* showing the overlay
+        let windowToClose = NSApp.keyWindow
+        
+        // Post notification to show overlay with prompt
+        NotificationCenter.default.post(name: .showOverlay, object: trimmed)
         
         // Clear the text
         promptText = ""
         
-        // Close the window
-        NSApp.keyWindow?.close()
+        // Close the prompt window
+        windowToClose?.close()
     }
 }
