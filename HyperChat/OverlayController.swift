@@ -1,8 +1,23 @@
 import Cocoa
 import SwiftUI
 
+class OverlayWindow: NSWindow {
+    weak var overlayController: OverlayController?
+
+    override var canBecomeKey: Bool { true }
+
+    override func keyDown(with event: NSEvent) {
+        if event.keyCode == 53 { // ESC key
+            overlayController?.hideOverlay()
+        } else {
+            super.keyDown(with: event)
+        }
+    }
+}
+
 class OverlayController {
-    private var overlayWindow: NSWindow?
+    private var overlayWindow: OverlayWindow?
+    private let serviceManager = ServiceManager()
 
     func showOverlay() {
         // If the window already exists, just bring it to the front.
@@ -14,23 +29,23 @@ class OverlayController {
         guard let mainScreen = NSScreen.main else { return }
 
         // Create a full-screen, borderless window.
-        overlayWindow = NSWindow(
+        let window = OverlayWindow(
             contentRect: mainScreen.frame,
             styleMask: [.borderless],
             backing: .buffered,
             defer: false
         )
+        window.overlayController = self
+        overlayWindow = window
 
-        guard let overlayWindow = overlayWindow else { return }
-
-        overlayWindow.level = .floating
-        overlayWindow.collectionBehavior = [.canJoinAllSpaces, .fullScreenAuxiliary]
-        overlayWindow.backgroundColor = .clear
-        overlayWindow.isOpaque = false
+        window.level = .floating
+        window.collectionBehavior = [.canJoinAllSpaces, .fullScreenAuxiliary]
+        window.backgroundColor = .clear
+        window.isOpaque = false
 
         // Create a container view that will hold our layers.
         let containerView = NSView(frame: mainScreen.frame)
-        overlayWindow.contentView = containerView
+        window.contentView = containerView
 
         // Layer 1: The blur effect using the .hudWindow material.
         let blurView = NSVisualEffectView(frame: containerView.bounds)
@@ -47,7 +62,13 @@ class OverlayController {
         tintView.autoresizingMask = [.width, .height]
         containerView.addSubview(tintView)
 
-        overlayWindow.makeKeyAndOrderFront(nil)
+        window.makeKeyAndOrderFront(nil)
+    }
+
+    // New method to support prompt
+    func showOverlay(with prompt: String) {
+        showOverlay()
+        serviceManager.executePrompt(prompt)
     }
 
     func hideOverlay() {

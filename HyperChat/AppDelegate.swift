@@ -2,19 +2,30 @@ import Cocoa
 import SwiftUI
 
 class AppDelegate: NSObject, NSApplicationDelegate {
-    var floatingButtonManager: FloatingButtonManager?
-    var overlayController: OverlayController?
-    var promptWindowController: PromptWindowController?
+    var floatingButtonManager: FloatingButtonManager
+    var overlayController: OverlayController
+    var promptWindowController: PromptWindowController
+
+    override init() {
+        self.floatingButtonManager = FloatingButtonManager()
+        self.overlayController = OverlayController()
+        self.promptWindowController = PromptWindowController()
+        super.init()
+    }
 
     func applicationDidFinishLaunching(_ aNotification: Notification) {
-        overlayController = OverlayController()
-        promptWindowController = PromptWindowController()
-        floatingButtonManager = FloatingButtonManager()
-        floatingButtonManager?.promptWindowController = promptWindowController
-        floatingButtonManager?.showFloatingButton()
+        floatingButtonManager.promptWindowController = promptWindowController
+        floatingButtonManager.showFloatingButton()
         
         // Setup minimal menu bar for Edit menu (copy/paste support)
         setupMenuBar()
+        
+        // Listen for prompt submission to show overlay
+        NotificationCenter.default.addObserver(forName: .showOverlay, object: nil, queue: .main) { [weak self] notification in
+            if let prompt = notification.object as? String {
+                self?.overlayController.showOverlay(with: prompt)
+            }
+        }
     }
 
     func applicationWillTerminate(_ aNotification: Notification) {
