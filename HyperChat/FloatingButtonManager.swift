@@ -67,7 +67,6 @@ class DraggableButton: NSButton {
 
 class FloatingButtonManager {
     private var buttonWindow: NSWindow?
-    private var promptHandler: PromptHandler?
     var promptWindowController: PromptWindowController?
     var overlayController: OverlayController?
     private let logger = Logger(subsystem: Bundle.main.bundleIdentifier ?? "com.transcendence.hyperchat", category: "FloatingButtonManager")
@@ -150,15 +149,12 @@ class FloatingButtonManager {
         // If an overlay is currently visible, hide it first
         overlayController?.hideOverlay()
 
-        // Pass the overlayController to the handler
-        if promptHandler == nil {
-            promptHandler = PromptHandler()
-            promptHandler?.overlayController = overlayController
-        }
+        // We re-create it each time to ensure it's fresh.
+        promptWindowController = PromptWindowController()
         
         // Use the screen the button is on, or the one with the mouse, or fallback to main.
         let screen = buttonWindow?.screen ?? NSScreen.screenWithMouse() ?? NSScreen.main!
-        promptHandler?.showPrompt(on: screen)
+        promptWindowController?.showWindow(on: screen)
     }
     
     private func checkAndUpdateScreenIfNeeded() {

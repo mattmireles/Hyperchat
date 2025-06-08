@@ -191,22 +191,28 @@ class AppDelegate: NSObject, NSApplicationDelegate {
 ```swift
 struct PromptWindow: View {
     @State private var prompt: String = ""
-    @FocusState private var isTextFieldFocused: Bool
+    @FocusState private var isEditorFocused: Bool
     let onSubmit: (String) -> Void
     let onCancel: () -> Void
     
     var body: some View {
         VStack(spacing: 16) {
-            TextField("Ask anything...", text: $prompt)
-                .textFieldStyle(.roundedBorder)
-                .font(.system(size: 16))
-                .focused($isTextFieldFocused)
-                .onSubmit {
-                    if !prompt.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty {
-                        onSubmit(prompt)
-                        prompt = ""
-                    }
+            ZStack(alignment: .topLeading) {
+                TextEditor(text: $prompt)
+                    .font(.system(size: 16))
+                    .frame(minHeight: 40, maxHeight: 200) // Auto-resizing up to a limit
+                    .focused($isEditorFocused)
+                    .scrollContentBackground(.hidden) // Make it transparent
+            
+                if prompt.isEmpty {
+                    Text("Ask anything...")
+                        .font(.system(size: 16))
+                        .foregroundColor(Color.gray.opacity(0.6))
+                        .padding(.top, 8)
+                        .padding(.leading, 5)
+                        .allowsHitTesting(false)
                 }
+            }
             
             HStack {
                 Button("Cancel") {
@@ -222,7 +228,7 @@ struct PromptWindow: View {
                         prompt = ""
                     }
                 }
-                .keyboardShortcut(.return)
+                .keyboardShortcut(.defaultAction) // Use .defaultAction for Enter key
                 .buttonStyle(.borderedProminent)
                 .disabled(prompt.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty)
             }
@@ -233,7 +239,7 @@ struct PromptWindow: View {
         .cornerRadius(12)
         .shadow(radius: 20)
         .onAppear {
-            isTextFieldFocused = true
+            isEditorFocused = true
         }
     }
 }
