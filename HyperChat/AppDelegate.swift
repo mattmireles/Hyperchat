@@ -15,6 +15,7 @@ class AppDelegate: NSObject, NSApplicationDelegate {
 
     func applicationDidFinishLaunching(_ aNotification: Notification) {
         floatingButtonManager.promptWindowController = promptWindowController
+        floatingButtonManager.overlayController = self.overlayController
         floatingButtonManager.showFloatingButton()
         
         // Setup minimal menu bar for Edit menu (copy/paste support)
@@ -25,6 +26,11 @@ class AppDelegate: NSObject, NSApplicationDelegate {
             if let prompt = notification.object as? String {
                 self?.overlayController.showOverlay(with: prompt)
             }
+        }
+        
+        // Listen for overlay hide to ensure floating button stays visible
+        NotificationCenter.default.addObserver(forName: .overlayDidHide, object: nil, queue: .main) { [weak self] _ in
+            self?.floatingButtonManager.ensureFloatingButtonVisible()
         }
     }
 

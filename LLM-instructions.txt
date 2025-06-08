@@ -1,16 +1,13 @@
-# HyperChat
+# HyperChat - v1.0 Technical Specifications
 
-### Accelerate Your Mind
-Maximum AI
+All Your AIs -- All At Once. 
+Accelerate Your Mind with Maximum AI
 
-<aside>
-<img src="notion://custom_emoji/7e6cffee-86c0-494d-9b3f-b8b85b4f8be9/205cc5dd-6455-80af-9756-007a1961cbc7" alt="notion://custom_emoji/7e6cffee-86c0-494d-9b3f-b8b85b4f8be9/205cc5dd-6455-80af-9756-007a1961cbc7" width="40px" />
+*This specification defines the technical foundation for HyperChat v1.0, focusing on real-time AI response streaming for information junkies while maintaining architectural flexibility for future enhancements.*
 
 ## Product Overview
 
 HyperChat is a native macOS app that provides instant access to multiple LLMs via floating button or global hotkey, enabling real-time comparison of responses across ChatGPT, Claude, Perplexity, and Google in a full-screen overlay interface. Designed for information junkies who want to watch AI responses stream in simultaneously.
-
-</aside>
 
 ## Core User Experience
 
@@ -344,7 +341,37 @@ struct OverlayView: View {
     let initialPrompt: String
     
     var body: some View {
-        // ... existing overlay view code ...
+        let layout = layoutManager.calculateLayout(
+            for: serviceManager.activeServices,
+            screenSize: NSScreen.main?.frame.size ?? .zero
+        )
+
+        ScrollView(layout.needsScrolling ? .horizontal : []) {
+            HStack(spacing: layoutManager.windowPadding) {
+                ForEach(serviceManager.activeServices, id: \.id) { service in
+                    if let webService = serviceManager.webService(for: service),
+                       let observer = serviceManager.observer(for: service) {
+                        ServiceView(
+                            service: service,
+                            webService: webService,
+                            observer: observer,
+                            onClose: {
+                                serviceManager.disableService(service.id)
+                            }
+                        )
+                        .frame(
+                            width: layout.frames.first?.width ?? layoutManager.minWidth,
+                            height: layout.frames.first?.height ?? 0
+                        )
+                    }
+                }
+            }
+            .padding()
+            .frame(height: NSScreen.main?.frame.height)
+        }
+        .onAppear {
+            serviceManager.executePrompt(initialPrompt)
+        }
         .onKeyDown { event in
             switch event.keyCode {
             case 53: // ESC key
@@ -384,6 +411,7 @@ extension ServiceManager {
         // Remove from active services
         activeServices.removeAll { $0.id == serviceId }
         webServices.removeValue(forKey: serviceId)
+        webViewObservers.removeValue(forKey: serviceId)
         
         // Trigger layout reflow
         NotificationCenter.default.post(name: .serviceWindowClosed, object: serviceId)
@@ -393,18 +421,32 @@ extension ServiceManager {
         guard webServices[service.id] == nil else { return }
         
         let webView = createWebView()
+        let observer = WebViewObserver()
+        webView.navigationDelegate = observer
+        observer.observeWebView(webView)
+        
         let webService: WebService
         
+        // Warm-up: immediately load the service's base page so the web process is alive before first query
         switch service.activationMethod {
-        case .urlParameter:
-            webService = URLParameterService(webView: webView, service: service)
-        case .clipboardPaste:
-            webService = ClaudeService(webView: webView, service: service)
+        case .urlParameter(let baseURL, _):
+            if let url = URL(string: baseURL) {
+                webView.load(URLRequest(url: url))
+            }
+        case .clipboardPaste(let baseURL):
+            if let url = URL(string: baseURL) {
+                webView.load(URLRequest(url: url))
+            }
         }
         
         webServices[service.id] = webService
+        webViewObservers[service.id] = observer
         activeServices.append(service)
         activeServices.sort { $0.order < $1.order }
+    }
+    
+    func removeService(_ serviceId: String) {
+        disableService(serviceId)
     }
 }
 
@@ -446,7 +488,7 @@ let defaultServices = [
             parameter: "q"
         ),
         enabled: true,
-        order: 1
+        order: 3
     ),
     AIService(
         id: "claude",
@@ -456,7 +498,7 @@ let defaultServices = [
             baseURL: "https://claude.ai"
         ),
         enabled: true,
-        order: 2
+        order: 4
     ),
     AIService(
         id: "perplexity",
@@ -467,7 +509,7 @@ let defaultServices = [
             parameter: "q"
         ),
         enabled: true,
-        order: 3
+        order: 2
     ),
     AIService(
         id: "google",
@@ -478,7 +520,7 @@ let defaultServices = [
             parameter: "q"
         ),
         enabled: true,
-        order: 4
+        order: 1
     )
 ]
 ```
@@ -491,23 +533,38 @@ let defaultServices = [
 
 ## Security & Privacy
 
-### Sandboxing
+### App Sandboxing Disabled
 
-- **App Sandbox**: Enable with minimal required entitlements
-- **WKWebView Sandbox**: Isolate web content from app process
-- **Network Access**: Restricted to configured AI service domains
-- **Clipboard Access**: Required for Claude automation
+To allow for necessary system-level integrations like global hotkeys and direct hardware access without persistent user prompts, App Sandboxing is disabled. The application runs with the same permissions as the logged-in user. This is a common approach for developer tools and utilities distributed outside the Mac App Store.
 
-### Required Entitlements
+- **WKWebView Isolation**: Despite no sandbox, web content remains isolated in its own process via `WKWebView`.
+- **Network Access**: Unrestricted access to configured AI service domains.
+- **Global Hotkeys**: Direct system access without requiring Accessibility permissions for `KeyboardShortcuts`.
+- **Clipboard Access**: Native access for Claude automation.
+
+### Required for Distribution
+
+**Code Signing**: Required for notarization and user trust.
+**Notarization**: Required for Gatekeeper compatibility on modern macOS.
+**Hardened Runtime**: Enabled to protect against runtime attacks, even without the sandbox.
+
+### Entitlements Configuration
+
+The entitlements file configures the Hardened Runtime. The key setting for disabling the sandbox is the *absence* of the `com.apple.security.app-sandbox` key.
 
 ```xml
-<key>com.apple.security.app-sandbox</key>
+<!-- Minimal Entitlements for a non-sandboxed app with Hardened Runtime -->
+
+<!-- The absence of the key below disables App Sandboxing. -->
+<!-- <key>com.apple.security.app-sandbox</key> -->
+<!-- <true/> -->
+
+<!-- Allow JIT compilation for WebKit and other potential needs. -->
+<key>com.apple.security.cs.allow-jit</key>
 <true/>
-<key>com.apple.security.network.client</key>
-<true/>
-<key>com.apple.security.files.user-selected.read-write</key>
-<true/>
-<key>com.apple.security.automation.apple-events</key>
+
+<!-- Allows the app to be debugged. Set to false for production builds. -->
+<key>com.apple.security.get-task-allow</key>
 <true/>
 ```
 
@@ -585,9 +642,93 @@ protocol WebService {
     var service: AIService { get }
 }
 
-class URLParameterService: WebService {
+class WebViewObserver: NSObject, WKNavigationDelegate, ObservableObject {
+    @Published var urlString: String = ""
+    @Published var isLoading: Bool = false
+    @Published var canGoBack: Bool = false
+    @Published var canGoForward: Bool = false
+    
+    private var urlObservation: NSKeyValueObservation?
+    
+    func observeWebView(_ webView: WKWebView) {
+        // Use KVO to observe URL changes directly
+        urlObservation = webView.observe(\.url, options: [.new]) { [weak self] webView, _ in
+            DispatchQueue.main.async {
+                self?.urlString = webView.url?.absoluteString ?? ""
+                self?.canGoBack = webView.canGoBack
+                self?.canGoForward = webView.canGoForward
+            }
+        }
+    }
+    
+    deinit {
+        urlObservation?.invalidate()
+    }
+
+    func webView(_ webView: WKWebView, didStartProvisionalNavigation navigation: WKNavigation!) {
+        DispatchQueue.main.async {
+            self.isLoading = true
+        }
+    }
+
+    func webView(_ webView: WKWebView, didFinish navigation: WKNavigation!) {
+        DispatchQueue.main.async {
+            self.isLoading = false
+            self.updateNavigationState(for: webView)
+        }
+    }
+
+    func webView(_ webView: WKWebView, didFail navigation: WKNavigation!, withError error: Error) {
+        DispatchQueue.main.async {
+            self.isLoading = false
+            self.updateNavigationState(for: webView)
+        }
+    }
+
+    func webView(_ webView: WKWebView, didCommit navigation: WKNavigation!) {
+        updateNavigationState(for: webView)
+    }
+
+    private func updateNavigationState(for webView: WKWebView) {
+        DispatchQueue.main.async {
+            self.urlString = webView.url?.absoluteString ?? ""
+            self.canGoBack = webView.canGoBack
+            self.canGoForward = webView.canGoForward
+        }
+    }
+}
+
+class URLParameterService: NSObject, WebService, WKNavigationDelegate {
     let webView: WKWebView
     let service: AIService
+    private var pendingPrompt: String?
+    private var hasLoadedInitialPage = false
+    private var originalDelegate: WKNavigationDelegate?
+    var onReady: (() -> Void)?
+    
+    init(webView: WKWebView, service: AIService) {
+        self.webView = webView
+        self.service = service
+        super.init()
+        
+        // Preload the base URL for services that need it
+        if case .urlParameter(let baseURL, _) = service.activationMethod {
+            if service.id == "perplexity" {
+                // Perplexity needs special handling
+                self.originalDelegate = webView.navigationDelegate
+                webView.navigationDelegate = self
+                if let url = URL(string: baseURL) {
+                    webView.load(URLRequest(url: url))
+                }
+            } else {
+                // Other URL services can be marked ready immediately
+                DispatchQueue.main.async { [weak self] in
+                    self?.hasLoadedInitialPage = true
+                    self?.onReady?()
+                }
+            }
+        }
+    }
     
     func executePrompt(_ prompt: String) {
         guard case .urlParameter(let baseURL, let parameter) = service.activationMethod else { return }
@@ -596,14 +737,63 @@ class URLParameterService: WebService {
         let urlString = "\(baseURL)?\(parameter)=\(encodedPrompt)"
         
         if let url = URL(string: urlString) {
-            webView.load(URLRequest(url: url))
+            // For Perplexity, ensure page is loaded first
+            if service.id == "perplexity" && !hasLoadedInitialPage {
+                pendingPrompt = prompt
+            } else {
+                webView.load(URLRequest(url: url))
+            }
+        }
+    }
+    
+    // WKNavigationDelegate method to detect when page finished loading
+    func webView(_ webView: WKWebView, didFinish navigation: WKNavigation!) {
+        // Pass through to original delegate
+        originalDelegate?.webView?(webView, didFinish: navigation)
+        
+        if !hasLoadedInitialPage {
+            hasLoadedInitialPage = true
+            
+            // Notify that this service is ready
+            onReady?()
+            
+            // Restore original delegate
+            if let original = originalDelegate {
+                webView.navigationDelegate = original
+            }
+            
+            // Execute pending prompt after a short delay
+            if let pending = pendingPrompt {
+                DispatchQueue.main.asyncAfter(deadline: .now() + 0.5) {
+                    self.executePrompt(pending)
+                    self.pendingPrompt = nil
+                }
+            }
         }
     }
 }
 
-class ClaudeService: WebService {
+class ClaudeService: NSObject, WebService {
     let webView: WKWebView
     let service: AIService
+    var onReady: (() -> Void)?
+    
+    init(webView: WKWebView, service: AIService) {
+        self.webView = webView
+        self.service = service
+        super.init()
+        
+        // Load Claude's base URL to ensure it's ready
+        if case .clipboardPaste(let baseURL) = service.activationMethod,
+           let url = URL(string: baseURL) {
+            webView.load(URLRequest(url: url))
+            
+            // Mark ready after a delay to ensure page loads
+            DispatchQueue.main.asyncAfter(deadline: .now() + 2.0) { [weak self] in
+                self?.onReady?()
+            }
+        }
+    }
     
     func executePrompt(_ prompt: String) {
         guard case .clipboardPaste(let baseURL) = service.activationMethod else { return }
@@ -767,7 +957,11 @@ class DefaultBrowserManager: ObservableObject {
 ```swift
 class ServiceManager: ObservableObject {
     @Published var activeServices: [AIService] = []
+    @Published var isReady: Bool = false
     private var webServices: [String: WebService] = [:]
+    private var webViewObservers: [String: WebViewObserver] = [:]
+    private var serviceReadyStates: [String: Bool] = [:]
+    private var pendingPrompt: String?
     
     init() {
         setupServices()
@@ -776,30 +970,145 @@ class ServiceManager: ObservableObject {
     private func setupServices() {
         for service in defaultServices where service.enabled {
             let webView = createWebView()
+            let observer = WebViewObserver()
+            webView.navigationDelegate = observer
+            observer.observeWebView(webView)
+            
+            // Track readiness
+            serviceReadyStates[service.id] = false
             
             let webService: WebService
             switch service.activationMethod {
             case .urlParameter:
-                webService = URLParameterService(webView: webView, service: service)
+                let urlService = URLParameterService(webView: webView, service: service)
+                urlService.onReady = { [weak self] in
+                    self?.markServiceReady(service.id)
+                }
+                webService = urlService
             case .clipboardPaste:
-                webService = ClaudeService(webView: webView, service: service)
+                let claudeService = ClaudeService(webView: webView, service: service)
+                claudeService.onReady = { [weak self] in
+                    self?.markServiceReady(service.id)
+                }
+                webService = claudeService
+            }
+            
+            // Warm-up: immediately load the service's base page so the web process is alive before first query
+            switch service.activationMethod {
+            case .urlParameter(let baseURL, _):
+                if let url = URL(string: baseURL) {
+                    webView.load(URLRequest(url: url))
+                }
+            case .clipboardPaste(let baseURL):
+                if let url = URL(string: baseURL) {
+                    webView.load(URLRequest(url: url))
+                }
             }
             
             webServices[service.id] = webService
+            webViewObservers[service.id] = observer
             activeServices.append(service)
+        }
+        
+        // For services that don't need preloading, mark them ready after a short delay
+        DispatchQueue.main.asyncAfter(deadline: .now() + 1.0) {
+            for service in self.activeServices {
+                if service.id != "perplexity" && self.serviceReadyStates[service.id] == false {
+                    self.markServiceReady(service.id)
+                }
+            }
+        }
+    }
+    
+    private func markServiceReady(_ serviceId: String) {
+        serviceReadyStates[serviceId] = true
+        checkAllServicesReady()
+    }
+    
+    private func checkAllServicesReady() {
+        let allReady = activeServices.allSatisfy { serviceReadyStates[$0.id] == true }
+        if allReady && !isReady {
+            isReady = true
+            // Execute any pending prompt
+            if let prompt = pendingPrompt {
+                executePrompt(prompt)
+                pendingPrompt = nil
+            }
         }
     }
     
     func executePrompt(_ prompt: String) {
+        // If not all services are ready, queue the prompt
+        if !isReady {
+            pendingPrompt = prompt
+            return
+        }
+        
         for service in activeServices {
             webServices[service.id]?.executePrompt(prompt)
         }
     }
     
+    func webService(for service: AIService) -> WebService? {
+        return webServices[service.id]
+    }
+
+    func observer(for service: AIService) -> WebViewObserver? {
+        return webViewObservers[service.id]
+    }
+    
     private func createWebView() -> WKWebView {
         let configuration = WKWebViewConfiguration()
         configuration.processPool = WKProcessPool.shared
-        return WKWebView(frame: .zero, configuration: configuration)
+        
+        // Generate a dynamic, highly-compatible user agent.
+        let userAgent = generateCompatibleUserAgent()
+        configuration.applicationNameForUserAgent = userAgent.applicationName
+        
+        let webView = WKWebView(frame: .zero, configuration: configuration)
+        webView.customUserAgent = userAgent.fullUserAgent
+        
+        return webView
+    }
+
+    private func generateCompatibleUserAgent() -> (applicationName: String, fullUserAgent: String) {
+        // We generate a user agent that mimics Safari on the user's current OS.
+        // We report the actual OS version to ensure services like Google serve modern UIs.
+        let osVersion = ProcessInfo.processInfo.operatingSystemVersion
+        let osVersionString = "\(osVersion.majorVersion)_\(osVersion.minorVersion)\(osVersion.patchVersion > 0 ? "_\(osVersion.patchVersion)" : "")"
+        
+        // For maximum compatibility, we still report "Intel" even on Apple Silicon,
+        // as this is what Safari itself does.
+        let architecture = "Intel"
+
+        // Get WebKit and Safari versions dynamically to stay current.
+        let webKitVersion = getWebKitVersion()
+        let safariVersion = getSafariVersion()
+
+        // Build the final user agent string.
+        let applicationName = "Version/\(safariVersion) Safari/\(webKitVersion)"
+        let fullUserAgent = "Mozilla/5.0 (Macintosh; \(architecture) Mac OS X \(osVersionString)) AppleWebKit/\(webKitVersion) (KHTML, like Gecko) \(applicationName)"
+        
+        return (applicationName: applicationName, fullUserAgent: fullUserAgent)
+    }
+
+    private func getWebKitVersion() -> String {
+        if let webKitBundle = Bundle(identifier: "com.apple.WebKit"),
+           let version = webKitBundle.infoDictionary?["CFBundleShortVersionString"] as? String {
+            return version
+        }
+        // A modern, safe fallback.
+        return "605.1.15"
+    }
+
+    private func getSafariVersion() -> String {
+        if let safariURL = NSWorkspace.shared.urlForApplication(withBundleIdentifier: "com.apple.Safari"),
+           let safariBundle = Bundle(url: safariURL),
+           let version = safariBundle.infoDictionary?["CFBundleShortVersionString"] as? String {
+            return version
+        }
+        // If Safari isn't found, use a reasonable modern version.
+        return "17.5"
     }
 }
 
@@ -819,53 +1128,148 @@ extension WKProcessPool {
 
 ### Service Windows
 
-- **Header**: Service name with icon, dynamic browser button, close button
-- **Content**: Full WKWebView for service interaction
-- **Controls**: 
+- **Browser Toolbar**: Each service window includes a full browser navigation bar with:
+  - Back/Forward buttons (with enable/disable state)
+  - Reload button  
+  - Editable URL bar showing current page URL
+  - Service icon and name for identification
+- **Navigation Controls**: 
   - Close button (X) with "Close Service" tooltip - removes service and triggers window reflow
   - "Open in [Browser]" button showing user's default browser name
-- **Loading States**: Spinner for URL services, extended loading indicator for Claude
-- **Dynamic Layout**: When a service window is closed, remaining windows automatically expand and reposition to fill available space using the Window Layout Engine
+- **Content Area**: Full WKWebView for service interaction below toolbar
+- **Loading States**: Progress indicator in URL bar, spinner during page loads
+- **Dynamic Layout**: When a service window is closed, remaining windows automatically expand and reposition to fill available space using SwiftUI's layout system
 - **Keyboard Focus**: Cmd+1/2/3/4 focuses specific service windows in order
 
 ### Service Header Implementation
 
 ```swift
-struct ServiceHeader: View {
+struct ServiceBrowserToolbar: View {
     let service: AIService
-    let onClose: () -> Void
-    let onOpenInBrowser: () -> Void
+    let webView: WKWebView
+    @ObservedObject var observer: WebViewObserver
     @StateObject private var browserManager = DefaultBrowserManager()
     
+    let onClose: () -> Void
+    let onOpenInBrowser: () -> Void
+    
     var body: some View {
-        HStack {
-            Image(service.iconName)
-                .frame(width: 16, height: 16)
-            Text(service.name)
-                .font(.headline)
-            
-            Spacer()
-            
-            Button(action: onOpenInBrowser) {
-                HStack(spacing: 4) {
-                    Image(systemName: "arrow.up.forward.app")
-                    Text(browserManager.browserName)
+        VStack(spacing: 0) {
+            // Browser toolbar
+            HStack(spacing: 8) {
+                // Service identification
+                HStack(spacing: 6) {
+                    Image(service.iconName)
+                        .frame(width: 16, height: 16)
+                    Text(service.name)
                         .font(.caption)
+                        .foregroundColor(.secondary)
                 }
+                .frame(width: 80)
+                
+                // Navigation controls
+                Button(action: { webView.goBack() }) {
+                    Image(systemName: "chevron.left")
+                }
+                .disabled(!observer.canGoBack)
+                
+                Button(action: { webView.goForward() }) {
+                    Image(systemName: "chevron.right")
+                }
+                .disabled(!observer.canGoForward)
+                
+                Button(action: { webView.reload() }) {
+                    Image(systemName: "arrow.clockwise")
+                }
+                
+                // URL bar
+                TextField("URL", text: $observer.urlString)
+                    .textFieldStyle(.roundedBorder)
+                    .font(.system(size: 12, family: .monospaced))
+                    .onSubmit {
+                        if let url = URL(string: observer.urlString) {
+                            webView.load(URLRequest(url: url))
+                        }
+                    }
+                
+                // Action buttons
+                Button(action: onOpenInBrowser) {
+                    HStack(spacing: 4) {
+                        Image(systemName: "arrow.up.forward.app")
+                        Text(browserManager.browserName)
+                            .font(.caption2)
+                    }
+                }
+                .help("Open in \(browserManager.browserName)")
+                
+                Button(action: onClose) {
+                    Image(systemName: "xmark")
+                }
+                .help("Close Service")
             }
-            .help("Open in \(browserManager.browserName)")
+            .padding(.horizontal, 8)
+            .padding(.vertical, 6)
+            .background(.regularMaterial)
             
-            Button(action: onClose) {
-                Image(systemName: "xmark")
+            // Loading progress bar
+            if observer.isLoading {
+                ProgressView()
+                    .progressViewStyle(LinearProgressViewStyle())
+                    .frame(height: 2)
             }
-            .help("Close Service")
         }
-        .padding(.horizontal, 12)
-        .padding(.vertical, 8)
-        .background(.regularMaterial)
         .onAppear {
             browserManager.updateDefaultBrowser()
         }
+    }
+}
+
+// Updated ServiceView with browser toolbar
+struct ServiceView: View {
+    let service: AIService
+    let webService: WebService?
+    let observer: WebViewObserver?
+    let onClose: () -> Void
+    
+    var body: some View {
+        VStack(spacing: 0) {
+            if let webView = webService?.webView, let observer = observer {
+                ServiceBrowserToolbar(
+                    service: service,
+                    webView: webView,
+                    observer: observer,
+                    onClose: onClose,
+                    onOpenInBrowser: {
+                        if let url = webView.url {
+                            NSWorkspace.shared.open(url)
+                        }
+                    }
+                )
+            }
+            
+            // Web content
+            if let webView = webService?.webView {
+                WebViewRepresentable(webView: webView)
+            } else {
+                Text("Service not available")
+                    .foregroundColor(.secondary)
+                    .frame(maxWidth: .infinity, maxHeight: .infinity)
+            }
+        }
+        .background(Color(NSColor.controlBackgroundColor))
+        .cornerRadius(8)
+    }
+}
+
+struct WebViewRepresentable: NSViewRepresentable {
+    let webView: WKWebView
+    
+    func makeNSView(context: Context) -> WKWebView {
+        return webView
+    }
+    
+    func updateNSView(_ nsView: WKWebView, context: Context) {
+        // No updates needed
     }
 }
 ```
@@ -921,13 +1325,14 @@ struct ServiceHeader: View {
 - [ ] Claude clipboard automation with paste+enter method
 - [ ] Dynamic browser detection for "Open in [Browser]" buttons
 - [ ] SwiftUI-based responsive layout with 50px padding and 600-800px width constraints
+- [ ] Browser toolbar for each service with navigation controls and editable URL bar
 - [ ] Prompt window with auto-focus and keyboard shortcuts
 - [ ] Multi-monitor support (overlay appears on screen with cursor)
 - [ ] Keyboard navigation (ESC to close, Cmd+1-4 for service focus)
 - [ ] Dynamic window management with automatic reflow when services are closed
 - [ ] Proper resource cleanup when services are disabled
 - [ ] Basic settings and configuration
-- [ ] App Store submission
+- [ ] Direct distribution with code signing and notarization
 
 ### Enhanced (v1.1)
 
@@ -966,6 +1371,3 @@ struct ServiceHeader: View {
 - **KeyboardShortcuts**: For modern global hotkey handling
 - **Sparkle**: For automatic updates (optional)
 
----
-
-*This specification defines the technical foundation for HyperChat v1.0, focusing on real-time AI response streaming for information junkies while maintaining architectural flexibility for future enhancements.*

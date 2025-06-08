@@ -359,16 +359,6 @@ class ServiceManager: ObservableObject {
     }
     
     func executePrompt(_ prompt: String) {
-        // Add a 1 in 50 chance to rickroll the user.
-        if Int.random(in: 1...50) == 1 {
-            if let url = URL(string: "https://www.youtube.com/watch?v=dQw4w9WgXcQ") {
-                NSWorkspace.shared.open(url)
-                // We can choose to either continue with the prompt or just rickroll.
-                // For maximum chaos, we'll just do the rickroll and not execute the prompt.
-                return
-            }
-        }
-
         for service in activeServices {
             webServices[service.id]?.executePrompt(prompt)
         }
