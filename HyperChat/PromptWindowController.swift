@@ -1,15 +1,42 @@
 import Cocoa
 import SwiftUI
 
+// MARK: - AppKit Components
+
+// The NSWindow subclass for our prompt.
+// This is where we handle window-level keyboard events.
 class PromptWindow: NSWindow {
+    private var enterMonitor: Any?
+    
     override var canBecomeKey: Bool { true }
     override var canBecomeMain: Bool { true }
-    
-    // Make ESC key close the window
-    override func cancelOperation(_ sender: Any?) {
-        self.close()
+
+    override func makeKeyAndOrderFront(_ sender: Any?) {
+        super.makeKeyAndOrderFront(sender)
+        
+        // Install local event monitor for Enter key
+        enterMonitor = NSEvent.addLocalMonitorForEvents(matching: .keyDown) { event in
+            if event.keyCode == 36 && !event.modifierFlags.contains(.shift) {
+                // Enter pressed without Shift
+                NotificationCenter.default.post(name: .submitPrompt, object: nil)
+                return nil // Swallow the event
+            }
+            return event // Let other keys through (including Shift+Enter)
+        }
     }
     
+    override func close() {
+        if let monitor = enterMonitor {
+            NSEvent.removeMonitor(monitor)
+        }
+        super.close()
+    }
+
+    // Make the ESC key close the window, which is standard AppKit behavior.
+    override func cancelOperation(_ sender: Any?) {
+        close()
+    }
+
     // Manually handle command-key shortcuts to ensure they work in a borderless window.
     override func performKeyEquivalent(with event: NSEvent) -> Bool {
         if event.modifierFlags.contains(.command) {
@@ -24,11 +51,14 @@ class PromptWindow: NSWindow {
                 return NSApp.sendAction(#selector(NSText.cut(_:)), to: nil, from: self)
             case "z":
                 if event.modifierFlags.contains(.shift) {
+                    // Cmd+Shift+Z for Redo
                     return NSApp.sendAction(Selector(("redo:")), to: nil, from: self)
                 } else {
+                    // Cmd+Z for Undo
                     return NSApp.sendAction(Selector(("undo:")), to: nil, from: self)
                 }
             default:
+                // Not a recognized shortcut, let the system handle it.
                 break
             }
         }
@@ -36,13 +66,14 @@ class PromptWindow: NSWindow {
     }
 }
 
+// The NSWindowController that manages the PromptWindow.
 class PromptWindowController: NSWindowController {
-    private var promptViewController: NSHostingController<PromptView>?
-    
+    private var hostingController: NSHostingController<PromptView>?
+    private var currentScreen: NSScreen?
+
     convenience init() {
-        // Borderless floating window
         let window = PromptWindow(
-            contentRect: NSRect(x: 0, y: 0, width: 540, height: 100),
+            contentRect: NSRect(x: 0, y: 0, width: 500, height: 124), // Set initial size
             styleMask: [.borderless],
             backing: .buffered,
             defer: false
@@ -51,127 +82,179 @@ class PromptWindowController: NSWindowController {
         window.backgroundColor = .clear
         window.hasShadow = true
         window.level = .floating
-        window.center()
-        
+
         self.init(window: window)
+
+        // Create the SwiftUI view, passing a callback to handle size changes.
+        let promptView = PromptView(onHeightChange: { [weak self] newHeight in
+            self?.adjustWindowHeight(to: newHeight)
+        }, maxHeight: { [weak self] in
+            self?.getMaxHeight() ?? 600
+        })
         
-        // Create the SwiftUI view and hosting controller
-        let promptView = PromptView()
-        let hostingController = NSHostingController(rootView: promptView)
+        hostingController = NSHostingController(rootView: promptView)
         window.contentViewController = hostingController
-        self.promptViewController = hostingController
-        
-        // Set the window's content size to match our SwiftUI view
-        window.setContentSize(NSSize(width: 540, height: 100))
     }
-    
+
+    // Show the window and center it on the correct screen.
     func showWindow(on screen: NSScreen?) {
-        guard let window = self.window else { return }
+        guard let window = window else { return }
         
-        // Use the provided screen or default to the main screen
-        let targetScreen = screen ?? NSScreen.main
-        
+        currentScreen = screen
+
         // Center the window on the target screen
-        let screenRect = targetScreen?.visibleFrame ?? NSRect.zero
-        let windowRect = window.frame
-        let newOriginX = screenRect.origin.x + (screenRect.width - windowRect.width) / 2
-        let newOriginY = screenRect.origin.y + (screenRect.height - windowRect.height) / 2
-        window.setFrameOrigin(NSPoint(x: newOriginX, y: newOriginY))
-        
+        if let targetScreen = screen {
+            let screenRect = targetScreen.visibleFrame
+            let windowFrame = window.frame
+            let x = screenRect.origin.x + (screenRect.width - windowFrame.width) / 2
+            let y = screenRect.origin.y + (screenRect.height - windowFrame.height) / 2
+            window.setFrameOrigin(NSPoint(x: x, y: y))
+        }
+
         super.showWindow(nil)
         NSApp.activate(ignoringOtherApps: true)
         window.makeKeyAndOrderFront(nil)
+    }
+    
+    private func getMaxHeight() -> CGFloat {
+        let screen = currentScreen ?? NSScreen.main ?? NSScreen.screens.first
+        let screenHeight = screen?.visibleFrame.height ?? 800
+        return screenHeight * 0.8 // 80% of screen height
+    }
 
-        // DO NOT manually manage first responder here.
-        // Let SwiftUI's @FocusState handle it.
-        // The old code `makeFirstResponder(nil)` was breaking keyboard input.
+    private func adjustWindowHeight(to newHeight: CGFloat) {
+        guard let window = window else { return }
+        
+        let maxHeight = getMaxHeight()
+        let constrainedHeight = min(newHeight, maxHeight)
+        
+        let currentFrame = window.frame
+        // Only resize if the height difference is significant
+        if abs(constrainedHeight - currentFrame.height) > 1 {
+            // Keep the window anchored at its current top position
+            // In macOS coordinates, we need to adjust the origin.y to maintain the top edge position
+            let newFrame = NSRect(
+                x: currentFrame.origin.x,
+                y: currentFrame.origin.y - (constrainedHeight - currentFrame.height), // Grow downward
+                width: currentFrame.width,
+                height: constrainedHeight
+            )
+            
+            // Ensure the window doesn't go below the screen bounds
+            if let screen = currentScreen ?? window.screen {
+                let screenFrame = screen.visibleFrame
+                var adjustedFrame = newFrame
+                
+                // If the bottom would go below the screen, adjust the position
+                if adjustedFrame.origin.y < screenFrame.origin.y {
+                    adjustedFrame.origin.y = screenFrame.origin.y
+                }
+                
+                window.setFrame(adjustedFrame, display: true, animate: true)
+            } else {
+                window.setFrame(newFrame, display: true, animate: true)
+            }
+        }
     }
 }
 
+// MARK: - SwiftUI View and Helpers
+
+// Notification name for showing the main overlay.
 extension Notification.Name {
     static let showOverlay = Notification.Name("showOverlay")
+    static let submitPrompt = Notification.Name("submitPrompt")
 }
 
+// Preference key to communicate the view's height up the hierarchy.
+struct HeightPreferenceKey: PreferenceKey {
+    static var defaultValue: CGFloat = 0
+    static func reduce(value: inout CGFloat, nextValue: () -> CGFloat) {
+        value = max(value, nextValue())
+    }
+}
+
+// The SwiftUI view for the prompt input.
 struct PromptView: View {
+    var onHeightChange: (CGFloat) -> Void
+    var maxHeight: () -> CGFloat
+
     @State private var promptText: String = ""
     @FocusState private var isEditorFocused: Bool
+
+    private let minHeight: CGFloat = 60
+    private func maxEditorHeight() -> CGFloat {
+        if let screen = NSScreen.main {
+            return screen.visibleFrame.height * 0.4
+        }
+        return 400
+    }
 
     var body: some View {
         VStack(spacing: 16) {
             ZStack(alignment: .topLeading) {
+                RoundedRectangle(cornerRadius: 8)
+                    .fill(Color.clear)
                 TextEditor(text: $promptText)
-                    .font(.system(size: 16))
-                    .frame(minHeight: 40, maxHeight: 200) // Auto-resizing up to a limit
+                    .scrollContentBackground(.hidden)
+                    .background(Color.clear)
                     .focused($isEditorFocused)
-                    .scrollContentBackground(.hidden) // Make it transparent
-                    .onKeyPress { press in
-                        // Handle submit on Enter, allow newlines with Shift+Enter
-                        if press.key == .return {
-                            if press.modifiers.contains(.shift) {
-                                return .ignored // Allow newline
-                            } else {
-                                handleSubmit()
-                                return .handled // Prevent newline
-                            }
-                        }
-                        return .ignored
-                    }
-            
+                    .frame(minHeight: minHeight, maxHeight: maxEditorHeight())
+                    .fixedSize(horizontal: false, vertical: true)
+                    .font(.system(size: 14))
+                    .padding(.horizontal, 8)
+                    .padding(.vertical, 8)
                 if promptText.isEmpty {
-                    Text("Ask anything...")
-                        .font(.system(size: 16))
-                        .foregroundColor(Color.gray.opacity(0.6))
-                        .padding(.top, 8)
-                        .padding(.leading, 5)
-                        .allowsHitTesting(false)
+                    Text("Type your prompt...")
+                        .foregroundColor(.secondary)
+                        .padding(.leading, 14)
+                        .padding(.top, 12)
                 }
             }
-            
+            .padding(0)
+
             HStack {
-                Button("Cancel") {
-                    closeWindow()
-                }
-                // Rely on standard window cancelOperation for ESC
-                
+                Button("Cancel", role: .cancel, action: closeWindow)
                 Spacer()
-                
-                Button("Ask All Services") {
-                    handleSubmit()
-                }
-                .buttonStyle(.borderedProminent)
-                .disabled(promptText.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty)
+                Button("Ask All Services", action: handleSubmit)
+                    .buttonStyle(.borderedProminent)
+                    .disabled(promptText.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty)
             }
         }
         .padding(20)
-        .frame(width: 500) // Keep the overall width fixed
+        .frame(width: 500)
         .background(Color(NSColor.windowBackgroundColor))
         .cornerRadius(12)
         .shadow(radius: 20)
-        .onAppear {
-            isEditorFocused = true
+        .overlay(
+            GeometryReader { geometry in
+                Color.clear.preference(key: HeightPreferenceKey.self, value: geometry.size.height)
+            }
+        )
+        .onPreferenceChange(HeightPreferenceKey.self) { newTotalHeight in
+            if newTotalHeight > 0 {
+                onHeightChange(newTotalHeight)
+            }
+        }
+        .onAppear { isEditorFocused = true }
+        .onReceive(NotificationCenter.default.publisher(for: .submitPrompt)) { _ in
+            handleSubmit()
         }
     }
-    
+
+    // Handlers
     private func closeWindow() {
-        if let window = NSApp.windows.first(where: { $0 is PromptWindow }) {
-            window.close()
-        }
+        NSApp.keyWindow?.close()
     }
-    
+
     private func handleSubmit() {
         let trimmed = promptText.trimmingCharacters(in: .whitespacesAndNewlines)
         guard !trimmed.isEmpty else { return }
-        
-        // Grab a reference to the window *before* showing the overlay
-        let windowToClose = NSApp.keyWindow
-        
-        // Post notification to show overlay with prompt
-        NotificationCenter.default.post(name: .showOverlay, object: trimmed)
-        
-        // Clear the text
-        promptText = ""
-        
-        // Close the prompt window
-        windowToClose?.close()
+
+        if let windowToClose = NSApp.keyWindow {
+            NotificationCenter.default.post(name: .showOverlay, object: trimmed)
+            promptText = ""
+            windowToClose.close()
+        }
     }
 }

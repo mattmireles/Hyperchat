@@ -22,7 +22,7 @@ HyperChat is a native macOS app that provides instant access to multiple LLMs vi
 9. **Selective Viewing**: Close individual service windows (e.g., dismiss Google results) to focus on preferred responses
 10. **Browser Handoff**: "Open in [Browser]" button launches any conversation in user's default browser for extended work
 11. **Dynamic Window Management**: Closing individual service windows causes remaining windows to reflow and expand to fill available space
-12. **Keyboard Navigation**: ESC closes overlay, Enter submits prompts, Cmd+1/2/3/4 focuses specific services
+12. **Keyboard Navigation**: ESC closes overlay, Enter submits prompts (Shift+Enter for new lines), Cmd+1/2/3/4 focuses specific services
 13. **Quick Exit**: ESC closes overlay, returns to previous work with all sessions preserved
 
 ## Technical Architecture
@@ -123,6 +123,7 @@ extension Notification.Name {
     static let showPromptWindow = Notification.Name("showPromptWindow")
     static let hideOverlay = Notification.Name("hideOverlay")
     static let serviceWindowClosed = Notification.Name("serviceWindowClosed")
+    static let submitPrompt = Notification.Name("submitPrompt")
 }
 ```
 
@@ -189,28 +190,65 @@ class AppDelegate: NSObject, NSApplicationDelegate {
 ### Prompt Window Implementation
 
 ```swift
-struct PromptWindow: View {
+// Custom NSWindow to handle Enter key intercept
+class PromptWindow: NSWindow {
+    private var enterMonitor: Any?
+    
+    override func makeKeyAndOrderFront(_ sender: Any?) {
+        super.makeKeyAndOrderFront(sender)
+        
+        // Install local event monitor for Enter key
+        enterMonitor = NSEvent.addLocalMonitorForEvents(matching: .keyDown) { event in
+            if event.keyCode == 36 && !event.modifierFlags.contains(.shift) {
+                // Enter pressed without Shift
+                NotificationCenter.default.post(name: .submitPrompt, object: nil)
+                return nil // Swallow the event
+            }
+            return event // Let other keys through (including Shift+Enter)
+        }
+    }
+    
+    override func close() {
+        if let monitor = enterMonitor {
+            NSEvent.removeMonitor(monitor)
+        }
+        super.close()
+    }
+}
+
+// SwiftUI view with auto-resizing TextEditor
+struct PromptView: View {
     @State private var prompt: String = ""
     @FocusState private var isEditorFocused: Bool
     let onSubmit: (String) -> Void
     let onCancel: () -> Void
     
+    private let minHeight: CGFloat = 60
+    private func maxEditorHeight() -> CGFloat {
+        if let screen = NSScreen.main {
+            return screen.visibleFrame.height * 0.4
+        }
+        return 400
+    }
+    
     var body: some View {
         VStack(spacing: 16) {
             ZStack(alignment: .topLeading) {
                 TextEditor(text: $prompt)
-                    .font(.system(size: 16))
-                    .frame(minHeight: 40, maxHeight: 200) // Auto-resizing up to a limit
+                    .scrollContentBackground(.hidden)
+                    .background(Color.clear)
                     .focused($isEditorFocused)
-                    .scrollContentBackground(.hidden) // Make it transparent
+                    .frame(minHeight: minHeight, maxHeight: maxEditorHeight())
+                    .fixedSize(horizontal: false, vertical: true) // This enables auto-resize!
+                    .font(.system(size: 14))
+                    .padding(.horizontal, 8)
+                    .padding(.vertical, 8)
             
                 if prompt.isEmpty {
-                    Text("Ask anything...")
-                        .font(.system(size: 16))
-                        .foregroundColor(Color.gray.opacity(0.6))
-                        .padding(.top, 8)
-                        .padding(.leading, 5)
-                        .allowsHitTesting(false)
+                    Text("Type your prompt...")
+                        .foregroundColor(.secondary)
+                        .padding(.leading, 14)
+                        .padding(.top, 12)
                 }
             }
             
@@ -228,19 +266,26 @@ struct PromptWindow: View {
                         prompt = ""
                     }
                 }
-                .keyboardShortcut(.defaultAction) // Use .defaultAction for Enter key
                 .buttonStyle(.borderedProminent)
                 .disabled(prompt.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty)
             }
         }
         .padding(20)
         .frame(width: 500)
-        .background(.regularMaterial)
+        .background(Color(NSColor.windowBackgroundColor))
         .cornerRadius(12)
         .shadow(radius: 20)
-        .onAppear {
-            isEditorFocused = true
+        .onAppear { isEditorFocused = true }
+        .onReceive(NotificationCenter.default.publisher(for: .submitPrompt)) { _ in
+            handleSubmit()
         }
+    }
+    
+    private func handleSubmit() {
+        let trimmed = prompt.trimmingCharacters(in: .whitespacesAndNewlines)
+        guard !trimmed.isEmpty else { return }
+        onSubmit(trimmed)
+        prompt = ""
     }
 }
 ```
@@ -276,7 +321,7 @@ class OverlayController: ObservableObject {
         let screen = NSScreen.screenWithMouse() ?? NSScreen.main!
         let screenFrame = screen.frame
         
-        promptWindow = NSWindow(
+        promptWindow = PromptWindow(
             contentRect: NSRect(x: 0, y: 0, width: 540, height: 120),
             styleMask: [.borderless],
             backing: .buffered,
@@ -289,7 +334,7 @@ class OverlayController: ObservableObject {
         promptWindow?.hasShadow = false
         promptWindow?.center()
         
-        let promptView = PromptWindow(
+        let promptView = PromptView(
             onSubmit: { [weak self] prompt in
                 self?.showOverlay(with: prompt)
             },
@@ -1127,10 +1172,12 @@ extension WKProcessPool {
 
 ### Prompt Window
 
-- **Size**: 600x60px, centered on active display
-- **Style**: Floating, rounded corners, subtle shadow
-- **Animation**: Fade in/out, smooth scaling
-- **Focus**: Auto-focus text input, full text selection
+- **Size**: Auto-resizing height with 500px width, centered on active display
+- **Height Behavior**: Starts at 60px minimum, expands as text is typed, capped at 40% of screen height
+- **Style**: Floating, rounded corners, subtle shadow, transparent background with seamless TextEditor
+- **Animation**: Smooth height transitions as content changes
+- **Focus**: Auto-focus text input with immediate typing capability
+- **Keyboard**: Enter submits prompt, Shift+Enter creates new line
 
 ### Service Windows
 
@@ -1287,7 +1334,7 @@ struct WebViewRepresentable: NSViewRepresentable {
 - **Service Management**: Enable/disable services (with proper WKWebView cleanup), reorder services
 - **Claude Configuration**: Timing adjustment for paste delay
 - **Appearance**: Dark/light/system theme selection
-- **Keyboard Shortcuts**: Display current shortcuts (ESC to close, Enter to submit, Cmd+1-4 for service focus)
+- **Keyboard Shortcuts**: Display current shortcuts (ESC to close, Enter to submit, Shift+Enter for new line, Cmd+1-4 for service focus)
 - **About**: Version, credits, privacy policy
 
 ## Error Handling
