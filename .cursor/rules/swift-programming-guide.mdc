@@ -1,0 +1,283 @@
+---
+description: 
+globs: 
+alwaysApply: true
+---
+# Swift for macOS Development - Essential Patterns
+
+## AppKit + SwiftUI Integration
+
+### Embedding SwiftUI in AppKit Windows
+```swift
+// Programmatic window with SwiftUI content
+class WindowController: NSWindowController {
+    override func windowDidLoad() {
+        window?.contentView = NSHostingView(rootView: MySwiftUIView())
+    }
+}
+
+// Fix keyboard shortcuts in NSHostingView (critical for macOS)
+class FixedHostingView<Content: View>: NSHostingView<Content> {
+    override func performKeyEquivalent(with event: NSEvent) -> Bool {
+        if event.modifierFlags.contains(.command) {
+            switch event.charactersIgnoringModifiers {
+            case "a": NSApp.sendAction(#selector(NSText.selectAll(_:)), to: nil, from: self); return true
+            case "c": NSApp.sendAction(#selector(NSText.copy(_:)), to: nil, from: self); return true
+            case "v": NSApp.sendAction(#selector(NSText.paste(_:)), to: nil, from: self); return true
+            default: break
+            }
+        }
+        return super.performKeyEquivalent(with: event)
+    }
+}
+```
+
+### AppKit Views in SwiftUI
+```swift
+struct WebViewWrapper: NSViewRepresentable {
+    let webView: WKWebView
+    
+    func makeNSView(context: Context) -> WKWebView { webView }
+    func updateNSView(_ nsView: WKWebView, context: Context) {}
+}
+```
+
+## Window Management
+
+### Floating Windows
+```swift
+// Floating button window
+window.level = .floating
+window.collectionBehavior = [.canJoinAllSpaces, .moveToActiveSpace]
+window.styleMask = [.borderless]
+window.canBecomeKey = true  // Required for borderless windows
+
+// Overlay window
+window.level = .modalPanel
+window.backgroundColor = NSColor.clear
+window.isOpaque = false
+```
+
+### Multi-Monitor Support
+```swift
+extension NSScreen {
+    static func screenWithMouse() -> NSScreen? {
+        let mouseLocation = NSEvent.mouseLocation
+        return NSScreen.screens.first { NSMouseInRect(mouseLocation, $0.frame, false) }
+    }
+}
+```
+
+## System Integration
+
+### Global Shortcuts (Use KeyboardShortcuts Library)
+```swift
+import KeyboardShortcuts
+
+extension KeyboardShortcuts.Name {
+    static let showApp = Self("showApp")  // No default!
+}
+
+// Setup
+KeyboardShortcuts.onKeyDown(for: .showApp) {
+    showMainWindow()
+}
+```
+
+### Accessory App Setup
+```swift
+// In AppDelegate
+NSApp.setActivationPolicy(.accessory)  // No dock icon
+
+// For menu bar apps
+NSApp.setActivationPolicy(.prohibited)  // Completely hidden
+```
+
+## WebKit Optimization
+
+### Shared Process Pool (Critical for Memory)
+```swift
+extension WKProcessPool {
+    static let shared = WKProcessPool()
+}
+
+// Use in all WebViews
+let config = WKWebViewConfiguration()
+config.processPool = WKProcessPool.shared
+```
+
+### WebView Lifecycle Management
+```swift
+class WebService: ObservableObject {
+    let webView: WKWebView
+    
+    init() {
+        let config = WKWebViewConfiguration()
+        config.processPool = WKProcessPool.shared
+        self.webView = WKWebView(frame: .zero, configuration: config)
+        webView.customUserAgent = "Mozilla/5.0 (Macintosh; Intel Mac OS X 15_0) AppleWebKit/605.1.15"
+    }
+    
+    // CRITICAL: Handle process termination
+    func webViewWebContentProcessDidTerminate(_ webView: WKWebView) {
+        webView.reload()  // Or show error state
+    }
+}
+```
+
+## Modern Concurrency for macOS
+
+### MainActor for UI Updates
+```swift
+@MainActor
+class AppState: ObservableObject {
+    @Published var isOverlayVisible = false
+    
+    func showOverlay() {
+        isOverlayVisible = true  // Always on main thread
+    }
+}
+```
+
+### Background Processing with Actors
+```swift
+actor ServiceManager {
+    private var services: [String: WebService] = [:]
+    
+    func executePrompt(_ prompt: String) async {
+        for service in services.values {
+            await service.execute(prompt)
+        }
+    }
+}
+```
+
+## Memory Management for Background Apps
+
+### Weak References for Callbacks
+```swift
+class FloatingButton {
+    var onClick: (() -> Void)?
+    
+    func setup() {
+        button.target = self
+        button.action = #selector(buttonClicked)
+    }
+    
+    @objc func buttonClicked() {
+        onClick?()  // Avoid [weak self] here - button owns the action
+    }
+}
+```
+
+### Resource Cleanup
+```swift
+class ServiceManager {
+    func disableService(_ id: String) {
+        guard let service = services[id] else { return }
+        
+        // Clean up WebView resources
+        service.webView.stopLoading()
+        service.webView.loadHTMLString("", baseURL: nil)
+        
+        services.removeValue(forKey: id)
+    }
+}
+```
+
+## Essential macOS Patterns
+
+### Notification-Based Communication
+```swift
+extension Notification.Name {
+    static let showPromptWindow = Notification.Name("showPromptWindow")
+}
+
+// Post
+NotificationCenter.default.post(name: .showPromptWindow, object: nil)
+// Observe
+NotificationCenter.default.addObserver(forName: .showPromptWindow, object: nil, queue: .main) { _ in
+    showPrompt()
+}
+```
+
+### UserDefaults for Preferences
+```swift
+struct AppConfig {
+    @UserDefault("floatingButtonPosition", defaultValue: CGPoint(x: 100, y: 100))
+    static var buttonPosition: CGPoint
+    
+    @UserDefault("enabledServices", defaultValue: ["chatgpt", "claude"])
+    static var enabledServices: [String]
+}
+
+@propertyWrapper
+struct UserDefault<T: Codable> {
+    let key: String
+    let defaultValue: T
+    
+    var wrappedValue: T {
+        get { UserDefaults.standard.object(forKey: key) as? T ?? defaultValue }
+        set { UserDefaults.standard.set(newValue, forKey: key) }
+    }
+}
+```
+
+### Error Handling for System APIs
+```swift
+enum SystemError: Error {
+    case permissionDenied
+    case serviceUnavailable
+}
+
+func requestGlobalShortcut() throws {
+    guard canRegisterShortcut() else {
+        throw SystemError.permissionDenied
+    }
+    registerShortcut()
+}
+```
+
+## Performance Patterns
+
+### Lazy Initialization
+```swift
+class ExpensiveManager {
+    lazy var processor = {
+        // Only create when first accessed
+        return HeavyProcessor()
+    }()
+}
+```
+
+### Background Queue Management
+```swift
+class BackgroundProcessor {
+    private let queue = DispatchQueue(label: "processor", qos: .utility)
+    
+    func processInBackground() {
+        queue.async { [weak self] in
+            // Heavy work
+            DispatchQueue.main.async {
+                self?.updateUI()
+            }
+        }
+    }
+}
+```
+
+## Key macOS Frameworks
+- **AppKit**: Native windows, menus, events
+- **WebKit**: Embedded web content
+- **KeyboardShortcuts**: Global shortcuts (third-party)
+- **Combine**: Reactive state management
+- **UserNotifications**: System notifications
+
+## Critical Don'ts for macOS
+1. **Don't use Mac Catalyst** - Build native AppKit/SwiftUI instead
+2. **Don't assume iOS patterns work** - macOS has different UI paradigms
+3. **Don't ignore memory pressure** - Background apps get aggressively managed
+4. **Don't skip entitlements** - Required for system integration
+5. **Don't use default global shortcuts** - Always let users configure
+
+This focuses on what you actually need to build native macOS apps, not Swift theory.

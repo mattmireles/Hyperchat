@@ -35,11 +35,23 @@ class PromptWindowController: NSWindowController {
         window.setContentSize(NSSize(width: 540, height: 100))
     }
     
-    override func showWindow(_ sender: Any?) {
-        super.showWindow(sender)
-        window?.center()
+    func showWindow(on screen: NSScreen?) {
+        guard let window = self.window else { return }
+        
+        // Use the provided screen or default to the main screen
+        let targetScreen = screen ?? NSScreen.main
+        
+        // Center the window on the target screen
+        let screenRect = targetScreen?.visibleFrame ?? NSRect.zero
+        let windowRect = window.frame
+        let newOriginX = screenRect.origin.x + (screenRect.width - windowRect.width) / 2
+        let newOriginY = screenRect.origin.y + (screenRect.height - windowRect.height) / 2
+        window.setFrameOrigin(NSPoint(x: newOriginX, y: newOriginY))
+        
+        super.showWindow(nil)
         NSApp.activate(ignoringOtherApps: true)
-        window?.makeKeyAndOrderFront(nil)
+        window.makeKeyAndOrderFront(nil)
+
         // Ensure focus
         DispatchQueue.main.async { [weak self] in
             self?.promptViewController?.view.window?.makeFirstResponder(nil)
@@ -61,12 +73,18 @@ struct PromptView: View {
                 .textFieldStyle(RoundedBorderTextFieldStyle())
                 .font(.system(size: 18))
                 .focused($isTextFieldFocused)
+                .onChange(of: promptText) { oldValue, newValue in
+                    // Force view update when text changes (fixes paste display issues)
+                    isTextFieldFocused = true
+                }
                 .onSubmit {
                     handleSubmit()
                 }
                 // Enable standard keyboard shortcuts
                 .onKeyPress(.escape) {
-                    NSApp.keyWindow?.close()
+                    if let window = NSApp.windows.first(where: { $0 is PromptWindow }) {
+                        window.close()
+                    }
                     return .handled
                 }
         }

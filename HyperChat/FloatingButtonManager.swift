@@ -2,6 +2,22 @@ import Cocoa
 import SwiftUI
 import os.log
 
+// Custom panel that can receive clicks but won't become key
+class FloatingPanel: NSPanel {
+    override var canBecomeKey: Bool { false }
+    override var canBecomeMain: Bool { false }
+    override var acceptsFirstResponder: Bool { false }
+    
+    override func makeKey() {
+        // Ignore all attempts to make this key window
+    }
+    
+    override func makeKeyAndOrderFront(_ sender: Any?) {
+        // Just order front, don't make key
+        self.orderFront(sender)
+    }
+}
+
 // Custom button that can be dragged
 class DraggableButton: NSButton {
     private var initialLocation: NSPoint?
@@ -36,23 +52,33 @@ class DraggableButton: NSButton {
     }
     
     override func mouseUp(with event: NSEvent) {
-        if initialLocation != nil {
+        if let initialLocation = initialLocation, initialLocation == event.locationInWindow {
+            // This was a click, not a drag.
+            if let action = self.action {
+                _ = self.target?.perform(action, with: self)
+            }
+        } else {
+            // This was a drag.
             dragCallback()
-            initialLocation = nil
         }
+        self.initialLocation = nil
     }
 }
 
 class FloatingButtonManager {
     private var buttonWindow: NSWindow?
+    private var promptHandler: PromptHandler?
     var promptWindowController: PromptWindowController?
+    var overlayController: OverlayController?
     private let logger = Logger(subsystem: Bundle.main.bundleIdentifier ?? "com.transcendence.hyperchat", category: "FloatingButtonManager")
     private var screenUpdateTimer: Timer?
     private var lastKnownScreen: NSScreen?
     private let positionsKey = "HyperChatButtonPositions"
+    private var visibilityTimer: Timer?
 
     deinit {
         screenUpdateTimer?.invalidate()
+        visibilityTimer?.invalidate()
     }
 
     func showFloatingButton() {
@@ -61,9 +87,9 @@ class FloatingButtonManager {
         let buttonSize: CGFloat = 48
         let buttonFrame = NSRect(x: 0, y: 0, width: buttonSize, height: buttonSize)
 
-        let window = NSPanel(
+        let window = FloatingPanel(
             contentRect: buttonFrame,
-            styleMask: [.borderless, .nonactivatingPanel],
+            styleMask: [.borderless],
             backing: .buffered,
             defer: false
         )
@@ -74,6 +100,7 @@ class FloatingButtonManager {
         window.isOpaque = false
         window.hasShadow = true
         window.isMovableByWindowBackground = false // Disable this since we're handling dragging ourselves
+        window.hidesOnDeactivate = false // Important: don't hide when app loses focus
         self.buttonWindow = window
 
         let button = DraggableButton(frame: NSRect(origin: .zero, size: CGSize(width: buttonSize, height: buttonSize))) { [weak self] in
@@ -86,7 +113,7 @@ class FloatingButtonManager {
         button.layer?.cornerRadius = buttonSize / 2
         
         button.target = self
-        button.action = #selector(buttonClicked)
+        button.action = #selector(floatingButtonClicked)
 
         window.contentView = button
         
@@ -99,6 +126,13 @@ class FloatingButtonManager {
             self?.checkAndUpdateScreenIfNeeded()
         }
 
+        // Start timer to ensure button stays visible
+        visibilityTimer = Timer.scheduledTimer(withTimeInterval: 1.0, repeats: true) { [weak self] _ in
+            if let window = self?.buttonWindow, !window.isVisible {
+                window.orderFront(nil)
+            }
+        }
+
         DispatchQueue.main.asyncAfter(deadline: .now() + 1.0) {
             if let w = self.buttonWindow, w.isVisible {
                 self.logger.log("✅ SUCCESS: Floating button window is visible on screen.")
@@ -108,9 +142,23 @@ class FloatingButtonManager {
         }
     }
 
-    @objc func buttonClicked() {
-        logger.log("🎉 Button clicked! Showing prompt window...")
-        promptWindowController?.showWindow(nil)
+    func ensureFloatingButtonVisible() {
+        buttonWindow?.orderFront(nil)
+    }
+
+    @objc private func floatingButtonClicked() {
+        // If an overlay is currently visible, hide it first
+        overlayController?.hideOverlay()
+
+        // Pass the overlayController to the handler
+        if promptHandler == nil {
+            promptHandler = PromptHandler()
+            promptHandler?.overlayController = overlayController
+        }
+        
+        // Use the screen the button is on, or the one with the mouse, or fallback to main.
+        let screen = buttonWindow?.screen ?? NSScreen.screenWithMouse() ?? NSScreen.main!
+        promptHandler?.showPrompt(on: screen)
     }
     
     private func checkAndUpdateScreenIfNeeded() {
@@ -140,7 +188,6 @@ class FloatingButtonManager {
             window.setFrameOrigin(savedPosition)
         } else {
             // Default position if no saved position exists
-            let buttonSize: CGFloat = 48
             let padding: CGFloat = 20
             let xPos = screen.visibleFrame.minX + padding
             let yPos = screen.visibleFrame.minY + padding
