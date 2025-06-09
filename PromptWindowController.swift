@@ -55,14 +55,25 @@ class PromptWindowController: NSWindowController {
         
         self.init(window: window)
         
-        // Create the SwiftUI view and hosting controller
-        let promptView = PromptView()
+        // Create the SwiftUI view with closures that control this controller
+        let promptView = PromptView(
+            onSubmit: { [weak self] prompt in
+                // Tell the app to show the overlay
+                NotificationCenter.default.post(name: .showOverlay, object: prompt)
+                // Close our own window
+                self?.close()
+            },
+            onCancel: { [weak self] in
+                // Just close our own window
+                self?.close()
+            }
+        )
         let hostingController = NSHostingController(rootView: promptView)
         window.contentViewController = hostingController
         self.promptViewController = hostingController
         
         // Set the window's content size to match our SwiftUI view
-        window.setContentSize(NSSize(width: 540, height: 100))
+        window.setContentSize(hostingController.view.fittingSize)
     }
     
     func showWindow(on screen: NSScreen?) {
@@ -78,13 +89,14 @@ class PromptWindowController: NSWindowController {
         let newOriginY = screenRect.origin.y + (screenRect.height - windowRect.height) / 2
         window.setFrameOrigin(NSPoint(x: newOriginX, y: newOriginY))
         
+        // Set the window's content size to match our SwiftUI view
+        if let size = promptViewController?.view.fittingSize, size != .zero {
+            window.setContentSize(size)
+        }
+        
         super.showWindow(nil)
         NSApp.activate(ignoringOtherApps: true)
         window.makeKeyAndOrderFront(nil)
-
-        // DO NOT manually manage first responder here.
-        // Let SwiftUI's @FocusState handle it.
-        // The old code `makeFirstResponder(nil)` was breaking keyboard input.
     }
 }
 
@@ -95,6 +107,10 @@ extension Notification.Name {
 struct PromptView: View {
     @State private var promptText: String = ""
     @FocusState private var isEditorFocused: Bool
+
+    // Callbacks for the controller to handle logic
+    let onSubmit: (String) -> Void
+    let onCancel: () -> Void
 
     var body: some View {
         VStack(spacing: 16) {
@@ -129,9 +145,9 @@ struct PromptView: View {
             
             HStack {
                 Button("Cancel") {
-                    closeWindow()
+                    onCancel()
                 }
-                // Rely on standard window cancelOperation for ESC
+                .keyboardShortcut(.escape)
                 
                 Spacer()
                 
@@ -152,26 +168,9 @@ struct PromptView: View {
         }
     }
     
-    private func closeWindow() {
-        if let window = NSApp.windows.first(where: { $0 is PromptWindow }) {
-            window.close()
-        }
-    }
-    
     private func handleSubmit() {
         let trimmed = promptText.trimmingCharacters(in: .whitespacesAndNewlines)
         guard !trimmed.isEmpty else { return }
-        
-        // Grab a reference to the window *before* showing the overlay
-        let windowToClose = NSApp.keyWindow
-        
-        // Post notification to show overlay with prompt
-        NotificationCenter.default.post(name: .showOverlay, object: trimmed)
-        
-        // Clear the text
-        promptText = ""
-        
-        // Close the prompt window
-        windowToClose?.close()
+        onSubmit(trimmed)
     }
 }
