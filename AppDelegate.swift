@@ -5,10 +5,12 @@ class AppDelegate: NSObject, NSApplicationDelegate {
     var floatingButtonManager: FloatingButtonManager
     var overlayController: OverlayController
     var promptWindowController: PromptWindowController
+    var serviceManager: ServiceManager
 
     override init() {
+        self.serviceManager = ServiceManager()
         self.floatingButtonManager = FloatingButtonManager()
-        self.overlayController = OverlayController()
+        self.overlayController = OverlayController(serviceManager: self.serviceManager)
         self.promptWindowController = PromptWindowController()
         super.init()
     }

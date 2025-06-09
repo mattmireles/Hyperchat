@@ -7,7 +7,7 @@ Accelerate Your Mind with Maximum AI
 
 ## Product Overview
 
-HyperChat is a native macOS app that provides instant access to multiple LLMs via floating button or global hotkey, enabling real-time comparison of responses across ChatGPT, Claude, Perplexity, and Google in a full-screen overlay interface. Designed for information junkies who want to watch AI responses stream in simultaneously.
+HyperChat is a native macOS app that provides instant access to multiple LLMs via floating button or global hotkey, enabling real-time comparison of responses across ChatGPT, Claude, Perplexity, and Google in a persistent window interface that can toggle between normal and full-screen overlay modes. Designed for information junkies who want to watch AI responses stream in simultaneously.
 
 ## Core User Experience
 
@@ -16,14 +16,21 @@ HyperChat is a native macOS app that provides instant access to multiple LLMs vi
 3. **One-Click Activation**: Click floating button to invoke prompt window instantly
 4. **Instant Input**: Floating prompt bar appears center screen
 5. **Multi-Service Query**: Enter sends prompt to all configured services simultaneously
-6. **Real-Time Response Streaming**: Full-screen overlay with side-by-side service windows showing live AI responses as they generate
-7. **Interactive Sessions**: Each window functions as a full browser - users can continue conversations, click links, interact naturally
-8. **Session Persistence**: Login state maintained across app sessions - no re-authentication required
-9. **Selective Viewing**: Close individual service windows (e.g., dismiss Google results) to focus on preferred responses
-10. **Browser Handoff**: "Open in [Browser]" button launches any conversation in user's default browser for extended work
-11. **Dynamic Window Management**: Closing individual service windows causes remaining windows to reflow and expand to fill available space
-12. **Keyboard Navigation**: ESC closes overlay, Enter submits prompts, Cmd+1/2/3/4 focuses specific services
-13. **Quick Exit**: ESC closes overlay, returns to previous work with all sessions preserved
+6. **Dual-Mode Interface**: 
+   - Normal Mode: Standard window with title bar, resizable, movable
+   - Overlay Mode: Full-screen with blur effect, ESC to toggle modes
+7. **Real-Time Response Streaming**: Side-by-side service windows showing live AI responses as they generate
+8. **Interactive Sessions**: Each window functions as a full browser - users can continue conversations, click links, interact naturally
+9. **Session Persistence**: Login state maintained across app sessions - no re-authentication required
+10. **Selective Viewing**: Close individual service windows (e.g., dismiss Google results) to focus on preferred responses
+11. **Browser Handoff**: "Open in [Browser]" button launches any conversation in user's default browser for extended work
+12. **Dynamic Window Management**: Closing individual service windows causes remaining windows to reflow and expand to fill available space
+13. **Keyboard Navigation**: 
+    - ESC toggles between normal and overlay modes
+    - Enter submits prompts
+    - Cmd+1/2/3/4 focuses specific services
+14. **Window State Preservation**: Window position and size are preserved when toggling between modes
+15. **Quick Exit**: ESC closes overlay, returns to previous work with all sessions preserved
 
 ## Technical Architecture
 
@@ -34,7 +41,7 @@ HyperChatApp
 ├── AppDelegate (app lifecycle, global hotkey registration)
 ├── FloatingButtonManager (persistent on-screen activation)
 ├── ServiceManager (persistent WKWebView management)
-├── OverlayController (full-screen window management)
+├── OverlayController (dual-mode window management)
 ├── PromptWindow (floating input interface)
 ├── ServiceWindow (individual AI service containers)
 ├── DefaultBrowserManager (browser detection)
@@ -69,20 +76,35 @@ HyperChatApp
     - Perplexity: URL parameter activation
     - Google: URL parameter activation
 
-#### 4. Overlay Window System
+#### 4. Window System
 
-- **Overlay Height**: 80% of screen height (leaves breathing room, less claustrophobic)
-- **Background Blur**: Semi-transparent blur effect over desktop
-- **Child Windows**: Service windows as children of overlay
-- **Z-Order Management**: Ensure proper layering and focus handling
-- **Multi-Display**: Appears on display containing the cursor at activation time
+- **Dual-Mode Architecture**:
+  - Normal Mode: Standard window with title bar, resizable, movable
+  - Overlay Mode: Full-screen with blur effect, ESC to toggle modes
+- **Window State Management**:
+  - Saves window position, size, and style when entering overlay mode
+  - Restores state when exiting overlay mode
+  - Smooth transitions between modes with animations
+- **Normal Mode Properties**:
+  - Title bar with standard window controls
+  - Resizable with minimum size constraints
+  - Movable and dockable
+  - Standard window level and collection behavior
+- **Overlay Mode Properties**:
+  - Borderless window style
+  - Floating window level
+  - Full-screen auxiliary behavior
+  - Background blur and tint effects
+- **Multi-Display Support**: 
+  - Normal mode: Standard window positioning
+  - Overlay mode: Appears on display containing the cursor
 - **Window Reflow**: Dynamic resizing and repositioning when services are closed
 
 #### 5. Window Layout System
 
-Window layout will be calculated dynamically using SwiftUI's native layout system. The main overlay view will use a GeometryReader to determine the available screen size. A ScrollView(.horizontal) will be used if the total width of the service windows exceeds the screen width.
+Window layout will be calculated dynamically using SwiftUI's native layout system. The main window view will use a GeometryReader to determine the available screen size. A ScrollView(.horizontal) will be used if the total width of the service windows exceeds the screen width.
 
-The width for each ServiceView will be calculated based on the number of active services, the available screen width, and the specified constraints (minWidth: 600, maxWidth: 800, padding: 50). This logic will reside directly within the OverlayView, removing the need for a separate WindowLayoutEngine class and promoting a more direct, maintainable SwiftUI implementation.
+The width for each ServiceView will be calculated based on the number of active services, the available screen width, and the specified constraints (minWidth: 600, maxWidth: 800, padding: 50). This logic will reside directly within the main view, removing the need for a separate WindowLayoutEngine class and promoting a more direct, maintainable SwiftUI implementation.
 
 ## Performance Requirements
 
@@ -1287,7 +1309,7 @@ struct WebViewRepresentable: NSViewRepresentable {
 - **Service Management**: Enable/disable services (with proper WKWebView cleanup), reorder services
 - **Claude Configuration**: Timing adjustment for paste delay
 - **Appearance**: Dark/light/system theme selection
-- **Keyboard Shortcuts**: Display current shortcuts (ESC to close, Enter to submit, Cmd+1-4 for service focus)
+- **Keyboard Shortcuts**: Display current shortcuts (ESC to toggle modes, Enter to submit, Cmd+1-4 for service focus)
 - **About**: Version, credits, privacy policy
 
 ## Error Handling
@@ -1326,7 +1348,11 @@ struct WebViewRepresentable: NSViewRepresentable {
 
 - [ ] Persistent floating button with simplified cross-space behavior
 - [ ] Four core services: ChatGPT, Claude, Perplexity, Google
-- [ ] Full-screen overlay interface (80% height) with real-time response streaming
+- [ ] Dual-mode window interface:
+  - Normal mode: Standard window with title bar and controls
+  - Overlay mode: Full-screen with blur effect
+- [ ] Smooth transitions between window modes with animations
+- [ ] Window state preservation when toggling modes
 - [ ] Global hotkey support using KeyboardShortcuts framework
 - [ ] Claude clipboard automation with paste+enter method
 - [ ] Dynamic browser detection for "Open in [Browser]" buttons
@@ -1334,7 +1360,7 @@ struct WebViewRepresentable: NSViewRepresentable {
 - [ ] Browser toolbar for each service with navigation controls and editable URL bar
 - [ ] Prompt window with auto-focus and keyboard shortcuts
 - [ ] Multi-monitor support (overlay appears on screen with cursor)
-- [ ] Keyboard navigation (ESC to close, Cmd+1-4 for service focus)
+- [ ] Keyboard navigation (ESC to toggle modes, Cmd+1-4 for service focus)
 - [ ] Dynamic window management with automatic reflow when services are closed
 - [ ] Proper resource cleanup when services are disabled
 - [ ] Basic settings and configuration

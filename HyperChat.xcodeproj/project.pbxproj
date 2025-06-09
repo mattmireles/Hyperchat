@@ -3,23 +3,42 @@
 	archiveVersion = 1;
 	classes = {
 	};
-	objectVersion = 77;
+	objectVersion = 60;
 	objects = {
 
+/* Begin PBXBuildFile section */
+		3EE13B9B2C4F6B2900A8A61E /* AppDelegate.swift in Sources */ = {isa = PBXBuildFile; fileRef = 3EE13B8E2C4F6B2900A8A61E /* AppDelegate.swift */; };
+		3EE13B9C2C4F6B2900A8A61E /* Assets.xcassets in Resources */ = {isa = PBXBuildFile; fileRef = 3EE13B932C4F6B2900A8A61E /* Assets.xcassets */; };
+		3EE13B9D2C4F6B2900A8A61E /* FloatingButtonManager.swift in Sources */ = {isa = PBXBuildFile; fileRef = 3EE13B8F2C4F6B2900A8A61E /* FloatingButtonManager.swift */; };
+		3EE13B9E2C4F6B2900A8A61E /* HyperChatApp.swift in Sources */ = {isa = PBXBuildFile; fileRef = 3EE13B902C4F6B2900A8A61E /* HyperChatApp.swift */; };
+		3EE13B9F2C4F6B2900A8A61E /* MainMenu.xib in Resources */ = {isa = PBXBuildFile; fileRef = 3EE13B942C4F6B2900A8A61E /* MainMenu.xib */; };
+		3EE13BA92C4F6B2900A8A61E /* OverlayController.swift in Sources */ = {isa = PBXBuildFile; fileRef = 3EE13BA32C4F6B2900A8A61E /* OverlayController.swift */; };
+		3EE13BAA2C4F6B2900A8A61E /* PromptWindowController.swift in Sources */ = {isa = PBXBuildFile; fileRef = 3EE13BA42C4F6B2900A8A61E /* PromptWindowController.swift */; };
+		3EE13BAB2C4F6B2900A8A61E /* ServiceManager.swift in Sources */ = {isa = PBXBuildFile; fileRef = 3EE13BA52C4F6B2900A8A61E /* ServiceManager.swift */; };
+		3EE13BAC2C4F6B2900A8A61E /* UserAgentGenerator.swift in Sources */ = {isa = PBXBuildFile; fileRef = 3EE13BA62C4F6B2900A8A61E /* UserAgentGenerator.swift */; };
+		3EE13BAD2C4F6B2900A8A61E /* NSScreen+Extensions.swift in Sources */ = {isa = PBXBuildFile; fileRef = 3EE13BA72C4F6B2900A8A61E /* NSScreen+Extensions.swift */; };
+		3EE13BAE2C4F6B2900A8A61E /* ServiceConfiguration.swift in Sources */ = {isa = PBXBuildFile; fileRef = 3EE13BA82C4F6B2900A8A61E /* ServiceConfiguration.swift */; };
+/* End PBXBuildFile section */
+
 /* Begin PBXFileReference section */
-		BEE5CF452DEFDF79006EEE47 /* HyperChat.app */ = {isa = PBXFileReference; explicitFileType = wrapper.application; includeInIndex = 0; path = HyperChat.app; sourceTree = BUILT_PRODUCTS_DIR; };
+		3EE13B8B2C4F6B2900A8A61E /* HyperChat.app */ = {isa = PBXFileReference; explicitFileType = wrapper.application; includeInIndex = 0; path = HyperChat.app; sourceTree = BUILT_PRODUCTS_DIR; };
+		3EE13B8E2C4F6B2900A8A61E /* AppDelegate.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = AppDelegate.swift; sourceTree = "<group>"; };
+		3EE13B8F2C4F6B2900A8A61E /* FloatingButtonManager.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = FloatingButtonManager.swift; sourceTree = "<group>"; };
+		3EE13B902C4F6B2900A8A61E /* HyperChatApp.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = HyperChatApp.swift; sourceTree = "<group>"; };
+		3EE13B912C4F6B2900A8A61E /* HyperChat.entitlements */ = {isa = PBXFileReference; lastKnownFileType = text.plist.entitlements; path = HyperChat.entitlements; sourceTree = "<group>"; };
+		3EE13B922C4F6B2900A8A61E /* Info.plist */ = {isa = PBXFileReference; lastKnownFileType = text.plist.xml; path = Info.plist; sourceTree = "<group>"; };
+		3EE13B932C4F6B2900A8A61E /* Assets.xcassets */ = {isa = PBXFileReference; lastKnownFileType = folder.assetcatalog; path = Assets.xcassets; sourceTree = "<group>"; };
+		3EE13B942C4F6B2900A8A61E /* MainMenu.xib */ = {isa = PBXFileReference; lastKnownFileType = file.xib; path = MainMenu.xib; sourceTree = "<group>"; };
+		3EE13BA32C4F6B2900A8A61E /* OverlayController.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = OverlayController.swift; sourceTree = "<group>"; };
+		3EE13BA42C4F6B2900A8A61E /* PromptWindowController.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = PromptWindowController.swift; sourceTree = "<group>"; };
+		3EE13BA52C4F6B2900A8A61E /* ServiceManager.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ServiceManager.swift; sourceTree = "<group>"; };
+		3EE13BA62C4F6B2900A8A61E /* UserAgentGenerator.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = UserAgentGenerator.swift; sourceTree = "<group>"; };
+		3EE13BA72C4F6B2900A8A61E /* NSScreen+Extensions.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = "NSScreen+Extensions.swift"; sourceTree = "<group>"; };
+		3EE13BA82C4F6B2900A8A61E /* ServiceConfiguration.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ServiceConfiguration.swift; sourceTree = "<group>"; };
 /* End PBXFileReference section */
 
-/* Begin PBXFileSystemSynchronizedRootGroup section */
-		BEE5CF472DEFDF79006EEE47 /* HyperChat */ = {
-			isa = PBXFileSystemSynchronizedRootGroup;
-			path = HyperChat;
-			sourceTree = "<group>";
-		};
-/* End PBXFileSystemSynchronizedRootGroup section */
-
 /* Begin PBXFrameworksBuildPhase section */
-		BEE5CF422DEFDF79006EEE47 /* Frameworks */ = {
+		3EE13B882C4F6B2900A8A61E /* Frameworks */ = {
 			isa = PBXFrameworksBuildPhase;
 			buildActionMask = 2147483647;
 			files = (
@@ -29,280 +48,202 @@
 /* End PBXFrameworksBuildPhase section */
 
 /* Begin PBXGroup section */
-		BEE5CF3C2DEFDF79006EEE47 = {
+		3EE13B862C4F6B2900A8A61E = {
 			isa = PBXGroup;
 			children = (
-				BEE5CF472DEFDF79006EEE47 /* HyperChat */,
-				BEE5CF462DEFDF79006EEE47 /* Products */,
+				3EE13B8D2C4F6B2900A8A61E /* . */,
+				3EE13B8C2C4F6B2900A8A61E /* Products */,
 			);
 			sourceTree = "<group>";
 		};
-		BEE5CF462DEFDF79006EEE47 /* Products */ = {
+		3EE13B8C2C4F6B2900A8A61E /* Products */ = {
 			isa = PBXGroup;
 			children = (
-				BEE5CF452DEFDF79006EEE47 /* HyperChat.app */,
+				3EE13B8B2C4F6B2900A8A61E /* HyperChat.app */,
 			);
 			name = Products;
+			sourceTree = "<group>";
+		};
+		3EE13B8D2C4F6B2900A8A61E /* . */ = {
+			isa = PBXGroup;
+			children = (
+				3EE13B8E2C4F6B2900A8A61E /* AppDelegate.swift */,
+				3EE13B8F2C4F6B2900A8A61E /* FloatingButtonManager.swift */,
+				3EE13B902C4F6B2900A8A61E /* HyperChatApp.swift */,
+				3EE13B912C4F6B2900A8A61E /* HyperChat.entitlements */,
+				3EE13B922C4F6B2900A8A61E /* Info.plist */,
+				3EE13B932C4F6B2900A8A61E /* Assets.xcassets */,
+				3EE13B942C4F6B2900A8A61E /* MainMenu.xib */,
+				3EE13BA32C4F6B2900A8A61E /* OverlayController.swift */,
+				3EE13BA42C4F6B2900A8A61E /* PromptWindowController.swift */,
+				3EE13BA52C4F6B2900A8A61E /* ServiceManager.swift */,
+				3EE13BA62C4F6B2900A8A61E /* UserAgentGenerator.swift */,
+				3EE13BA72C4F6B2900A8A61E /* NSScreen+Extensions.swift */,
+				3EE13BA82C4F6B2900A8A61E /* ServiceConfiguration.swift */,
+			);
+			path = .;
 			sourceTree = "<group>";
 		};
 /* End PBXGroup section */
 
 /* Begin PBXNativeTarget section */
-		BEE5CF442DEFDF79006EEE47 /* HyperChat */ = {
+		3EE13B8A2C4F6B2900A8A61E /* HyperChat */ = {
 			isa = PBXNativeTarget;
-			buildConfigurationList = BEE5CF512DEFDF7A006EEE47 /* Build configuration list for PBXNativeTarget "HyperChat" */;
+			buildConfigurationList = 3EE13BA22C4F6B2900A8A61E /* Build configuration list for PBXNativeTarget "HyperChat" */;
 			buildPhases = (
-				BEE5CF412DEFDF79006EEE47 /* Sources */,
-				BEE5CF422DEFDF79006EEE47 /* Frameworks */,
-				BEE5CF432DEFDF79006EEE47 /* Resources */,
+				3EE13B872C4F6B2900A8A61E /* Sources */,
+				3EE13B882C4F6B2900A8A61E /* Frameworks */,
+				3EE13B892C4F6B2900A8A61E /* Resources */,
 			);
 			buildRules = (
 			);
 			dependencies = (
 			);
-			fileSystemSynchronizedGroups = (
-				BEE5CF472DEFDF79006EEE47 /* HyperChat */,
-			);
 			name = HyperChat;
-			packageProductDependencies = (
-			);
 			productName = HyperChat;
-			productReference = BEE5CF452DEFDF79006EEE47 /* HyperChat.app */;
+			productReference = 3EE13B8B2C4F6B2900A8A61E /* HyperChat.app */;
 			productType = "com.apple.product-type.application";
 		};
 /* End PBXNativeTarget section */
 
 /* Begin PBXProject section */
-		BEE5CF3D2DEFDF79006EEE47 /* Project object */ = {
+		3EE13B842C4F6B2900A8A61E /* Project object */ = {
 			isa = PBXProject;
 			attributes = {
 				BuildIndependentTargetsInParallel = 1;
 				LastSwiftUpdateCheck = 1640;
 				LastUpgradeCheck = 1640;
 				TargetAttributes = {
-					BEE5CF442DEFDF79006EEE47 = {
+					3EE13B8A2C4F6B2900A8A61E = {
 						CreatedOnToolsVersion = 16.4;
 					};
 				};
 			};
-			buildConfigurationList = BEE5CF402DEFDF79006EEE47 /* Build configuration list for PBXProject "HyperChat" */;
+			buildConfigurationList = 3EE13B9A2C4F6B2900A8A61E /* Build configuration list for PBXProject "HyperChat" */;
+			compatibilityVersion = "Xcode 15.0";
 			developmentRegion = en;
 			hasScannedForEncodings = 0;
 			knownRegions = (
 				en,
 				Base,
 			);
-			mainGroup = BEE5CF3C2DEFDF79006EEE47;
-			minimizedProjectReferenceProxies = 1;
-			preferredProjectObjectVersion = 77;
-			productRefGroup = BEE5CF462DEFDF79006EEE47 /* Products */;
+			mainGroup = 3EE13B862C4F6B2900A8A61E;
+			productRefGroup = 3EE13B8C2C4F6B2900A8A61E /* Products */;
 			projectDirPath = "";
 			projectRoot = "";
 			targets = (
-				BEE5CF442DEFDF79006EEE47 /* HyperChat */,
+				3EE13B8A2C4F6B2900A8A61E /* HyperChat */,
 			);
 		};
 /* End PBXProject section */
 
 /* Begin PBXResourcesBuildPhase section */
-		BEE5CF432DEFDF79006EEE47 /* Resources */ = {
+		3EE13B892C4F6B2900A8A61E /* Resources */ = {
 			isa = PBXResourcesBuildPhase;
 			buildActionMask = 2147483647;
 			files = (
+				3EE13B9F2C4F6B2900A8A61E /* MainMenu.xib in Resources */,
+				3EE13B9C2C4F6B2900A8A61E /* Assets.xcassets in Resources */,
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 		};
 /* End PBXResourcesBuildPhase section */
 
 /* Begin PBXSourcesBuildPhase section */
-		BEE5CF412DEFDF79006EEE47 /* Sources */ = {
+		3EE13B872C4F6B2900A8A61E /* Sources */ = {
 			isa = PBXSourcesBuildPhase;
 			buildActionMask = 2147483647;
 			files = (
+				3EE13B9E2C4F6B2900A8A61E /* HyperChatApp.swift in Sources */,
+				3EE13B9B2C4F6B2900A8A61E /* AppDelegate.swift in Sources */,
+				3EE13B9D2C4F6B2900A8A61E /* FloatingButtonManager.swift in Sources */,
+				3EE13BA92C4F6B2900A8A61E /* OverlayController.swift in Sources */,
+				3EE13BAA2C4F6B2900A8A61E /* PromptWindowController.swift in Sources */,
+				3EE13BAB2C4F6B2900A8A61E /* ServiceManager.swift in Sources */,
+				3EE13BAC2C4F6B2900A8A61E /* UserAgentGenerator.swift in Sources */,
+				3EE13BAD2C4F6B2900A8A61E /* NSScreen+Extensions.swift in Sources */,
+				3EE13BAE2C4F6B2900A8A61E /* ServiceConfiguration.swift in Sources */,
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 		};
 /* End PBXSourcesBuildPhase section */
 
 /* Begin XCBuildConfiguration section */
-		BEE5CF4F2DEFDF7A006EEE47 /* Debug */ = {
+		3EE13B982C4F6B2900A8A61E /* Debug */ = {
 			isa = XCBuildConfiguration;
 			buildSettings = {
 				ALWAYS_SEARCH_USER_PATHS = NO;
-				ASSETCATALOG_COMPILER_GENERATE_SWIFT_ASSET_SYMBOL_EXTENSIONS = YES;
-				CLANG_ANALYZER_NONNULL = YES;
-				CLANG_ANALYZER_NUMBER_OBJECT_CONVERSION = YES_AGGRESSIVE;
-				CLANG_CXX_LANGUAGE_STANDARD = "gnu++20";
-				CLANG_ENABLE_MODULES = YES;
-				CLANG_ENABLE_OBJC_ARC = YES;
-				CLANG_ENABLE_OBJC_WEAK = YES;
-				CLANG_WARN_BLOCK_CAPTURE_AUTORELEASING = YES;
-				CLANG_WARN_BOOL_CONVERSION = YES;
-				CLANG_WARN_COMMA = YES;
-				CLANG_WARN_CONSTANT_CONVERSION = YES;
-				CLANG_WARN_DEPRECATED_OBJC_IMPLEMENTATIONS = YES;
-				CLANG_WARN_DIRECT_OBJC_ISA_USAGE = YES_ERROR;
-				CLANG_WARN_DOCUMENTATION_COMMENTS = YES;
-				CLANG_WARN_EMPTY_BODY = YES;
-				CLANG_WARN_ENUM_CONVERSION = YES;
-				CLANG_WARN_INFINITE_RECURSION = YES;
-				CLANG_WARN_INT_CONVERSION = YES;
-				CLANG_WARN_NON_LITERAL_NULL_CONVERSION = YES;
-				CLANG_WARN_OBJC_IMPLICIT_RETAIN_SELF = YES;
-				CLANG_WARN_OBJC_LITERAL_CONVERSION = YES;
-				CLANG_WARN_OBJC_ROOT_CLASS = YES_ERROR;
-				CLANG_WARN_QUOTED_INCLUDE_IN_FRAMEWORK_HEADER = YES;
-				CLANG_WARN_RANGE_LOOP_ANALYSIS = YES;
-				CLANG_WARN_STRICT_PROTOTYPES = YES;
-				CLANG_WARN_SUSPICIOUS_MOVE = YES;
-				CLANG_WARN_UNGUARDED_AVAILABILITY = YES_AGGRESSIVE;
-				CLANG_WARN_UNREACHABLE_CODE = YES;
-				CLANG_WARN__DUPLICATE_METHOD_MATCH = YES;
-				COPY_PHASE_STRIP = NO;
-				DEBUG_INFORMATION_FORMAT = dwarf;
-				DEVELOPMENT_TEAM = K39XS6L5PP;
-				ENABLE_STRICT_OBJC_MSGSEND = YES;
-				ENABLE_TESTABILITY = YES;
-				ENABLE_USER_SCRIPT_SANDBOXING = YES;
-				GCC_C_LANGUAGE_STANDARD = gnu17;
-				GCC_DYNAMIC_NO_PIC = NO;
-				GCC_NO_COMMON_BLOCKS = YES;
-				GCC_OPTIMIZATION_LEVEL = 0;
-				GCC_PREPROCESSOR_DEFINITIONS = (
-					"DEBUG=1",
-					"$(inherited)",
-				);
-				GCC_WARN_64_TO_32_BIT_CONVERSION = YES;
-				GCC_WARN_ABOUT_RETURN_TYPE = YES_ERROR;
-				GCC_WARN_UNDECLARED_SELECTOR = YES;
-				GCC_WARN_UNINITIALIZED_AUTOS = YES_AGGRESSIVE;
-				GCC_WARN_UNUSED_FUNCTION = YES;
-				GCC_WARN_UNUSED_VARIABLE = YES;
-				LOCALIZATION_PREFERS_STRING_CATALOGS = YES;
-				MACOSX_DEPLOYMENT_TARGET = 15.5;
-				MTL_ENABLE_DEBUG_INFO = INCLUDE_SOURCE;
-				MTL_FAST_MATH = YES;
-				ONLY_ACTIVE_ARCH = YES;
-				SDKROOT = macosx;
-				SWIFT_ACTIVE_COMPILATION_CONDITIONS = "DEBUG $(inherited)";
-				SWIFT_OPTIMIZATION_LEVEL = "-Onone";
-			};
-			name = Debug;
-		};
-		BEE5CF502DEFDF7A006EEE47 /* Release */ = {
-			isa = XCBuildConfiguration;
-			buildSettings = {
-				ALWAYS_SEARCH_USER_PATHS = NO;
-				ASSETCATALOG_COMPILER_GENERATE_SWIFT_ASSET_SYMBOL_EXTENSIONS = YES;
-				CLANG_ANALYZER_NONNULL = YES;
-				CLANG_ANALYZER_NUMBER_OBJECT_CONVERSION = YES_AGGRESSIVE;
-				CLANG_CXX_LANGUAGE_STANDARD = "gnu++20";
-				CLANG_ENABLE_MODULES = YES;
-				CLANG_ENABLE_OBJC_ARC = YES;
-				CLANG_ENABLE_OBJC_WEAK = YES;
-				CLANG_WARN_BLOCK_CAPTURE_AUTORELEASING = YES;
-				CLANG_WARN_BOOL_CONVERSION = YES;
-				CLANG_WARN_COMMA = YES;
-				CLANG_WARN_CONSTANT_CONVERSION = YES;
-				CLANG_WARN_DEPRECATED_OBJC_IMPLEMENTATIONS = YES;
-				CLANG_WARN_DIRECT_OBJC_ISA_USAGE = YES_ERROR;
-				CLANG_WARN_DOCUMENTATION_COMMENTS = YES;
-				CLANG_WARN_EMPTY_BODY = YES;
-				CLANG_WARN_ENUM_CONVERSION = YES;
-				CLANG_WARN_INFINITE_RECURSION = YES;
-				CLANG_WARN_INT_CONVERSION = YES;
-				CLANG_WARN_NON_LITERAL_NULL_CONVERSION = YES;
-				CLANG_WARN_OBJC_IMPLICIT_RETAIN_SELF = YES;
-				CLANG_WARN_OBJC_LITERAL_CONVERSION = YES;
-				CLANG_WARN_OBJC_ROOT_CLASS = YES_ERROR;
-				CLANG_WARN_QUOTED_INCLUDE_IN_FRAMEWORK_HEADER = YES;
-				CLANG_WARN_RANGE_LOOP_ANALYSIS = YES;
-				CLANG_WARN_STRICT_PROTOTYPES = YES;
-				CLANG_WARN_SUSPICIOUS_MOVE = YES;
-				CLANG_WARN_UNGUARDED_AVAILABILITY = YES_AGGRESSIVE;
-				CLANG_WARN_UNREACHABLE_CODE = YES;
-				CLANG_WARN__DUPLICATE_METHOD_MATCH = YES;
-				COPY_PHASE_STRIP = NO;
-				DEBUG_INFORMATION_FORMAT = "dwarf-with-dsym";
-				DEVELOPMENT_TEAM = K39XS6L5PP;
-				ENABLE_NS_ASSERTIONS = NO;
-				ENABLE_STRICT_OBJC_MSGSEND = YES;
-				ENABLE_USER_SCRIPT_SANDBOXING = YES;
-				GCC_C_LANGUAGE_STANDARD = gnu17;
-				GCC_NO_COMMON_BLOCKS = YES;
-				GCC_WARN_64_TO_32_BIT_CONVERSION = YES;
-				GCC_WARN_ABOUT_RETURN_TYPE = YES_ERROR;
-				GCC_WARN_UNDECLARED_SELECTOR = YES;
-				GCC_WARN_UNINITIALIZED_AUTOS = YES_AGGRESSIVE;
-				GCC_WARN_UNUSED_FUNCTION = YES;
-				GCC_WARN_UNUSED_VARIABLE = YES;
-				LOCALIZATION_PREFERS_STRING_CATALOGS = YES;
-				MACOSX_DEPLOYMENT_TARGET = 15.5;
-				MTL_ENABLE_DEBUG_INFO = NO;
-				MTL_FAST_MATH = YES;
-				SDKROOT = macosx;
-				SWIFT_COMPILATION_MODE = wholemodule;
-			};
-			name = Release;
-		};
-		BEE5CF522DEFDF7A006EEE47 /* Debug */ = {
-			isa = XCBuildConfiguration;
-			buildSettings = {
 				ASSETCATALOG_COMPILER_APPICON_NAME = AppIcon;
-				ASSETCATALOG_COMPILER_GLOBAL_ACCENT_COLOR_NAME = AccentColor;
-				ASSETCATALOG_COMPILER_INCLUDE_ALL_APPICON_ASSETS = NO;
-				CODE_SIGN_ENTITLEMENTS = HyperChat/HyperChat.entitlements;
+				CLANG_ANALYZER_NONNULL = YES;
+				CLANG_ANALYZER_NUMBER_OBJECT_CONVERSION = YES_AGGRESSIVE;
+				CLANG_CXX_LANGUAGE_STANDARD = "gnu++17";
+				CLANG_ENABLE_MODULES = YES;
+				CLANG_ENABLE_OBJC_ARC = YES;
+				CLANG_ENABLE_OBJC_WEAK = YES;
+				CLANG_WARN_DOCUMENTATION_COMMENTS = YES;
+				CLANG_WARN_UNGUARDED_AVAILABILITY = YES_AGGRESSIVE;
+				CODE_SIGN_ENTITLEMENTS = HyperChat.entitlements;
 				CODE_SIGN_STYLE = Automatic;
-				COMBINE_HIDPI_IMAGES = YES;
+				COPY_PHASE_STRIP = NO;
 				CURRENT_PROJECT_VERSION = 1;
+				DEBUG_INFORMATION_FORMAT = dwarf;
 				DEVELOPMENT_TEAM = K39XS6L5PP;
 				ENABLE_HARDENED_RUNTIME = YES;
 				ENABLE_PREVIEWS = YES;
-				GENERATE_INFOPLIST_FILE = NO;
-				INFOPLIST_FILE = HyperChat/Info.plist;
-				INFOPLIST_KEY_CFBundleDisplayName = HyperChat;
-				INFOPLIST_KEY_NSHumanReadableCopyright = "";
+				GCC_C_LANGUAGE_STANDARD = gnu11;
+				GCC_NO_COMMON_BLOCKS = YES;
+				INFOPLIST_FILE = Info.plist;
 				LD_RUNPATH_SEARCH_PATHS = (
 					"$(inherited)",
 					"@executable_path/../Frameworks",
 				);
-				MACOSX_DEPLOYMENT_TARGET = 14.6;
+				MACOSX_DEPLOYMENT_TARGET = 15.5;
 				MARKETING_VERSION = 1.0;
-				PRODUCT_BUNDLE_IDENTIFIER = com.Transcendence.HyperChat;
+				MTL_ENABLE_DEBUG_INFO = INCLUDE_SOURCE;
+				PRODUCT_BUNDLE_IDENTIFIER = com.transcendence.hyperchat;
 				PRODUCT_NAME = "$(TARGET_NAME)";
-				REGISTER_APP_GROUPS = YES;
-				SWIFT_EMIT_LOC_STRINGS = YES;
+				SWIFT_ACTIVE_COMPILATION_CONDITIONS = DEBUG;
+				SWIFT_OPTIMIZATION_LEVEL = "-Onone";
 				SWIFT_VERSION = 5.0;
 			};
 			name = Debug;
 		};
-		BEE5CF532DEFDF7A006EEE47 /* Release */ = {
+		3EE13B992C4F6B2900A8A61E /* Release */ = {
 			isa = XCBuildConfiguration;
 			buildSettings = {
+				ALWAYS_SEARCH_USER_PATHS = NO;
 				ASSETCATALOG_COMPILER_APPICON_NAME = AppIcon;
-				ASSETCATALOG_COMPILER_GLOBAL_ACCENT_COLOR_NAME = AccentColor;
-				ASSETCATALOG_COMPILER_INCLUDE_ALL_APPICON_ASSETS = NO;
-				CODE_SIGN_ENTITLEMENTS = HyperChat/HyperChat.entitlements;
+				CLANG_ANALYZER_NONNULL = YES;
+				CLANG_ANALYZER_NUMBER_OBJECT_CONVERSION = YES_AGGRESSIVE;
+				CLANG_CXX_LANGUAGE_STANDARD = "gnu++17";
+				CLANG_ENABLE_MODULES = YES;
+				CLANG_ENABLE_OBJC_ARC = YES;
+				CLANG_ENABLE_OBJC_WEAK = YES;
+				CLANG_WARN_DOCUMENTATION_COMMENTS = YES;
+				CLANG_WARN_UNGUARDED_AVAILABILITY = YES_AGGRESSIVE;
+				CODE_SIGN_ENTITLEMENTS = HyperChat.entitlements;
 				CODE_SIGN_STYLE = Automatic;
-				COMBINE_HIDPI_IMAGES = YES;
+				COPY_PHASE_STRIP = YES;
 				CURRENT_PROJECT_VERSION = 1;
+				DEBUG_INFORMATION_FORMAT = "dwarf-with-dsym";
 				DEVELOPMENT_TEAM = K39XS6L5PP;
 				ENABLE_HARDENED_RUNTIME = YES;
 				ENABLE_PREVIEWS = YES;
-				GENERATE_INFOPLIST_FILE = NO;
-				INFOPLIST_FILE = HyperChat/Info.plist;
-				INFOPLIST_KEY_CFBundleDisplayName = HyperChat;
-				INFOPLIST_KEY_NSHumanReadableCopyright = "";
+				GCC_C_LANGUAGE_STANDARD = gnu11;
+				GCC_NO_COMMON_BLOCKS = YES;
+				INFOPLIST_FILE = Info.plist;
 				LD_RUNPATH_SEARCH_PATHS = (
 					"$(inherited)",
 					"@executable_path/../Frameworks",
 				);
-				MACOSX_DEPLOYMENT_TARGET = 14.6;
+				MACOSX_DEPLOYMENT_TARGET = 15.5;
 				MARKETING_VERSION = 1.0;
-				PRODUCT_BUNDLE_IDENTIFIER = com.Transcendence.HyperChat;
+				MTL_COMPILER_PERFORMANCE_ANALYSIS = YES;
+				MTL_ENABLE_DEBUG_INFO = NO;
+				PRODUCT_BUNDLE_IDENTIFIER = com.transcendence.hyperchat;
 				PRODUCT_NAME = "$(TARGET_NAME)";
-				REGISTER_APP_GROUPS = YES;
-				SWIFT_EMIT_LOC_STRINGS = YES;
+				SWIFT_COMPILATION_MODE = wholemodule;
+				SWIFT_OPTIMIZATION_LEVEL = "-O";
 				SWIFT_VERSION = 5.0;
 			};
 			name = Release;
@@ -310,25 +251,25 @@
 /* End XCBuildConfiguration section */
 
 /* Begin XCConfigurationList section */
-		BEE5CF402DEFDF79006EEE47 /* Build configuration list for PBXProject "HyperChat" */ = {
+		3EE13B9A2C4F6B2900A8A61E /* Build configuration list for PBXProject "HyperChat" */ = {
 			isa = XCConfigurationList;
 			buildConfigurations = (
-				BEE5CF4F2DEFDF7A006EEE47 /* Debug */,
-				BEE5CF502DEFDF7A006EEE47 /* Release */,
+				3EE13B982C4F6B2900A8A61E /* Debug */,
+				3EE13B992C4F6B2900A8A61E /* Release */,
 			);
 			defaultConfigurationIsVisible = 0;
 			defaultConfigurationName = Release;
 		};
-		BEE5CF512DEFDF7A006EEE47 /* Build configuration list for PBXNativeTarget "HyperChat" */ = {
+		3EE13BA22C4F6B2900A8A61E /* Build configuration list for PBXNativeTarget "HyperChat" */ = {
 			isa = XCConfigurationList;
 			buildConfigurations = (
-				BEE5CF522DEFDF7A006EEE47 /* Debug */,
-				BEE5CF532DEFDF7A006EEE47 /* Release */,
+				3EE13B982C4F6B2900A8A61E /* Debug */,
+				3EE13B992C4F6B2900A8A61E /* Release */,
 			);
 			defaultConfigurationIsVisible = 0;
 			defaultConfigurationName = Release;
 		};
 /* End XCConfigurationList section */
 	};
-	rootObject = BEE5CF3D2DEFDF79006EEE47 /* Project object */;
+	rootObject = 3EE13B842C4F6B2900A8A61E /* Project object */;
 }

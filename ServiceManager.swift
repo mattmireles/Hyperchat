@@ -335,6 +335,7 @@ class ClaudeService: WebService {
 class ServiceManager: ObservableObject {
     @Published var activeServices: [AIService] = []
     var webServices: [String: WebService] = [:]
+    private let processPool = WKProcessPool.shared  // Critical optimization
     
     init() {
         setupServices()
@@ -359,8 +360,13 @@ class ServiceManager: ObservableObject {
     }
     
     func executePrompt(_ prompt: String) {
+        // Reset all WebViews to a clean state before executing new prompt
         for service in activeServices {
-            webServices[service.id]?.executePrompt(prompt)
+            if let webService = webServices[service.id] {
+                // Stop any ongoing loads and execute the new prompt
+                webService.browserView.webView.stopLoading()
+                webService.executePrompt(prompt)
+            }
         }
     }
     
@@ -369,7 +375,7 @@ class ServiceManager: ObservableObject {
         if #available(macOS 11.0, *) {
             configuration.defaultWebpagePreferences.allowsContentJavaScript = true
         }
-        configuration.processPool = .shared
+        configuration.processPool = processPool
         
         let userAgent = UserAgentGenerator.generate()
         configuration.applicationNameForUserAgent = userAgent.applicationName
@@ -377,7 +383,20 @@ class ServiceManager: ObservableObject {
         let webView = WKWebView(frame: .zero, configuration: configuration)
         webView.customUserAgent = userAgent.fullUserAgent
         
+        // Set valid preferences
+        webView.configuration.preferences.setValue(true, forKey: "developerExtrasEnabled")
+        
         return webView
+    }
+    
+    func resetForNewPrompt() {
+        // Stop all WebViews to prepare for a new prompt.
+        // Loading a blank page here was causing the WebContent processes to crash.
+        for service in activeServices {
+            if let webService = webServices[service.id] {
+                webService.browserView.webView.stopLoading()
+            }
+        }
     }
 }
 
