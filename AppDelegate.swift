@@ -5,10 +5,12 @@ class AppDelegate: NSObject, NSApplicationDelegate {
     var floatingButtonManager: FloatingButtonManager
     var overlayController: OverlayController
     var promptWindowController: PromptWindowController
+    var serviceManager: ServiceManager
 
     override init() {
+        self.serviceManager = ServiceManager()
         self.floatingButtonManager = FloatingButtonManager()
-        self.overlayController = OverlayController()
+        self.overlayController = OverlayController(serviceManager: self.serviceManager)
         self.promptWindowController = PromptWindowController()
         super.init()
     }
@@ -20,6 +22,9 @@ class AppDelegate: NSObject, NSApplicationDelegate {
         
         // Setup minimal menu bar for Edit menu (copy/paste support)
         setupMenuBar()
+        
+        // Show the window in normal view on startup
+        overlayController.showOverlay()
         
         // Listen for prompt submission to show overlay
         NotificationCenter.default.addObserver(forName: .showOverlay, object: nil, queue: .main) { [weak self] notification in

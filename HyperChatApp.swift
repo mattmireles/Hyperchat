@@ -1,4 +1,5 @@
 import SwiftUI
+import AppKit
 
 @main
 struct HyperChatApp: App {
