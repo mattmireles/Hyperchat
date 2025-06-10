@@ -27,6 +27,14 @@ class BrowserView: NSView {
         setupWebViewDelegate()
     }
     
+    override var acceptsFirstResponder: Bool {
+        return true
+    }
+    
+    override func acceptsFirstMouse(for event: NSEvent?) -> Bool {
+        return true
+    }
+    
     required init?(coder: NSCoder) {
         fatalError("init(coder:) has not been implemented")
     }
@@ -159,6 +167,14 @@ extension BrowserView: WKNavigationDelegate {
             self?.updateBackButton()
         }
     }
+    
+    func webView(_ webView: WKWebView, didFailProvisionalNavigation navigation: WKNavigation!, withError error: Error) {
+        // Handle provisional navigation failures
+        DispatchQueue.main.async { [weak self] in
+            self?.urlField.stringValue = webView.url?.absoluteString ?? ""
+            self?.updateBackButton()
+        }
+    }
 }
 
 // MARK: - Service Configuration
@@ -227,6 +243,7 @@ let defaultServices = [
 
 protocol WebService {
     func executePrompt(_ prompt: String)
+    func executePrompt(_ prompt: String, replyToAll: Bool)
     var browserView: BrowserView { get }
     var service: AIService { get }
 }
@@ -241,16 +258,210 @@ class URLParameterService: WebService {
     }
 
     func executePrompt(_ prompt: String) {
-        guard case .urlParameter = service.activationMethod,
-              let config = ServiceConfigurations.config(for: service.id) else { return }
-        
-        let urlString = config.buildURL(with: prompt)
-        print("🔗 \(service.name): Loading URL: \(urlString)")
-        
-        if let url = URL(string: urlString) {
-            browserView.webView.load(URLRequest(url: url))
+        executePrompt(prompt, replyToAll: false)
+    }
+    
+    func executePrompt(_ prompt: String, replyToAll: Bool) {
+        if replyToAll {
+            // Use clipboard paste for Reply to All mode
+            pastePromptIntoCurrentPage(prompt)
         } else {
-            print("❌ \(service.name): Failed to create URL from: \(urlString)")
+            // New Chat mode: Use URL parameters for all services
+            guard case .urlParameter = service.activationMethod,
+                  let config = ServiceConfigurations.config(for: service.id) else { return }
+            
+            let urlString = config.buildURL(with: prompt)
+            print("🔗 \(service.name): Loading URL: \(urlString)")
+            
+            if let url = URL(string: urlString) {
+                browserView.webView.load(URLRequest(url: url))
+            } else {
+                print("❌ \(service.name): Failed to create URL from: \(urlString)")
+            }
+        }
+    }
+    
+    private func loadHomePage() {
+        let defaultURL: String
+        
+        switch service.id {
+        case "google":
+            defaultURL = "https://www.google.com"
+        case "perplexity":
+            defaultURL = "https://www.perplexity.ai"
+        case "chatgpt":
+            defaultURL = "https://chatgpt.com"
+        case "claude":
+            defaultURL = "https://claude.ai"
+        default:
+            return
+        }
+        
+        if let url = URL(string: defaultURL) {
+            browserView.webView.load(URLRequest(url: url))
+        }
+    }
+    
+    private func pastePromptIntoCurrentPage(_ prompt: String) {
+        // Copy prompt to clipboard
+        let pasteboard = NSPasteboard.general
+        pasteboard.clearContents()
+        pasteboard.setString(prompt, forType: .string)
+        
+        print("PASTE \(service.name): Pasting prompt '\(prompt.prefix(50))...' into current page")
+        
+        // Execute JavaScript to find and paste into text field
+        DispatchQueue.main.asyncAfter(deadline: .now() + 1.0) {
+            self.browserView.webView.evaluateJavaScript("""
+                (function() {
+                    const promptText = `\(prompt.replacingOccurrences(of: "`", with: "\\`"))`;
+                    console.log('PASTE: Starting with prompt:', promptText.substring(0, 50));
+                    
+                    // Enhanced service-specific selectors
+                    const selectors = [
+                        // ChatGPT - try multiple known selectors
+                        'div[contenteditable="true"][data-id="root"]',
+                        '#prompt-textarea',
+                        'textarea[data-id="root"]',
+                        'textarea[placeholder*="Message ChatGPT"]',
+                        'textarea[placeholder*="Send a message"]',
+                        'div[contenteditable="true"][role="textbox"]',
+                        
+                        // Perplexity - comprehensive selectors
+                        'textarea[placeholder*="Ask anything"]',
+                        'textarea[placeholder*="Ask follow-up"]',
+                        'textarea[placeholder*="Ask"]',
+                        'textarea[aria-label*="Ask"]',
+                        'div[contenteditable="true"][aria-label*="Ask"]',
+                        
+                        // Google Search - all variations
+                        'input[name="q"]',
+                        'textarea[name="q"]',
+                        'input[title="Search"]',
+                        'input[aria-label*="Search"]',
+                        'input[role="combobox"]',
+                        'input[type="search"]',
+                        
+                        // General fallbacks with better filtering
+                        'textarea:not([readonly]):not([disabled]):not([style*="display: none"]):not([style*="visibility: hidden"])',
+                        'input[type="text"]:not([readonly]):not([disabled]):not([style*="display: none"]):not([style*="visibility: hidden"])',
+                        'div[contenteditable="true"]:not([style*="display: none"]):not([style*="visibility: hidden"])'
+                    ];
+                    
+                    let input = null;
+                    let inputType = 'unknown';
+                    
+                    // Find the first visible and interactable input
+                    for (const selector of selectors) {
+                        const elements = document.querySelectorAll(selector);
+                        for (const el of elements) {
+                            const rect = el.getBoundingClientRect();
+                            const style = window.getComputedStyle(el);
+                            
+                            if (rect.width > 0 && rect.height > 0 && 
+                                style.display !== 'none' && 
+                                style.visibility !== 'hidden' &&
+                                !el.disabled && !el.readOnly) {
+                                input = el;
+                                inputType = el.tagName.toLowerCase();
+                                break;
+                            }
+                        }
+                        if (input) break;
+                    }
+                    
+                    if (input) {
+                        try {
+                            // Focus the input
+                            input.focus();
+                            input.click();
+                            
+                            // Wait for focus to take effect
+                            setTimeout(() => {
+                                try {
+                                    // Direct text insertion instead of clipboard paste
+                                    if (inputType === 'div') {
+                                        // For contenteditable divs
+                                        input.textContent = promptText;
+                                        input.innerHTML = promptText; // Fallback
+                                    } else {
+                                        // For input/textarea elements
+                                        input.value = promptText;
+                                    }
+                                    
+                                    console.log('DIRECT SET: Set text to', promptText.substring(0, 50));
+                                    
+                                    // Fire comprehensive events to notify frameworks
+                                    const events = [
+                                        new Event('input', { bubbles: true, cancelable: true }),
+                                        new Event('change', { bubbles: true, cancelable: true }),
+                                        new Event('keyup', { bubbles: true, cancelable: true }),
+                                        new Event('blur', { bubbles: true, cancelable: true }),
+                                        new Event('focus', { bubbles: true, cancelable: true })
+                                    ];
+                                    
+                                    events.forEach(event => {
+                                        try {
+                                            input.dispatchEvent(event);
+                                        } catch (e) {
+                                            console.log('Event error:', e);
+                                        }
+                                    });
+                                    
+                                    // React-specific events
+                                    if (input._valueTracker) {
+                                        input._valueTracker.setValue('');
+                                    }
+                                    
+                                    const reactInputEvent = new Event('input', { bubbles: true });
+                                    reactInputEvent.simulated = true;
+                                    input.dispatchEvent(reactInputEvent);
+                                    
+                                } catch (e) {
+                                    console.log('DIRECT SET ERROR:', e);
+                                }
+                            }, 200);
+                            
+                            console.log('SUCCESS: Found input', inputType, input.placeholder || input.getAttribute('aria-label') || 'no-label');
+                            return 'SUCCESS: Found ' + inputType;
+                        } catch (e) {
+                            console.log('ERROR setting up paste:', e);
+                            return 'ERROR: ' + e.message;
+                        }
+                    } else {
+                        console.log('ERROR: No suitable input found');
+                        // Enhanced debugging
+                        const allInputs = document.querySelectorAll('input, textarea, div[contenteditable]');
+                        console.log('DEBUG: Found', allInputs.length, 'total input elements');
+                        
+                        // Log details about each input element for debugging
+                        allInputs.forEach((el, i) => {
+                            const rect = el.getBoundingClientRect();
+                            const style = window.getComputedStyle(el);
+                            console.log('INPUT', i, ':', {
+                                tagName: el.tagName,
+                                type: el.type || 'N/A',
+                                placeholder: el.placeholder || 'N/A',
+                                'aria-label': el.getAttribute('aria-label') || 'N/A',
+                                'data-id': el.getAttribute('data-id') || 'N/A',
+                                visible: rect.width > 0 && rect.height > 0,
+                                display: style.display,
+                                visibility: style.visibility,
+                                disabled: el.disabled,
+                                readonly: el.readOnly
+                            });
+                        });
+                        
+                        return 'ERROR: No input found (' + allInputs.length + ' total inputs)';
+                    }
+                })();
+            """) { result, error in
+                if let error = error {
+                    print("PASTE ERROR \(self.service.name): \(error)")
+                } else {
+                    print("PASTE RESULT \(self.service.name): \(result ?? "unknown")")
+                }
+            }
         }
     }
 }
@@ -265,6 +476,10 @@ class ClaudeService: WebService {
     }
 
     func executePrompt(_ prompt: String) {
+        executePrompt(prompt, replyToAll: false)
+    }
+    
+    func executePrompt(_ prompt: String, replyToAll: Bool) {
         guard case .clipboardPaste(let baseURL) = service.activationMethod else { return }
         
         let pasteboard = NSPasteboard.general
@@ -332,12 +547,16 @@ class ClaudeService: WebService {
 
 // MARK: - ServiceManager
 
-class ServiceManager: ObservableObject {
+class ServiceManager: NSObject, ObservableObject {
     @Published var activeServices: [AIService] = []
+    @Published var sharedPrompt: String = ""
+    @Published var replyToAll: Bool = false
+    @Published var loadingStates: [String: Bool] = [:]  // Track loading state per service (for UI only)
     var webServices: [String: WebService] = [:]
     private let processPool = WKProcessPool.shared  // Critical optimization
     
-    init() {
+    override init() {
+        super.init()
         setupServices()
     }
     
@@ -356,6 +575,7 @@ class ServiceManager: ObservableObject {
             
             webServices[service.id] = webService
             activeServices.append(service)
+            loadingStates[service.id] = false
             
             // Load default homepage for each service
             loadDefaultPage(for: service, webView: webView)
@@ -379,18 +599,77 @@ class ServiceManager: ObservableObject {
         }
         
         if let url = URL(string: defaultURL) {
-            webView.load(URLRequest(url: url))
+            var request = URLRequest(url: url)
+            // Add headers to prevent loading conflicts
+            request.setValue("no-cache", forHTTPHeaderField: "Cache-Control")
+            request.setValue("Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/605.1.15 (KHTML, like Gecko) Version/17.0 Safari/605.1.15", forHTTPHeaderField: "User-Agent")
+            
+            // Give each service a small delay to prevent conflicts
+            let delay = service.id == "google" ? 2.0 : 0.5
+            DispatchQueue.main.asyncAfter(deadline: .now() + delay) {
+                webView.load(request)
+            }
         }
     }
     
-    func executePrompt(_ prompt: String) {
-        // Give WebViews a moment to fully initialize if they were just created
-        DispatchQueue.main.asyncAfter(deadline: .now() + 0.5) { [weak self] in
-            // Execute prompt on all services without stopping them first
-            for service in self?.activeServices ?? [] {
-                if let webService = self?.webServices[service.id] {
-                    webService.executePrompt(prompt)
+    func executePrompt(_ prompt: String, replyToAll: Bool = false) {
+        // Execute prompt on all services
+        for service in activeServices {
+            if let webService = webServices[service.id] {
+                if replyToAll {
+                    // Reply to All mode: immediate execution with clipboard paste
+                    webService.executePrompt(prompt, replyToAll: true)
+                } else {
+                    // New Chat mode: use URL navigation with slight delay
+                    if service.id == "google" {
+                        DispatchQueue.main.asyncAfter(deadline: .now() + 1.0) {
+                            webService.executePrompt(prompt, replyToAll: false)
+                        }
+                    } else {
+                        DispatchQueue.main.asyncAfter(deadline: .now() + 0.3) {
+                            webService.executePrompt(prompt, replyToAll: false)
+                        }
+                    }
                 }
+            }
+        }
+    }
+    
+    func executeSharedPrompt() {
+        guard !sharedPrompt.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty else { return }
+        
+        let promptToExecute = sharedPrompt // Store the prompt before clearing
+        
+        if replyToAll {
+            // Reply to All Mode: Paste into current pages immediately
+            executePrompt(promptToExecute, replyToAll: true)
+            // Clear the prompt after sending
+            sharedPrompt = ""
+        } else {
+            // New Chat Mode: Reload each service first, then send prompt after short delay
+            reloadAllServices()
+            // Clear the prompt immediately for UI feedback
+            sharedPrompt = ""
+            
+            // Use a much shorter delay - 2 seconds instead of 4
+            DispatchQueue.main.asyncAfter(deadline: .now() + 2.0) {
+                self.executePrompt(promptToExecute, replyToAll: false)
+            }
+        }
+    }
+    
+    func reloadAllServices() {
+        for service in activeServices {
+            if let webService = webServices[service.id] {
+                loadingStates[service.id] = true
+                loadDefaultPage(for: service, webView: webService.browserView.webView)
+            }
+        }
+        
+        // Clear loading states after a reasonable delay
+        DispatchQueue.main.asyncAfter(deadline: .now() + 3.0) {
+            for service in self.activeServices {
+                self.loadingStates[service.id] = false
             }
         }
     }
@@ -402,29 +681,55 @@ class ServiceManager: ObservableObject {
         }
         configuration.processPool = processPool
         
+        // Prevent loading cancellations
+        configuration.suppressesIncrementalRendering = false
+        
         let userAgent = UserAgentGenerator.generate()
         configuration.applicationNameForUserAgent = userAgent.applicationName
         
         let webView = WKWebView(frame: .zero, configuration: configuration)
         webView.customUserAgent = userAgent.fullUserAgent
         
+        // Enable interactions
+        webView.allowsBackForwardNavigationGestures = true
+        webView.allowsMagnification = true
+        
         // Set valid preferences
         webView.configuration.preferences.setValue(true, forKey: "developerExtrasEnabled")
+        
+        // Add navigation delegate to handle errors
+        webView.navigationDelegate = self
         
         return webView
     }
     
     func resetForNewPrompt() {
-        // Stop all WebViews to prepare for a new prompt.
-        // Loading a blank page here was causing the WebContent processes to crash.
-        for service in activeServices {
-            if let webService = webServices[service.id] {
-                webService.browserView.webView.stopLoading()
-            }
-        }
+        // Don't stop loading during normal operation as it causes -999 errors
+        // Only stop if absolutely necessary
     }
 }
 
 extension WKProcessPool {
     static let shared = WKProcessPool()
+}
+
+// MARK: - WKNavigationDelegate for ServiceManager
+
+extension ServiceManager: WKNavigationDelegate {
+    func webView(_ webView: WKWebView, didFail navigation: WKNavigation!, withError error: Error) {
+        let nsError = error as NSError
+        print("ERROR WebView navigation failed: \(nsError.code) - \(nsError.localizedDescription)")
+        // Don't retry automatically to prevent unresponsive processes
+    }
+    
+    func webView(_ webView: WKWebView, didFailProvisionalNavigation navigation: WKNavigation!, withError error: Error) {
+        let nsError = error as NSError
+        print("ERROR WebView provisional navigation failed: \(nsError.code) - \(nsError.localizedDescription)")
+        // Don't retry automatically to prevent unresponsive processes
+    }
+    
+    func webView(_ webView: WKWebView, didFinish navigation: WKNavigation!) {
+        let urlString = webView.url?.absoluteString ?? "unknown"
+        print("SUCCESS WebView loaded successfully: \(urlString)")
+    }
 } 
