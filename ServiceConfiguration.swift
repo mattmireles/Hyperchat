@@ -31,10 +31,7 @@ struct ServiceURLConfig {
 struct ServiceConfigurations {
     static let chatGPT = ServiceURLConfig(
         baseURL: "https://chatgpt.com",
-        queryParam: "q",
-        additionalParams: [
-            "model": "gpt-4o"  // You can change this to gpt-3.5-turbo, gpt-4, etc.
-        ]
+        queryParam: "q"
     )
     
     static let perplexity = ServiceURLConfig(
