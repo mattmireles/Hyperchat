@@ -377,8 +377,8 @@ class URLParameterService: WebService {
                             // For Perplexity, be extra careful to avoid sidebar expansion
                             const isPerplexity = window.location.hostname.includes('perplexity');
                             
+                            // For Perplexity, skip focus to avoid sidebar expansion
                             if (!isPerplexity) {
-                                // Only focus for non-Perplexity sites
                                 input.focus();
                             }
                             
@@ -550,25 +550,107 @@ class URLParameterService: WebService {
                 } else {
                     print("PASTE RESULT \(self.service.name): \(result ?? "unknown")")
                     
-                    // For Perplexity, try to collapse any expanded sidebar
+                    // For Perplexity, lightly suppress sidebar expansion
                     if self.service.name == "Perplexity" {
-                        DispatchQueue.main.asyncAfter(deadline: .now() + 0.5) {
-                            self.browserView.webView.evaluateJavaScript("""
-                                // Try to close Perplexity sidebar if it's open
-                                const sidebar = document.querySelector('[data-testid="sidebar"], .sidebar, aside');
-                                if (sidebar) {
-                                    // Click on main content area to dismiss sidebar
-                                    const mainContent = document.querySelector('main, [role="main"], .main-content');
-                                    if (mainContent) {
-                                        mainContent.click();
-                                    }
-                                }
-                            """)
-                        }
+                        // Brief sidebar suppression
+                        self.suppressPerplexitySidebar()
                     }
                 }
             }
         }
+    }
+    
+    private func suppressPerplexitySidebar() {
+        browserView.webView.evaluateJavaScript("""
+            console.log('SIDEBAR DEBUG: Starting comprehensive sidebar analysis...');
+            
+            // First, let's find all potential sidebar elements
+            const allSidebarElements = {
+                'group/sidebar': document.querySelector('.group\\/sidebar'),
+                'group/sidebar-menu': document.querySelector('.group\\/sidebar-menu'),
+                'sidebar-testid': document.querySelector('[data-testid="sidebar"]'),
+                'width216px': document.querySelector('div[style*="width:216px"]'),
+                'width200px': document.querySelector('div[style*="width:200px"]'),
+                'pointer-events-none': document.querySelector('.pointer-events-none.absolute.inset-y-0')
+            };
+            
+            console.log('SIDEBAR DEBUG: Found elements:', allSidebarElements);
+            
+            // Log initial state of all elements
+            Object.entries(allSidebarElements).forEach(([name, element]) => {
+                if (element) {
+                    const style = window.getComputedStyle(element);
+                    console.log(`SIDEBAR DEBUG: ${name} initial state:`, {
+                        opacity: style.opacity,
+                        transform: style.transform,
+                        visibility: style.visibility,
+                        pointerEvents: style.pointerEvents,
+                        className: element.className,
+                        style: element.getAttribute('style')
+                    });
+                }
+            });
+            
+            // Function to log current state of all sidebar elements
+            const logSidebarState = (reason) => {
+                console.log(`SIDEBAR DEBUG: State check (${reason}):`);
+                Object.entries(allSidebarElements).forEach(([name, element]) => {
+                    if (element) {
+                        const style = window.getComputedStyle(element);
+                        const isVisible = style.opacity !== '0' && style.visibility !== 'hidden';
+                        console.log(`  ${name}: opacity=${style.opacity}, visible=${isVisible}, transform=${style.transform}`);
+                    }
+                });
+            };
+            
+            // Monitor the main sidebar container
+            const mainSidebar = allSidebarElements['group/sidebar'];
+            if (mainSidebar) {
+                console.log('SIDEBAR DEBUG: Setting up monitoring on main sidebar');
+                
+                // Set up mutation observer
+                const observer = new MutationObserver((mutations) => {
+                    mutations.forEach((mutation) => {
+                        console.log('SIDEBAR DEBUG: Mutation detected:', {
+                            type: mutation.type,
+                            attributeName: mutation.attributeName,
+                            target: mutation.target.className,
+                            oldValue: mutation.oldValue
+                        });
+                        
+                        if (mutation.attributeName === 'class') {
+                            console.log('SIDEBAR DEBUG: Class changed from', mutation.oldValue, 'to', mutation.target.className);
+                        }
+                        
+                        logSidebarState('mutation detected');
+                    });
+                });
+                
+                // Observe with detailed options
+                observer.observe(mainSidebar, {
+                    attributes: true,
+                    subtree: true,
+                    attributeOldValue: true,
+                    attributeFilter: ['style', 'class']
+                });
+                
+                // Periodic state logging
+                let checkCount = 0;
+                const intervalId = setInterval(() => {
+                    checkCount++;
+                    logSidebarState(`periodic check #${checkCount}`);
+                }, 500);
+                
+                // Clean up after 10 seconds
+                setTimeout(() => {
+                    console.log('SIDEBAR DEBUG: Cleaning up monitoring');
+                    observer.disconnect();
+                    clearInterval(intervalId);
+                }, 10000);
+            } else {
+                console.log('SIDEBAR DEBUG: No main sidebar found to monitor');
+            }
+        """)
     }
 }
 
