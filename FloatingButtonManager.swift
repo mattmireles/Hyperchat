@@ -146,11 +146,11 @@ class FloatingButtonManager {
     }
 
     @objc private func floatingButtonClicked() {
-        // If an overlay is currently visible, hide it first
-        overlayController?.hideOverlay()
-
-        // We re-create it each time to ensure it's fresh.
-        promptWindowController = PromptWindowController()
+        // Don't hide overlay if it's visible - just show prompt window
+        // This prevents the hanging issue
+        
+        // The controller is now persistent and passed in from the AppDelegate.
+        // DO NOT re-create it here.
         
         // Use the screen the button is on, or the one with the mouse, or fallback to main.
         let screen = buttonWindow?.screen ?? NSScreen.screenWithMouse() ?? NSScreen.main!
