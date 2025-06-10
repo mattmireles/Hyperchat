@@ -263,10 +263,10 @@ class URLParameterService: WebService {
     
     func executePrompt(_ prompt: String, replyToAll: Bool) {
         if replyToAll {
-            // Use clipboard paste for Reply to All mode
+            // Reply to All mode: Use clipboard paste with auto-submit
             pastePromptIntoCurrentPage(prompt)
         } else {
-            // New Chat mode: Use URL parameters for all services
+            // New Chat mode: Use URL parameters for all services (no auto-submit)
             guard case .urlParameter = service.activationMethod,
                   let config = ServiceConfigurations.config(for: service.id) else { return }
             
@@ -317,14 +317,16 @@ class URLParameterService: WebService {
                     const promptText = `\(prompt.replacingOccurrences(of: "`", with: "\\`"))`;
                     console.log('PASTE: Starting with prompt:', promptText.substring(0, 50));
                     
-                    // Enhanced service-specific selectors
+                    // Enhanced service-specific selectors with latest ChatGPT selectors
                     const selectors = [
-                        // ChatGPT - try multiple known selectors
+                        // ChatGPT - latest selectors (2024/2025)
+                        'textarea[data-testid="textbox"]',
+                        'div[contenteditable="true"][data-testid="textbox"]',
+                        'textarea[placeholder*="Message ChatGPT"]',
+                        'textarea[placeholder*="Send a message"]',
                         'div[contenteditable="true"][data-id="root"]',
                         '#prompt-textarea',
                         'textarea[data-id="root"]',
-                        'textarea[placeholder*="Message ChatGPT"]',
-                        'textarea[placeholder*="Send a message"]',
                         'div[contenteditable="true"][role="textbox"]',
                         
                         // Perplexity - comprehensive selectors
@@ -372,11 +374,15 @@ class URLParameterService: WebService {
                     
                     if (input) {
                         try {
-                            // Focus the input
-                            input.focus();
-                            input.click();
+                            // For Perplexity, be extra careful to avoid sidebar expansion
+                            const isPerplexity = window.location.hostname.includes('perplexity');
                             
-                            // Wait for focus to take effect
+                            if (!isPerplexity) {
+                                // Only focus for non-Perplexity sites
+                                input.focus();
+                            }
+                            
+                            // Wait for any focus effects to settle
                             setTimeout(() => {
                                 try {
                                     // Direct text insertion instead of clipboard paste
@@ -392,7 +398,11 @@ class URLParameterService: WebService {
                                     console.log('DIRECT SET: Set text to', promptText.substring(0, 50));
                                     
                                     // Fire comprehensive events to notify frameworks
-                                    const events = [
+                                    // For Perplexity, skip focus/blur events that might trigger UI changes
+                                    const events = isPerplexity ? [
+                                        new Event('input', { bubbles: true, cancelable: true }),
+                                        new Event('change', { bubbles: true, cancelable: true })
+                                    ] : [
                                         new Event('input', { bubbles: true, cancelable: true }),
                                         new Event('change', { bubbles: true, cancelable: true }),
                                         new Event('keyup', { bubbles: true, cancelable: true }),
@@ -416,6 +426,85 @@ class URLParameterService: WebService {
                                     const reactInputEvent = new Event('input', { bubbles: true });
                                     reactInputEvent.simulated = true;
                                     input.dispatchEvent(reactInputEvent);
+                                    
+                                    // Auto-submit after a short delay
+                                    setTimeout(() => {
+                                        try {
+                                            // Create more complete keyboard events that match real browser behavior
+                                            const keydownEvent = new KeyboardEvent('keydown', {
+                                                key: 'Enter',
+                                                code: 'Enter',
+                                                keyCode: 13,
+                                                which: 13,
+                                                charCode: 13,
+                                                bubbles: true,
+                                                cancelable: true,
+                                                composed: true,
+                                                isTrusted: true
+                                            });
+                                            
+                                            const keypressEvent = new KeyboardEvent('keypress', {
+                                                key: 'Enter',
+                                                code: 'Enter',
+                                                keyCode: 13,
+                                                which: 13,
+                                                charCode: 13,
+                                                bubbles: true,
+                                                cancelable: true,
+                                                composed: true
+                                            });
+                                            
+                                            const keyupEvent = new KeyboardEvent('keyup', {
+                                                key: 'Enter',
+                                                code: 'Enter',
+                                                keyCode: 13,
+                                                which: 13,
+                                                charCode: 13,
+                                                bubbles: true,
+                                                cancelable: true,
+                                                composed: true
+                                            });
+                                            
+                                            // Dispatch all three events in sequence (like real typing)
+                                            input.dispatchEvent(keydownEvent);
+                                            setTimeout(() => {
+                                                input.dispatchEvent(keypressEvent);
+                                                setTimeout(() => {
+                                                    input.dispatchEvent(keyupEvent);
+                                                }, 10);
+                                            }, 10);
+                                            
+                                            console.log('AUTO-SUBMIT: Sent complete Enter key sequence');
+                                            
+                                            // ChatGPT fallback: try to find and click submit button after keyboard events
+                                            setTimeout(() => {
+                                                try {
+                                                    const submitSelectors = [
+                                                        'button[data-testid="send-button"]',
+                                                        'button[data-testid="fruitjuice-send-button"]',
+                                                        'button[aria-label="Send message"]',
+                                                        'button[aria-label*="Send"]',
+                                                        'button:has(svg)',
+                                                        'button[type="submit"]'
+                                                    ];
+                                                    
+                                                    for (const selector of submitSelectors) {
+                                                        const submitBtn = document.querySelector(selector);
+                                                        if (submitBtn && !submitBtn.disabled) {
+                                                            submitBtn.click();
+                                                            console.log('AUTO-SUBMIT: Clicked submit button:', selector);
+                                                            break;
+                                                        }
+                                                    }
+                                                } catch (e) {
+                                                    console.log('AUTO-SUBMIT BUTTON ERROR:', e);
+                                                }
+                                            }, 200);
+                                            
+                                        } catch (e) {
+                                            console.log('AUTO-SUBMIT ERROR:', e);
+                                        }
+                                    }, 500);
                                     
                                 } catch (e) {
                                     console.log('DIRECT SET ERROR:', e);
@@ -460,6 +549,23 @@ class URLParameterService: WebService {
                     print("PASTE ERROR \(self.service.name): \(error)")
                 } else {
                     print("PASTE RESULT \(self.service.name): \(result ?? "unknown")")
+                    
+                    // For Perplexity, try to collapse any expanded sidebar
+                    if self.service.name == "Perplexity" {
+                        DispatchQueue.main.asyncAfter(deadline: .now() + 0.5) {
+                            self.browserView.webView.evaluateJavaScript("""
+                                // Try to close Perplexity sidebar if it's open
+                                const sidebar = document.querySelector('[data-testid="sidebar"], .sidebar, aside');
+                                if (sidebar) {
+                                    // Click on main content area to dismiss sidebar
+                                    const mainContent = document.querySelector('main, [role="main"], .main-content');
+                                    if (mainContent) {
+                                        mainContent.click();
+                                    }
+                                }
+                            """)
+                        }
+                    }
                 }
             }
         }
@@ -514,7 +620,6 @@ class ClaudeService: WebService {
                 
                 if (input) {
                     input.focus();
-                    input.click();
                     
                     // Small delay to ensure focus
                     setTimeout(() => {
@@ -522,19 +627,59 @@ class ClaudeService: WebService {
                         
                         // Another delay before submitting
                         setTimeout(() => {
-                            // Try Enter key
-                            const enterEvent = new KeyboardEvent('keydown', { 
-                                key: 'Enter', 
-                                keyCode: 13, 
-                                bubbles: true 
+                            // Create complete keyboard events that match real browser behavior
+                            const keydownEvent = new KeyboardEvent('keydown', {
+                                key: 'Enter',
+                                code: 'Enter',
+                                keyCode: 13,
+                                which: 13,
+                                charCode: 13,
+                                bubbles: true,
+                                cancelable: true,
+                                composed: true,
+                                isTrusted: true
                             });
-                            input.dispatchEvent(enterEvent);
+                            
+                            const keypressEvent = new KeyboardEvent('keypress', {
+                                key: 'Enter',
+                                code: 'Enter',
+                                keyCode: 13,
+                                which: 13,
+                                charCode: 13,
+                                bubbles: true,
+                                cancelable: true,
+                                composed: true
+                            });
+                            
+                            const keyupEvent = new KeyboardEvent('keyup', {
+                                key: 'Enter',
+                                code: 'Enter',
+                                keyCode: 13,
+                                which: 13,
+                                charCode: 13,
+                                bubbles: true,
+                                cancelable: true,
+                                composed: true
+                            });
+                            
+                            // Dispatch all three events in sequence (like real typing)
+                            input.dispatchEvent(keydownEvent);
+                            setTimeout(() => {
+                                input.dispatchEvent(keypressEvent);
+                                setTimeout(() => {
+                                    input.dispatchEvent(keyupEvent);
+                                }, 10);
+                            }, 10);
                             
                             // Also try looking for a submit button as backup
-                            const submitBtn = document.querySelector('button[data-testid="send-button"], button[type="submit"], button:contains("Send")');
-                            if (submitBtn) {
-                                submitBtn.click();
-                            }
+                            setTimeout(() => {
+                                const submitBtn = document.querySelector('button[data-testid="send-button"], button[type="submit"], button:contains("Send")');
+                                if (submitBtn) {
+                                    submitBtn.click();
+                                }
+                            }, 100);
+                            
+                            console.log('CLAUDE AUTO-SUBMIT: Sent complete Enter key sequence');
                         }, 200);
                     }, 100);
                 } else {
