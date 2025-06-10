@@ -9,6 +9,8 @@ class OverlayWindow: NSWindow {
     override func keyDown(with event: NSEvent) {
         if event.keyCode == 53 { // ESC key
             overlayController?.exitFullScreenOverlay()
+        } else if event.keyCode == 45 && event.modifierFlags.contains(.command) { // Cmd+N
+            NotificationCenter.default.post(name: .focusUnifiedInput, object: nil)
         } else {
             super.keyDown(with: event)
         }
@@ -38,6 +40,7 @@ class OverlayController {
     private var blurView: NSVisualEffectView?
     private var tintView: NSView?
     private var stackViewConstraints: [NSLayoutConstraint] = []
+    private var inputBarHostingView: NSHostingView<UnifiedInputBar>?
 
     init(serviceManager: ServiceManager) {
         self.serviceManager = serviceManager
@@ -112,19 +115,36 @@ class OverlayController {
             serviceManager.webServices[service.id]?.browserView
         }
         
-        let stackView = NSStackView(views: browserViews)
-        stackView.distribution = .fillEqually
-        stackView.orientation = .horizontal
-        stackView.spacing = 10
-        stackView.translatesAutoresizingMaskIntoConstraints = false
-        stackView.identifier = NSUserInterfaceItemIdentifier("browserStackView")
-        containerView.addSubview(stackView)
+        let browserStackView = NSStackView(views: browserViews)
+        browserStackView.distribution = .fillEqually
+        browserStackView.orientation = .horizontal
+        browserStackView.spacing = 10
+        browserStackView.translatesAutoresizingMaskIntoConstraints = false
+        browserStackView.identifier = NSUserInterfaceItemIdentifier("browserStackView")
+        
+        // Create the UnifiedInputBar SwiftUI view
+        let inputBar = UnifiedInputBar(serviceManager: serviceManager)
+        let inputBarHostingView = NSHostingView(rootView: inputBar)
+        inputBarHostingView.translatesAutoresizingMaskIntoConstraints = false
+        self.inputBarHostingView = inputBarHostingView
+        
+        // Create a vertical stack view to hold browser views and input bar
+        let mainStackView = NSStackView(views: [browserStackView, inputBarHostingView])
+        mainStackView.distribution = .fill
+        mainStackView.orientation = .vertical
+        mainStackView.spacing = 0
+        mainStackView.translatesAutoresizingMaskIntoConstraints = false
+        mainStackView.identifier = NSUserInterfaceItemIdentifier("mainStackView")
+        containerView.addSubview(mainStackView)
         
         let constraints = [
-            stackView.topAnchor.constraint(equalTo: containerView.topAnchor, constant: 10),
-            stackView.bottomAnchor.constraint(equalTo: containerView.bottomAnchor, constant: -10),
-            stackView.leadingAnchor.constraint(equalTo: containerView.leadingAnchor, constant: 10),
-            stackView.trailingAnchor.constraint(equalTo: containerView.trailingAnchor, constant: -10)
+            mainStackView.topAnchor.constraint(equalTo: containerView.topAnchor, constant: 10),
+            mainStackView.bottomAnchor.constraint(equalTo: containerView.bottomAnchor, constant: -10),
+            mainStackView.leadingAnchor.constraint(equalTo: containerView.leadingAnchor, constant: 10),
+            mainStackView.trailingAnchor.constraint(equalTo: containerView.trailingAnchor, constant: -10),
+            
+            // Set input bar height constraint
+            inputBarHostingView.heightAnchor.constraint(equalToConstant: 60)
         ]
         NSLayoutConstraint.activate(constraints)
         stackViewConstraints = constraints
@@ -165,7 +185,7 @@ class OverlayController {
     private func addOverlayEffects() {
         guard let window = overlayWindow, let contentView = window.contentView else { return }
         guard let stackView = contentView.subviews.first(where: { 
-            $0.identifier == NSUserInterfaceItemIdentifier("browserStackView") 
+            $0.identifier == NSUserInterfaceItemIdentifier("mainStackView") 
         }) as? NSStackView else { return }
         
         let blur = NSVisualEffectView(frame: contentView.bounds)
@@ -188,14 +208,19 @@ class OverlayController {
             stackView.topAnchor.constraint(equalTo: contentView.topAnchor, constant: 40),
             stackView.bottomAnchor.constraint(equalTo: contentView.bottomAnchor, constant: -40),
             stackView.leadingAnchor.constraint(equalTo: contentView.leadingAnchor, constant: 40),
-            stackView.trailingAnchor.constraint(equalTo: contentView.trailingAnchor, constant: -40)
-        ]
+            stackView.trailingAnchor.constraint(equalTo: contentView.trailingAnchor, constant: -40),
+            
+            // Keep the input bar height constraint
+            inputBarHostingView?.heightAnchor.constraint(equalToConstant: 60)
+        ].compactMap { $0 }
         NSLayoutConstraint.activate(newConstraints)
         stackViewConstraints = newConstraints
     }
     
     func exitFullScreenOverlay() {
-        guard let window = overlayWindow, isInOverlayMode else { return }
+        guard let window = overlayWindow, isInOverlayMode, !isHiding else { return }
+        
+        isHiding = true
         
         blurView?.removeFromSuperview()
         tintView?.removeFromSuperview()
@@ -209,15 +234,18 @@ class OverlayController {
         
         if let contentView = window.contentView,
            let stackView = contentView.subviews.first(where: { 
-               $0.identifier == NSUserInterfaceItemIdentifier("browserStackView") 
+               $0.identifier == NSUserInterfaceItemIdentifier("mainStackView") 
            }) as? NSStackView {
             NSLayoutConstraint.deactivate(stackViewConstraints)
             let newConstraints = [
                 stackView.topAnchor.constraint(equalTo: contentView.topAnchor, constant: 10),
                 stackView.bottomAnchor.constraint(equalTo: contentView.bottomAnchor, constant: -10),
                 stackView.leadingAnchor.constraint(equalTo: contentView.leadingAnchor, constant: 10),
-                stackView.trailingAnchor.constraint(equalTo: contentView.trailingAnchor, constant: -10)
-            ]
+                stackView.trailingAnchor.constraint(equalTo: contentView.trailingAnchor, constant: -10),
+                
+                // Keep the input bar height constraint
+                inputBarHostingView?.heightAnchor.constraint(equalToConstant: 60)
+            ].compactMap { $0 }
             NSLayoutConstraint.activate(newConstraints)
             stackViewConstraints = newConstraints
         }
@@ -235,6 +263,7 @@ class OverlayController {
             }
         }, completionHandler: {
             self.isInOverlayMode = false
+            self.isHiding = false
             window.title = "HyperChat"
         })
     }
@@ -249,4 +278,89 @@ class OverlayController {
 
 extension Notification.Name {
     static let overlayDidHide = Notification.Name("overlayDidHide")
+    static let focusUnifiedInput = Notification.Name("focusUnifiedInput")
+}
+
+struct UnifiedInputBar: View {
+    @ObservedObject var serviceManager: ServiceManager
+    @FocusState private var isInputFocused: Bool
+    
+    var body: some View {
+        VStack(spacing: 0) {
+            Divider()
+            
+            HStack(spacing: 12) {
+                // Mode toggle with visual feedback
+                HStack(spacing: 8) {
+                    Image(systemName: serviceManager.replyToAll ? 
+                        "bubble.left.and.bubble.right.fill" : "plus.bubble.fill")
+                        .foregroundColor(.secondary)
+                        .font(.system(size: 14))
+                    
+                    Picker("", selection: $serviceManager.replyToAll) {
+                        Text("Reply to All").tag(true)
+                        Text("New Chat").tag(false)
+                    }
+                    .pickerStyle(.segmented)
+                    .frame(width: 180)
+                    
+                    // Show loading indicator when services are loading
+                    if serviceManager.loadingStates.values.contains(true) {
+                        HStack(spacing: 4) {
+                            ProgressView()
+                                .controlSize(.mini)
+                            Text("Loading...")
+                                .font(.caption)
+                                .foregroundColor(.secondary)
+                        }
+                    }
+                }
+                
+                // Input field with clear and send buttons
+                HStack(spacing: 8) {
+                    TextField("Ask all services...", text: $serviceManager.sharedPrompt)
+                        .textFieldStyle(.plain)
+                        .focused($isInputFocused)
+                        .onSubmit {
+                            serviceManager.executeSharedPrompt()
+                        }
+                        .font(.system(size: 14))
+                    
+                    if !serviceManager.sharedPrompt.isEmpty {
+                        Button(action: {
+                            serviceManager.sharedPrompt = ""
+                        }) {
+                            Image(systemName: "xmark.circle.fill")
+                                .foregroundColor(.secondary)
+                                .font(.system(size: 14))
+                        }
+                        .buttonStyle(.plain)
+                    }
+                    
+                    Button(action: {
+                        serviceManager.executeSharedPrompt()
+                    }) {
+                        Image(systemName: "paperplane.fill")
+                            .foregroundColor(serviceManager.sharedPrompt.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty ? .secondary : .accentColor)
+                            .font(.system(size: 14))
+                    }
+                    .buttonStyle(.plain)
+                    .disabled(serviceManager.sharedPrompt.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty)
+                }
+                .padding(.horizontal, 12)
+                .padding(.vertical, 8)
+                .background(Color(NSColor.controlBackgroundColor))
+                .cornerRadius(8)
+                .overlay(
+                    RoundedRectangle(cornerRadius: 8)
+                        .stroke(Color(NSColor.separatorColor), lineWidth: 1)
+                )
+            }
+            .padding(12)
+            .background(.regularMaterial)
+        }
+        .onReceive(NotificationCenter.default.publisher(for: .focusUnifiedInput)) { _ in
+            isInputFocused = true
+        }
+    }
 } 

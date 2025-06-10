@@ -22,5 +22,22 @@
 	<true/>
 	<key>com.apple.security.network.server</key>
 	<true/>
+	<!-- Microphone access for AI services -->
+	<key>com.apple.security.device.audio-input</key>
+	<true/>
+	<!-- Camera access for AI services -->
+	<key>com.apple.security.device.camera</key>
+	<true/>
+	<!-- Apple Events for clipboard automation -->
+	<key>com.apple.security.automation.apple-events</key>
+	<true/>
+	<!-- WebKit Process Management -->
+	<key>com.apple.security.cs.disable-executable-page-protection</key>
+	<true/>
+	<!-- Files and Downloads for WebKit -->
+	<key>com.apple.security.files.downloads.read-write</key>
+	<true/>
+	<key>com.apple.security.files.user-selected.read-write</key>
+	<true/>
 </dict>
 </plist>
