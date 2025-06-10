@@ -79,6 +79,12 @@ class PromptWindowController: NSWindowController {
     func showWindow(on screen: NSScreen?) {
         guard let window = self.window else { return }
         
+        // Don't show if already visible
+        if window.isVisible {
+            window.makeKeyAndOrderFront(nil)
+            return
+        }
+        
         // Use the provided screen or default to the main screen
         let targetScreen = screen ?? NSScreen.main
         

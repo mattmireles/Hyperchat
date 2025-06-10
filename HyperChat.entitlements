@@ -8,5 +8,19 @@
 	<!-- Allows the app to be debugged. Set to false for production builds. -->
 	<key>com.apple.security.get-task-allow</key>
 	<true/>
+	<!-- Allow unsigned executable memory for WebKit -->
+	<key>com.apple.security.cs.allow-unsigned-executable-memory</key>
+	<true/>
+	<!-- Allow DYLD environment variables -->
+	<key>com.apple.security.cs.allow-dyld-environment-variables</key>
+	<true/>
+	<!-- Disable library validation to allow WebKit processes -->
+	<key>com.apple.security.cs.disable-library-validation</key>
+	<true/>
+	<!-- Network access for WebKit - REQUIRED -->
+	<key>com.apple.security.network.client</key>
+	<true/>
+	<key>com.apple.security.network.server</key>
+	<true/>
 </dict>
 </plist>

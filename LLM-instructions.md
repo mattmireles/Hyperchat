@@ -78,14 +78,6 @@ HyperChatApp
 
 #### 4. Window System
 
-- **First Launch Behavior**:
-  - Opens in normal mode (non-fullscreen) with standard window controls
-  - Each service loads its default homepage:
-    - ChatGPT: https://chat.openai.com
-    - Claude: https://claude.ai
-    - Perplexity: https://www.perplexity.ai
-    - Google: https://www.google.com
-  - Window is centered on the screen with default size (1200x800)
 - **Dual-Mode Architecture**:
   - Normal Mode: Standard window with title bar, resizable, movable
   - Overlay Mode: Full-screen with blur effect, ESC to toggle modes

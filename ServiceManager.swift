@@ -356,16 +356,41 @@ class ServiceManager: ObservableObject {
             
             webServices[service.id] = webService
             activeServices.append(service)
+            
+            // Load default homepage for each service
+            loadDefaultPage(for: service, webView: webView)
+        }
+    }
+    
+    private func loadDefaultPage(for service: AIService, webView: WKWebView) {
+        let defaultURL: String
+        
+        switch service.id {
+        case "google":
+            defaultURL = "https://www.google.com"
+        case "perplexity":
+            defaultURL = "https://www.perplexity.ai"
+        case "chatgpt":
+            defaultURL = "https://chatgpt.com"
+        case "claude":
+            defaultURL = "https://claude.ai"
+        default:
+            return
+        }
+        
+        if let url = URL(string: defaultURL) {
+            webView.load(URLRequest(url: url))
         }
     }
     
     func executePrompt(_ prompt: String) {
-        // Reset all WebViews to a clean state before executing new prompt
-        for service in activeServices {
-            if let webService = webServices[service.id] {
-                // Stop any ongoing loads and execute the new prompt
-                webService.browserView.webView.stopLoading()
-                webService.executePrompt(prompt)
+        // Give WebViews a moment to fully initialize if they were just created
+        DispatchQueue.main.asyncAfter(deadline: .now() + 0.5) { [weak self] in
+            // Execute prompt on all services without stopping them first
+            for service in self?.activeServices ?? [] {
+                if let webService = self?.webServices[service.id] {
+                    webService.executePrompt(prompt)
+                }
             }
         }
     }

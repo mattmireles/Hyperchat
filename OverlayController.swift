@@ -19,7 +19,6 @@ class OverlayWindow: NSWindow {
     }
     
     override func close() {
-        overlayController?.serviceManager.resetForNewPrompt()
         super.close()
         NotificationCenter.default.post(name: .overlayDidHide, object: nil)
     }
