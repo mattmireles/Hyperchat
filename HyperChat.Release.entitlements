@@ -5,9 +5,9 @@
 	<!-- Allow JIT compilation for WebKit. -->
 	<key>com.apple.security.cs.allow-jit</key>
 	<true/>
-	<!-- Allows the app to be debugged. This is the DEBUG entitlements file. -->
+	<!-- Debugging disabled for production builds. -->
 	<key>com.apple.security.get-task-allow</key>
-	<true/>
+	<false/>
 	<!-- Allow unsigned executable memory for WebKit -->
 	<key>com.apple.security.cs.allow-unsigned-executable-memory</key>
 	<true/>
@@ -41,3 +41,5 @@
 	<true/>
 </dict>
 </plist>
+</parameter>
+</invoke>

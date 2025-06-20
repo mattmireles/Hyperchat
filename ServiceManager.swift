@@ -35,6 +35,11 @@ class BrowserView: NSView {
         return true
     }
     
+    override func becomeFirstResponder() -> Bool {
+        // Forward first responder to the webView for text selection
+        return webView.becomeFirstResponder()
+    }
+    
     required init?(coder: NSCoder) {
         fatalError("init(coder:) has not been implemented")
     }
@@ -137,6 +142,12 @@ class BrowserView: NSView {
 
 extension BrowserView: WKNavigationDelegate {
     func webView(_ webView: WKWebView, didStartProvisionalNavigation navigation: WKNavigation!) {
+        print("🌐 \(service.name): didStartProvisionalNavigation")
+        // Log navigation start
+        if let url = webView.url {
+            WebViewLogger.shared.logNavigation(navigation, request: URLRequest(url: url), service: service.name)
+        }
+        
         // Update URL as soon as navigation starts
         DispatchQueue.main.async { [weak self] in
             self?.urlField.stringValue = webView.url?.absoluteString ?? ""
@@ -145,6 +156,8 @@ extension BrowserView: WKNavigationDelegate {
     }
     
     func webView(_ webView: WKWebView, didCommit navigation: WKNavigation!) {
+        WebViewLogger.shared.logPageLoad(start: true, service: service.name, url: webView.url)
+        
         // Update URL when navigation commits
         DispatchQueue.main.async { [weak self] in
             self?.urlField.stringValue = webView.url?.absoluteString ?? ""
@@ -153,6 +166,8 @@ extension BrowserView: WKNavigationDelegate {
     }
     
     func webView(_ webView: WKWebView, didFinish navigation: WKNavigation!) {
+        WebViewLogger.shared.logPageLoad(start: false, service: service.name, url: webView.url)
+        
         // Final update when navigation finishes
         DispatchQueue.main.async { [weak self] in
             self?.urlField.stringValue = webView.url?.absoluteString ?? ""
@@ -161,6 +176,8 @@ extension BrowserView: WKNavigationDelegate {
     }
     
     func webView(_ webView: WKWebView, didFail navigation: WKNavigation!, withError error: Error) {
+        WebViewLogger.shared.logNavigationError(error, service: service.name)
+        
         // Update even on failure
         DispatchQueue.main.async { [weak self] in
             self?.urlField.stringValue = webView.url?.absoluteString ?? ""
@@ -169,11 +186,18 @@ extension BrowserView: WKNavigationDelegate {
     }
     
     func webView(_ webView: WKWebView, didFailProvisionalNavigation navigation: WKNavigation!, withError error: Error) {
+        WebViewLogger.shared.logNavigationError(error, service: service.name)
+        
         // Handle provisional navigation failures
         DispatchQueue.main.async { [weak self] in
             self?.urlField.stringValue = webView.url?.absoluteString ?? ""
             self?.updateBackButton()
         }
+    }
+    
+    func webView(_ webView: WKWebView, decidePolicyFor navigationResponse: WKNavigationResponse, decisionHandler: @escaping (WKNavigationResponsePolicy) -> Void) {
+        WebViewLogger.shared.logNavigationResponse(navigationResponse.response, service: service.name)
+        decisionHandler(.allow)
     }
 }
 
@@ -275,6 +299,27 @@ class URLParameterService: WebService {
             
             if let url = URL(string: urlString) {
                 browserView.webView.load(URLRequest(url: url))
+                
+                // Add debugging to monitor when services auto-submit
+                DispatchQueue.main.asyncAfter(deadline: .now() + 2.0) {
+                    let serviceName = self.service.name
+                    self.browserView.webView.evaluateJavaScript("""
+                        console.log('DEBUG \(serviceName): Checking if query was processed...');
+                        const inputs = document.querySelectorAll('textarea, input[type="text"], div[contenteditable="true"]');
+                        let foundInput = false;
+                        for (const input of inputs) {
+                            const value = input.value || input.textContent || '';
+                            if (value.length > 0) {
+                                console.log('DEBUG \(serviceName): Found populated input:', value.substring(0, 50));
+                                foundInput = true;
+                                break;
+                            }
+                        }
+                        if (!foundInput) {
+                            console.log('DEBUG \(serviceName): No populated input found yet');
+                        }
+                    """)
+                }
             } else {
                 print("❌ \(service.name): Failed to create URL from: \(urlString)")
             }
@@ -427,84 +472,101 @@ class URLParameterService: WebService {
                                     reactInputEvent.simulated = true;
                                     input.dispatchEvent(reactInputEvent);
                                     
-                                    // Auto-submit after a short delay
+                                    // Auto-submit after a short delay - PRIMARY METHOD: Click submit button
                                     setTimeout(() => {
                                         try {
-                                            // Create more complete keyboard events that match real browser behavior
-                                            const keydownEvent = new KeyboardEvent('keydown', {
-                                                key: 'Enter',
-                                                code: 'Enter',
-                                                keyCode: 13,
-                                                which: 13,
-                                                charCode: 13,
-                                                bubbles: true,
-                                                cancelable: true,
-                                                composed: true,
-                                                isTrusted: true
-                                            });
+                                            // Service-specific submit button selectors
+                                            const submitSelectors = {
+                                                chatgpt: [
+                                                    'button[data-testid="send-button"]',
+                                                    'button[data-testid="fruitjuice-send-button"]', 
+                                                    'button#composer-submit-button',
+                                                    'button[aria-label="Send message"]',
+                                                    'button[aria-label="Send prompt"]'
+                                                ],
+                                                perplexity: [
+                                                    'button[aria-label="Submit"]',
+                                                    'button[aria-label="Submit Search"]',
+                                                    'button[type="submit"]',
+                                                    'button.bg-super',
+                                                    'button:has(svg[data-icon="arrow-right"])'
+                                                ],
+                                                google: [
+                                                    'button[aria-label="Search"]',
+                                                    'button[type="submit"]',
+                                                    'input[type="submit"]'
+                                                ],
+                                                default: [
+                                                    'button[type="submit"]',
+                                                    'button[aria-label*="Send"]',
+                                                    'button[aria-label*="Submit"]',
+                                                    'button:has(svg)',
+                                                    'input[type="submit"]'
+                                                ]
+                                            };
                                             
-                                            const keypressEvent = new KeyboardEvent('keypress', {
-                                                key: 'Enter',
-                                                code: 'Enter',
-                                                keyCode: 13,
-                                                which: 13,
-                                                charCode: 13,
-                                                bubbles: true,
-                                                cancelable: true,
-                                                composed: true
-                                            });
+                                            // Determine which selectors to use based on the current site
+                                            const hostname = window.location.hostname;
+                                            let selectors = submitSelectors.default;
                                             
-                                            const keyupEvent = new KeyboardEvent('keyup', {
-                                                key: 'Enter',
-                                                code: 'Enter',
-                                                keyCode: 13,
-                                                which: 13,
-                                                charCode: 13,
-                                                bubbles: true,
-                                                cancelable: true,
-                                                composed: true
-                                            });
+                                            if (hostname.includes('chatgpt.com') || hostname.includes('chat.openai.com')) {
+                                                selectors = submitSelectors.chatgpt;
+                                            } else if (hostname.includes('perplexity.ai')) {
+                                                selectors = submitSelectors.perplexity;
+                                            } else if (hostname.includes('google.com')) {
+                                                selectors = submitSelectors.google;
+                                            }
                                             
-                                            // Dispatch all three events in sequence (like real typing)
-                                            input.dispatchEvent(keydownEvent);
-                                            setTimeout(() => {
-                                                input.dispatchEvent(keypressEvent);
+                                            // Try to find and click the submit button
+                                            let buttonClicked = false;
+                                            for (const selector of selectors) {
+                                                const submitBtn = document.querySelector(selector);
+                                                if (submitBtn && !submitBtn.disabled) {
+                                                    // For some sites, we might need to ensure the button is visible
+                                                    const rect = submitBtn.getBoundingClientRect();
+                                                    if (rect.width > 0 && rect.height > 0) {
+                                                        submitBtn.click();
+                                                        console.log('AUTO-SUBMIT: Clicked submit button with selector:', selector);
+                                                        buttonClicked = true;
+                                                        break;
+                                                    }
+                                                }
+                                            }
+                                            
+                                            // FALLBACK: If button click didn't work, try Enter key as backup
+                                            if (!buttonClicked) {
+                                                console.log('AUTO-SUBMIT: No submit button found, trying Enter key fallback');
+                                                
+                                                const keydownEvent = new KeyboardEvent('keydown', {
+                                                    key: 'Enter',
+                                                    code: 'Enter',
+                                                    keyCode: 13,
+                                                    which: 13,
+                                                    bubbles: true,
+                                                    cancelable: true,
+                                                    composed: true
+                                                });
+                                                
+                                                const keyupEvent = new KeyboardEvent('keyup', {
+                                                    key: 'Enter',
+                                                    code: 'Enter',
+                                                    keyCode: 13,
+                                                    which: 13,
+                                                    bubbles: true,
+                                                    cancelable: true,
+                                                    composed: true
+                                                });
+                                                
+                                                input.dispatchEvent(keydownEvent);
                                                 setTimeout(() => {
                                                     input.dispatchEvent(keyupEvent);
                                                 }, 10);
-                                            }, 10);
-                                            
-                                            console.log('AUTO-SUBMIT: Sent complete Enter key sequence');
-                                            
-                                            // ChatGPT fallback: try to find and click submit button after keyboard events
-                                            setTimeout(() => {
-                                                try {
-                                                    const submitSelectors = [
-                                                        'button[data-testid="send-button"]',
-                                                        'button[data-testid="fruitjuice-send-button"]',
-                                                        'button[aria-label="Send message"]',
-                                                        'button[aria-label*="Send"]',
-                                                        'button:has(svg)',
-                                                        'button[type="submit"]'
-                                                    ];
-                                                    
-                                                    for (const selector of submitSelectors) {
-                                                        const submitBtn = document.querySelector(selector);
-                                                        if (submitBtn && !submitBtn.disabled) {
-                                                            submitBtn.click();
-                                                            console.log('AUTO-SUBMIT: Clicked submit button:', selector);
-                                                            break;
-                                                        }
-                                                    }
-                                                } catch (e) {
-                                                    console.log('AUTO-SUBMIT BUTTON ERROR:', e);
-                                                }
-                                            }, 200);
+                                            }
                                             
                                         } catch (e) {
                                             console.log('AUTO-SUBMIT ERROR:', e);
                                         }
-                                    }, 500);
+                                    }, 300);
                                     
                                 } catch (e) {
                                     console.log('DIRECT SET ERROR:', e);
@@ -707,61 +769,67 @@ class ClaudeService: WebService {
                     setTimeout(() => {
                         document.execCommand('paste');
                         
-                        // Another delay before submitting
+                        // Another delay before submitting - PRIMARY METHOD: Click submit button
                         setTimeout(() => {
-                            // Create complete keyboard events that match real browser behavior
-                            const keydownEvent = new KeyboardEvent('keydown', {
-                                key: 'Enter',
-                                code: 'Enter',
-                                keyCode: 13,
-                                which: 13,
-                                charCode: 13,
-                                bubbles: true,
-                                cancelable: true,
-                                composed: true,
-                                isTrusted: true
-                            });
-                            
-                            const keypressEvent = new KeyboardEvent('keypress', {
-                                key: 'Enter',
-                                code: 'Enter',
-                                keyCode: 13,
-                                which: 13,
-                                charCode: 13,
-                                bubbles: true,
-                                cancelable: true,
-                                composed: true
-                            });
-                            
-                            const keyupEvent = new KeyboardEvent('keyup', {
-                                key: 'Enter',
-                                code: 'Enter',
-                                keyCode: 13,
-                                which: 13,
-                                charCode: 13,
-                                bubbles: true,
-                                cancelable: true,
-                                composed: true
-                            });
-                            
-                            // Dispatch all three events in sequence (like real typing)
-                            input.dispatchEvent(keydownEvent);
-                            setTimeout(() => {
-                                input.dispatchEvent(keypressEvent);
-                                setTimeout(() => {
-                                    input.dispatchEvent(keyupEvent);
-                                }, 10);
-                            }, 10);
-                            
-                            // Also try looking for a submit button as backup
-                            setTimeout(() => {
-                                const submitBtn = document.querySelector('button[data-testid="send-button"], button[type="submit"], button:contains("Send")');
-                                if (submitBtn) {
-                                    submitBtn.click();
+                            try {
+                                // Claude-specific submit button selectors
+                                const submitSelectors = [
+                                    'button[aria-label="Send Message"]',
+                                    'button[aria-label="Send"]',
+                                    'button[data-testid="send-button"]',
+                                    'button[type="submit"]',
+                                    'button:has(svg[viewBox="0 0 32 32"])', // Claude's send icon
+                                    'button.text-text-200:has(svg)',
+                                    'div[role="button"][aria-label="Send Message"]'
+                                ];
+                                
+                                let buttonClicked = false;
+                                for (const selector of submitSelectors) {
+                                    const submitBtn = document.querySelector(selector);
+                                    if (submitBtn && !submitBtn.disabled) {
+                                        // Ensure button is visible
+                                        const rect = submitBtn.getBoundingClientRect();
+                                        if (rect.width > 0 && rect.height > 0) {
+                                            submitBtn.click();
+                                            console.log('CLAUDE AUTO-SUBMIT: Clicked submit button with selector:', selector);
+                                            buttonClicked = true;
+                                            break;
+                                        }
+                                    }
                                 }
-                            }, 100);
-                            
-                            console.log('CLAUDE AUTO-SUBMIT: Sent complete Enter key sequence');
+                                
+                                // FALLBACK: If button click didn't work, try Enter key
+                                if (!buttonClicked) {
+                                    console.log('CLAUDE AUTO-SUBMIT: No submit button found, trying Enter key fallback');
+                                    
+                                    const keydownEvent = new KeyboardEvent('keydown', {
+                                        key: 'Enter',
+                                        code: 'Enter',
+                                        keyCode: 13,
+                                        which: 13,
+                                        bubbles: true,
+                                        cancelable: true,
+                                        composed: true
+                                    });
+                                    
+                                    const keyupEvent = new KeyboardEvent('keyup', {
+                                        key: 'Enter',
+                                        code: 'Enter',
+                                        keyCode: 13,
+                                        which: 13,
+                                        bubbles: true,
+                                        cancelable: true,
+                                        composed: true
+                                    });
+                                    
+                                    input.dispatchEvent(keydownEvent);
+                                    setTimeout(() => {
+                                        input.dispatchEvent(keyupEvent);
+                                    }, 10);
+                                }
+                            } catch (e) {
+                                console.log('CLAUDE AUTO-SUBMIT ERROR:', e);
+                            }
                         }, 200);
                     }, 100);
                 } else {
@@ -789,7 +857,7 @@ class ServiceManager: NSObject, ObservableObject {
     
     private func setupServices() {
         for service in defaultServices where service.enabled {
-            let webView = createWebView()
+            let webView = createWebView(for: service)
             let browserView = BrowserView(webView: webView, service: service)
             
             let webService: WebService
@@ -829,11 +897,10 @@ class ServiceManager: NSObject, ObservableObject {
             var request = URLRequest(url: url)
             // Add headers to prevent loading conflicts
             request.setValue("no-cache", forHTTPHeaderField: "Cache-Control")
-            request.setValue("Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/605.1.15 (KHTML, like Gecko) Version/17.0 Safari/605.1.15", forHTTPHeaderField: "User-Agent")
+            // User-Agent is already set on the webView itself, no need to set it here
             
-            // Give each service a small delay to prevent conflicts
-            let delay = service.id == "google" ? 2.0 : 0.5
-            DispatchQueue.main.asyncAfter(deadline: .now() + delay) {
+            // Add minimal delay to prevent race conditions
+            DispatchQueue.main.asyncAfter(deadline: .now() + 0.01) {
                 webView.load(request)
             }
         }
@@ -847,15 +914,9 @@ class ServiceManager: NSObject, ObservableObject {
                     // Reply to All mode: immediate execution with clipboard paste
                     webService.executePrompt(prompt, replyToAll: true)
                 } else {
-                    // New Chat mode: use URL navigation with slight delay
-                    if service.id == "google" {
-                        DispatchQueue.main.asyncAfter(deadline: .now() + 1.0) {
-                            webService.executePrompt(prompt, replyToAll: false)
-                        }
-                    } else {
-                        DispatchQueue.main.asyncAfter(deadline: .now() + 0.3) {
-                            webService.executePrompt(prompt, replyToAll: false)
-                        }
+                    // New Chat mode: use URL navigation with minimal delay
+                    DispatchQueue.main.asyncAfter(deadline: .now() + 0.01) {
+                        webService.executePrompt(prompt, replyToAll: false)
                     }
                 }
             }
@@ -873,15 +934,12 @@ class ServiceManager: NSObject, ObservableObject {
             // Clear the prompt after sending
             sharedPrompt = ""
         } else {
-            // New Chat Mode: Reload each service first, then send prompt after short delay
-            reloadAllServices()
+            // New Chat Mode: Navigate directly to URL with query parameters
             // Clear the prompt immediately for UI feedback
             sharedPrompt = ""
             
-            // Use a much shorter delay - 2 seconds instead of 4
-            DispatchQueue.main.asyncAfter(deadline: .now() + 2.0) {
-                self.executePrompt(promptToExecute, replyToAll: false)
-            }
+            // Execute prompt immediately - no need to reload first
+            executePrompt(promptToExecute, replyToAll: false)
         }
     }
     
@@ -901,7 +959,7 @@ class ServiceManager: NSObject, ObservableObject {
         }
     }
     
-    private func createWebView() -> WKWebView {
+    private func createWebView(for service: AIService) -> WKWebView {
         let configuration = WKWebViewConfiguration()
         if #available(macOS 11.0, *) {
             configuration.defaultWebpagePreferences.allowsContentJavaScript = true
@@ -911,21 +969,45 @@ class ServiceManager: NSObject, ObservableObject {
         // Prevent loading cancellations
         configuration.suppressesIncrementalRendering = false
         
-        let userAgent = UserAgentGenerator.generate()
-        configuration.applicationNameForUserAgent = userAgent.applicationName
+        // Setup logging scripts and message handlers
+        setupLoggingScripts(for: configuration, service: service)
         
         let webView = WKWebView(frame: .zero, configuration: configuration)
-        webView.customUserAgent = userAgent.fullUserAgent
+        
+        // Set user agent from service configuration
+        if let config = ServiceConfigurations.config(for: service.id),
+           let userAgent = config.userAgent {
+            webView.customUserAgent = userAgent
+            // Extract application name from user agent if needed
+            if userAgent.contains("Safari/") {
+                let components = userAgent.components(separatedBy: " ")
+                if let safariComponent = components.last(where: { $0.contains("Safari/") }) {
+                    configuration.applicationNameForUserAgent = safariComponent
+                }
+            }
+        } else {
+            // Fallback to desktop Safari user agent
+            let userAgent = UserAgentGenerator.generate()
+            webView.customUserAgent = userAgent.fullUserAgent
+            configuration.applicationNameForUserAgent = userAgent.applicationName
+        }
         
         // Enable interactions
         webView.allowsBackForwardNavigationGestures = true
         webView.allowsMagnification = true
         
-        // Set valid preferences
+        // Enable text selection
+        webView.configuration.preferences.javaScriptCanOpenWindowsAutomatically = false
         webView.configuration.preferences.setValue(true, forKey: "developerExtrasEnabled")
+        
+        // Ensure the WebView can become first responder for text selection
+        webView.wantsLayer = true
         
         // Add navigation delegate to handle errors
         webView.navigationDelegate = self
+        
+        // Add UI delegate for context menus
+        webView.uiDelegate = self
         
         return webView
     }
@@ -933,6 +1015,57 @@ class ServiceManager: NSObject, ObservableObject {
     func resetForNewPrompt() {
         // Don't stop loading during normal operation as it causes -999 errors
         // Only stop if absolutely necessary
+    }
+    
+    private func setupLoggingScripts(for configuration: WKWebViewConfiguration, service: AIService) {
+        let userContentController = configuration.userContentController
+        
+        // Create message handler for this service
+        let messageHandler = ConsoleMessageHandler(service: service.name)
+        
+        // Add message handlers
+        userContentController.add(messageHandler, name: "consoleLog")
+        userContentController.add(messageHandler, name: "networkRequest")
+        userContentController.add(messageHandler, name: "networkResponse")
+        // userContentController.add(messageHandler, name: "domChange") // Disabled
+        userContentController.add(messageHandler, name: "userInteraction")
+        
+        // Inject console logging script
+        let consoleScript = WKUserScript(
+            source: WebViewLogger.shared.consoleLogScript,
+            injectionTime: .atDocumentStart,
+            forMainFrameOnly: false
+        )
+        userContentController.addUserScript(consoleScript)
+        
+        // Inject network monitoring script
+        let networkScript = WKUserScript(
+            source: WebViewLogger.shared.networkMonitorScript,
+            injectionTime: .atDocumentStart,
+            forMainFrameOnly: false
+        )
+        userContentController.addUserScript(networkScript)
+        
+        // DOM monitoring disabled due to performance issues
+        // Uncomment to re-enable DOM change tracking
+        /*
+        let domScript = WKUserScript(
+            source: WebViewLogger.shared.domMonitorScript,
+            injectionTime: .atDocumentEnd,
+            forMainFrameOnly: false
+        )
+        userContentController.addUserScript(domScript)
+        */
+        
+        // Inject user interaction tracking script
+        let interactionScript = WKUserScript(
+            source: WebViewLogger.shared.userInteractionScript,
+            injectionTime: .atDocumentEnd,
+            forMainFrameOnly: false
+        )
+        userContentController.addUserScript(interactionScript)
+        
+        WebViewLogger.shared.log("Logging initialized for \(service.name)", for: service.name, type: .info)
     }
 }
 
@@ -958,5 +1091,14 @@ extension ServiceManager: WKNavigationDelegate {
     func webView(_ webView: WKWebView, didFinish navigation: WKNavigation!) {
         let urlString = webView.url?.absoluteString ?? "unknown"
         print("SUCCESS WebView loaded successfully: \(urlString)")
+    }
+}
+
+// MARK: - WKUIDelegate for ServiceManager
+
+extension ServiceManager: WKUIDelegate {
+    // Handle JavaScript alerts
+    func webView(_ webView: WKWebView, runJavaScriptAlertPanelWithMessage message: String, initiatedByFrame frame: WKFrameInfo, completionHandler: @escaping () -> Void) {
+        completionHandler()
     }
 } 
