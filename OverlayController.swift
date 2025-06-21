@@ -402,6 +402,7 @@ extension Notification.Name {
 struct UnifiedInputBar: View {
     @ObservedObject var serviceManager: ServiceManager
     @FocusState private var isInputFocused: Bool
+    @State private var isRefreshHovering = false
     
     var body: some View {
         VStack(spacing: 0) {
@@ -416,22 +417,6 @@ struct UnifiedInputBar: View {
                     .frame(width: 48, height: 48)
                     .cornerRadius(10)
                     .shadow(color: Color.black.opacity(0.1), radius: 2, x: 0, y: 1)
-                
-                // Refresh button with better styling
-                Button(action: {
-                    serviceManager.reloadAllServices()
-                }) {
-                    ZStack {
-                        Circle()
-                            .fill(Color(NSColor.controlBackgroundColor))
-                            .frame(width: 36, height: 36)
-                        Image(systemName: "arrow.clockwise")
-                            .foregroundColor(.primary)
-                            .font(.system(size: 16, weight: .medium))
-                    }
-                }
-                .buttonStyle(.plain)
-                .help("Refresh all services")
                 
                 // Show loading indicator when services are loading
                 if serviceManager.loadingStates.values.contains(true) {
@@ -450,7 +435,7 @@ struct UnifiedInputBar: View {
                 HStack(spacing: 0) {
                     ZStack(alignment: .topLeading) {
                         if serviceManager.sharedPrompt.isEmpty {
-                            Text("Ask them all...")
+                            Text("Ask all your AIs...")
                                 .foregroundColor(.secondary)
                                 .font(.system(size: 14))
                                 .padding(.leading, 17)  // Adjusted to align with cursor
@@ -482,14 +467,29 @@ struct UnifiedInputBar: View {
                             .transition(.scale.combined(with: .opacity))
                         }
                         
+                        // Refresh button
+                        Button(action: {
+                            serviceManager.reloadAllServices()
+                        }) {
+                            Image(systemName: "arrow.trianglehead.clockwise")
+                                .foregroundColor(.secondary.opacity(isRefreshHovering ? 1.0 : 0.4))
+                                .font(.system(size: 16, weight: .medium))
+                        }
+                        .buttonStyle(.plain)
+                        .help("Refresh all services")
+                        .onHover { hovering in
+                            withAnimation(.easeInOut(duration: 0.2)) {
+                                isRefreshHovering = hovering
+                            }
+                        }
+                        
                         Button(action: {
                             serviceManager.executeSharedPrompt()
                         }) {
-                            Image(systemName: "paperplane.fill")
+                            Image(systemName: "chevron.up.dotted.2")
                                 .foregroundColor(serviceManager.sharedPrompt.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty ? 
                                               .secondary.opacity(0.4) : .accentColor)
                                 .font(.system(size: 16, weight: .medium))
-                                .rotationEffect(.degrees(45))
                         }
                         .buttonStyle(.plain)
                         .disabled(serviceManager.sharedPrompt.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty)

@@ -111,11 +111,17 @@ class FloatingButtonManager {
         let button = DraggableButton(frame: NSRect(origin: .zero, size: CGSize(width: buttonSize, height: buttonSize))) { [weak self] in
             self?.saveCurrentPosition()
         }
-        button.image = NSImage(named: "HyperchatIcon")
+        if let appIcon = NSImage(named: "AppIcon") {
+            appIcon.size = NSSize(width: buttonSize, height: buttonSize)
+            button.image = appIcon
+        }
+        button.imageScaling = .scaleProportionallyUpOrDown
+        button.imagePosition = .imageOnly
         button.isBordered = false
         button.wantsLayer = true
         button.layer?.backgroundColor = NSColor.clear.cgColor
-        button.layer?.cornerRadius = buttonSize / 2
+        button.layer?.cornerRadius = 10  // Match the app icon's natural corner radius
+        button.layer?.masksToBounds = true
         
         button.target = self
         button.action = #selector(floatingButtonClicked)
