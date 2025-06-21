@@ -35,20 +35,21 @@ struct GradientToolbarButton: View {
                         )
                         .mask(
                             Image(systemName: systemName)
-                                .font(.system(size: 10, weight: .semibold))
-                                .offset(y: -11)  // Move up 11px
+                                .font(.system(size: 14, weight: .semibold))
+                                // Remove offset from here
                         )
                     } else {
                         Image(systemName: systemName)
-                            .font(.system(size: 10, weight: .semibold))
-                            .foregroundColor(state.isEnabled ? .secondary.opacity(0.4) : .secondary.opacity(0.3))
-                            .offset(y: -11)  // Move up 11px
+                            .font(.system(size: 14, weight: .semibold))
+                            .foregroundColor(state.isEnabled ? .secondary.opacity(0.7) : .secondary.opacity(0.7))
+                            // Remove offset from here
                     }
                 }
                 .frame(width: 16, height: 16)
             }
             .buttonStyle(.plain)
             .disabled(!state.isEnabled)
+            .offset(y: -11)  // Move the offset here instead
             .onHover { hovering in
                 withAnimation(.easeInOut(duration: 0.2)) {
                     isHovering = hovering
