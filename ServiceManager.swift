@@ -34,6 +34,8 @@ class BrowserView: NSView {
         self.wantsLayer = true
         self.layer?.cornerRadius = 8
         self.layer?.masksToBounds = true
+        self.layer?.borderWidth = 0.5
+        self.layer?.borderColor = NSColor.separatorColor.cgColor
         
         setupControls()
         setupLayout()
@@ -107,7 +109,8 @@ class BrowserView: NSView {
         urlField.font = NSFont.systemFont(ofSize: 11)
         urlField.bezelStyle = .roundedBezel
         urlField.focusRingType = .none
-        urlField.backgroundColor = NSColor.controlBackgroundColor.withAlphaComponent(0.5)
+        urlField.backgroundColor = NSColor.controlBackgroundColor.withAlphaComponent(0.3)
+        urlField.textColor = NSColor.secondaryLabelColor
         urlField.maximumNumberOfLines = 1
         urlField.lineBreakMode = .byTruncatingTail
         

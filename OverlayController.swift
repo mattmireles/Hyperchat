@@ -155,23 +155,22 @@ class OverlayController {
         inputBarHostingView.translatesAutoresizingMaskIntoConstraints = false
         self.inputBarHostingView = inputBarHostingView
         
-        // Create a vertical stack view to hold browser views and input bar
-        let mainStackView = NSStackView(views: [browserStackView, inputBarHostingView])
-        mainStackView.distribution = .fill
-        mainStackView.orientation = .vertical
-        mainStackView.spacing = 0
-        mainStackView.translatesAutoresizingMaskIntoConstraints = false
-        mainStackView.identifier = NSUserInterfaceItemIdentifier("mainStackView")
-        containerView.addSubview(mainStackView)
+        // Add browser stack and input bar separately to container
+        containerView.addSubview(browserStackView)
+        containerView.addSubview(inputBarHostingView)
         
         let constraints = [
-            mainStackView.topAnchor.constraint(equalTo: containerView.topAnchor, constant: 0), // Minimal spacing
-            mainStackView.bottomAnchor.constraint(equalTo: containerView.bottomAnchor, constant: -5),
-            mainStackView.leadingAnchor.constraint(equalTo: containerView.leadingAnchor, constant: 2),
-            mainStackView.trailingAnchor.constraint(equalTo: containerView.trailingAnchor, constant: -2),
+            // Browser stack with margins
+            browserStackView.topAnchor.constraint(equalTo: containerView.topAnchor, constant: 0),
+            browserStackView.leadingAnchor.constraint(equalTo: containerView.leadingAnchor, constant: 2),
+            browserStackView.trailingAnchor.constraint(equalTo: containerView.trailingAnchor, constant: -2),
+            browserStackView.bottomAnchor.constraint(equalTo: inputBarHostingView.topAnchor),
             
-            // Set input bar height constraint
-            inputBarHostingView.heightAnchor.constraint(equalToConstant: 44)
+            // Input bar full width
+            inputBarHostingView.leadingAnchor.constraint(equalTo: containerView.leadingAnchor),
+            inputBarHostingView.trailingAnchor.constraint(equalTo: containerView.trailingAnchor),
+            inputBarHostingView.bottomAnchor.constraint(equalTo: containerView.bottomAnchor),
+            inputBarHostingView.heightAnchor.constraint(equalToConstant: 56)
         ]
         NSLayoutConstraint.activate(constraints)
         stackViewConstraints = constraints
@@ -238,8 +237,8 @@ class OverlayController {
     
     private func addOverlayEffects() {
         guard let window = overlayWindow, let contentView = window.contentView else { return }
-        guard let stackView = contentView.subviews.first(where: { 
-            $0.identifier == NSUserInterfaceItemIdentifier("mainStackView") 
+        guard let browserStackView = contentView.subviews.first(where: { 
+            $0.identifier == NSUserInterfaceItemIdentifier("browserStackView") 
         }) as? NSStackView else { return }
         
         let blur = NSVisualEffectView(frame: contentView.bounds)
@@ -247,26 +246,30 @@ class OverlayController {
         blur.blendingMode = .behindWindow
         blur.state = .active
         blur.autoresizingMask = [.width, .height]
-        contentView.addSubview(blur, positioned: .below, relativeTo: stackView)
+        contentView.addSubview(blur, positioned: .below, relativeTo: browserStackView)
         self.blurView = blur
         
         let tint = NSView(frame: contentView.bounds)
         tint.wantsLayer = true
         tint.layer?.backgroundColor = NSColor.black.withAlphaComponent(0.8).cgColor
         tint.autoresizingMask = [.width, .height]
-        contentView.addSubview(tint, positioned: .below, relativeTo: stackView)
+        contentView.addSubview(tint, positioned: .below, relativeTo: browserStackView)
         self.tintView = tint
         
         NSLayoutConstraint.deactivate(stackViewConstraints)
         let newConstraints = [
-            stackView.topAnchor.constraint(equalTo: contentView.topAnchor, constant: 40),
-            stackView.bottomAnchor.constraint(equalTo: contentView.bottomAnchor, constant: -40),
-            stackView.leadingAnchor.constraint(equalTo: contentView.leadingAnchor, constant: 40),
-            stackView.trailingAnchor.constraint(equalTo: contentView.trailingAnchor, constant: -40),
+            // Browser stack with margins in overlay mode
+            browserStackView.topAnchor.constraint(equalTo: contentView.topAnchor, constant: 40),
+            browserStackView.leadingAnchor.constraint(equalTo: contentView.leadingAnchor, constant: 40),
+            browserStackView.trailingAnchor.constraint(equalTo: contentView.trailingAnchor, constant: -40),
+            browserStackView.bottomAnchor.constraint(equalTo: inputBarHostingView!.topAnchor),
             
-            // Keep the input bar height constraint
-            inputBarHostingView?.heightAnchor.constraint(equalToConstant: 44)
-        ].compactMap { $0 }
+            // Input bar still full width in overlay mode
+            inputBarHostingView!.leadingAnchor.constraint(equalTo: contentView.leadingAnchor),
+            inputBarHostingView!.trailingAnchor.constraint(equalTo: contentView.trailingAnchor),
+            inputBarHostingView!.bottomAnchor.constraint(equalTo: contentView.bottomAnchor, constant: -40),
+            inputBarHostingView!.heightAnchor.constraint(equalToConstant: 56)
+        ]
         NSLayoutConstraint.activate(newConstraints)
         stackViewConstraints = newConstraints
     }
@@ -405,6 +408,13 @@ struct UnifiedInputBar: View {
             Divider()
             
             HStack(spacing: 12) {
+                // Hyperchat logo
+                Image("HyperchatIcon")
+                    .resizable()
+                    .aspectRatio(contentMode: .fit)
+                    .frame(width: 24, height: 24)
+                    .opacity(0.7)
+                
                 // Mode toggle with visual feedback
                 HStack(spacing: 8) {
                     Image(systemName: serviceManager.replyToAll ? 
@@ -431,9 +441,11 @@ struct UnifiedInputBar: View {
                     }
                 }
                 
+                Spacer()
+                
                 // Input field with clear and send buttons
                 HStack(spacing: 8) {
-                    TextField("Ask all services...", text: $serviceManager.sharedPrompt)
+                    TextField("Ask them all", text: $serviceManager.sharedPrompt)
                         .textFieldStyle(.plain)
                         .focused($isInputFocused)
                         .onSubmit {
@@ -462,13 +474,14 @@ struct UnifiedInputBar: View {
                     .buttonStyle(.plain)
                     .disabled(serviceManager.sharedPrompt.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty)
                 }
+                .frame(width: 600)
                 .padding(.horizontal, 10)
-                .padding(.vertical, 6)
+                .padding(.vertical, 8)
                 .background(Color(NSColor.controlBackgroundColor).opacity(0.6))
                 .cornerRadius(6)
             }
-            .padding(.horizontal, 8)
-            .padding(.vertical, 6)
+            .padding(.horizontal, 12)
+            .padding(.vertical, 10)
             .background(Color(NSColor.windowBackgroundColor).opacity(0.8))
         }
         .onReceive(NotificationCenter.default.publisher(for: .focusUnifiedInput)) { _ in
