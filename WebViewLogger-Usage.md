@@ -1,7 +1,7 @@
 # WebViewLogger Usage Guide
 
 ## Overview
-The WebViewLogger provides comprehensive logging for all WebView activities in HyperChat. It captures:
+The WebViewLogger provides comprehensive logging for all WebView activities in Hyperchat. It captures:
 - Navigation events (URLs, redirects, errors)
 - JavaScript console logs (log, warn, error, debug)
 - Network requests and responses
@@ -11,11 +11,11 @@ The WebViewLogger provides comprehensive logging for all WebView activities in H
 ## Log File Locations
 Logs are saved to:
 ```
-~/Library/Logs/HyperChat/[ServiceName]/[YYYY-MM-DD].log
+~/Library/Logs/Hyperchat/[ServiceName]/[YYYY-MM-DD].log
 ```
 
 For example:
-- `~/Library/Logs/HyperChat/ChatGPT/2025-06-20.log`
+- `~/Library/Logs/Hyperchat/ChatGPT/2025-06-20.log`
 - `~/Library/Logs/HyperChat/Claude/2025-06-20.log`
 - `~/Library/Logs/HyperChat/Perplexity/2025-06-20.log`
 - `~/Library/Logs/HyperChat/Google/2025-06-20.log`

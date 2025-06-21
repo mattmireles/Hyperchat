@@ -78,7 +78,7 @@ class FloatingButtonManager {
     private let logger = Logger(subsystem: Bundle.main.bundleIdentifier ?? "com.transcendence.hyperchat", category: "FloatingButtonManager")
     private var screenUpdateTimer: Timer?
     private var lastKnownScreen: NSScreen?
-    private let positionsKey = "HyperChatButtonPositions"
+    private let positionsKey = "HyperchatButtonPositions"
     private var visibilityTimer: Timer?
 
     deinit {
@@ -111,7 +111,7 @@ class FloatingButtonManager {
         let button = DraggableButton(frame: NSRect(origin: .zero, size: CGSize(width: buttonSize, height: buttonSize))) { [weak self] in
             self?.saveCurrentPosition()
         }
-        button.image = NSImage(named: "HyperChatIcon")
+        button.image = NSImage(named: "HyperchatIcon")
         button.isBordered = false
         button.wantsLayer = true
         button.layer?.backgroundColor = NSColor.clear.cgColor

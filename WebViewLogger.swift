@@ -24,7 +24,7 @@ class WebViewLogger: NSObject {
     
     private func getLogDirectory() -> URL {
         let libraryPath = FileManager.default.urls(for: .libraryDirectory, in: .userDomainMask).first!
-        return libraryPath.appendingPathComponent("Logs/HyperChat")
+        return libraryPath.appendingPathComponent("Logs/Hyperchat")
     }
     
     private func getLogFile(for service: String) -> URL {

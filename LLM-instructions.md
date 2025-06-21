@@ -1,13 +1,13 @@
-# HyperChat - v1.0 Technical Specifications
+# Hyperchat - v1.0 Technical Specifications
 
 All Your AIs -- All At Once. 
 Accelerate Your Mind with Maximum AI
 
-*This specification defines the technical foundation for HyperChat v1.0, focusing on real-time AI response streaming for information junkies while maintaining architectural flexibility for future enhancements.*
+*This specification defines the technical foundation for Hyperchat v1.0, focusing on real-time AI response streaming for information junkies while maintaining architectural flexibility for future enhancements.*
 
 ## Product Overview
 
-HyperChat is a native macOS app that provides instant access to multiple LLMs via floating button or global hotkey, enabling real-time comparison of responses across ChatGPT, Claude, Perplexity, and Google in a full-screen overlay interface. Designed for information junkies who want to watch AI responses stream in simultaneously.
+Hyperchat is a native macOS app that provides instant access to multiple LLMs via floating button or global hotkey, enabling real-time comparison of responses across ChatGPT, Claude, Perplexity, and Google in a full-screen overlay interface. Designed for information junkies who want to watch AI responses stream in simultaneously.
 
 ## Core User Experience
 
@@ -30,7 +30,7 @@ HyperChat is a native macOS app that provides instant access to multiple LLMs vi
 ### App Structure
 
 ```
-HyperChatApp
+HyperchatApp
 ├── AppDelegate (app lifecycle, global hotkey registration)
 ├── FloatingButtonManager (persistent on-screen activation)
 ├── ServiceManager (persistent WKWebView management)
@@ -131,7 +131,7 @@ extension Notification.Name {
 
 ```swift
 @main
-struct HyperChatApp: App {
+struct HyperchatApp: App {
     @NSApplicationDelegateAdaptor(AppDelegate.self) var appDelegate
     
     var body: some Scene {
@@ -521,7 +521,7 @@ struct FloatingButtonConfig {
 }
 
 struct GlobalHotkeyConfig {
-    var keyCombo: KeyboardShortcuts.Name = .showHyperChat
+    var keyCombo: KeyboardShortcuts.Name = .showHyperchat
     var isEnabled: Bool = true
 }
 ```
@@ -645,7 +645,7 @@ class FloatingButtonManager: ObservableObject {
         window.hasShadow = true
         
         let button = NSButton(frame: NSRect(x: 0, y: 0, width: 48, height: 48))
-        button.image = NSImage(named: "HyperChatIcon")
+        button.image = NSImage(named: "HyperchatIcon")
         button.isBordered = false
         button.target = self
         button.action = #selector(buttonClicked)
@@ -668,12 +668,12 @@ class FloatingButtonManager: ObservableObject {
 import KeyboardShortcuts
 
 extension KeyboardShortcuts.Name {
-    static let showHyperChat = Self("showHyperChat", default: .init(.fn))
+    static let showHyperchat = Self("showHyperchat", default: .init(.fn))
 }
 
 class GlobalHotkeyManager {
     func setupHotkey() {
-        KeyboardShortcuts.onKeyUp(for: .showHyperChat) { [weak self] in
+        KeyboardShortcuts.onKeyUp(for: .showHyperchat) { [weak self] in
             self?.showPromptWindow()
         }
     }

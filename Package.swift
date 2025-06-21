@@ -2,7 +2,7 @@
 import PackageDescription
 
 let package = Package(
-    name: "HyperChat",
+    name: "Hyperchat",
     platforms: [
         .macOS(.v13)
     ],
@@ -11,7 +11,7 @@ let package = Package(
     ],
     targets: [
         .target(
-            name: "HyperChat",
+            name: "Hyperchat",
             dependencies: ["Sparkle"]
         )
     ]
