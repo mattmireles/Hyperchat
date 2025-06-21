@@ -180,50 +180,110 @@ struct PromptView: View {
     var maxHeight: () -> CGFloat
 
     @State private var promptText: String = ""
-    @FocusState private var isEditorFocused: Bool
-
-    private let minHeight: CGFloat = 60
-    private func maxEditorHeight() -> CGFloat {
-        if let screen = NSScreen.main {
-            return screen.visibleFrame.height * 0.4
-        }
-        return 400
-    }
+    @FocusState private var isInputFocused: Bool
+    @State private var isSubmitHovering = false
+    @State private var showFlameIcon = false
 
     var body: some View {
-        VStack(spacing: 16) {
-            ZStack(alignment: .topLeading) {
-                RoundedRectangle(cornerRadius: 8)
-                    .fill(Color.clear)
-                TextEditor(text: $promptText)
-                    .scrollContentBackground(.hidden)
-                    .background(Color.clear)
-                    .focused($isEditorFocused)
-                    .frame(minHeight: minHeight, maxHeight: maxEditorHeight())
-                    .fixedSize(horizontal: false, vertical: true)
-                    .font(.system(size: 14))
-                    .padding(.horizontal, 8)
-                    .padding(.vertical, 8)
-                if promptText.isEmpty {
-                    Text("Type your prompt...")
-                        .foregroundColor(.secondary)
-                        .padding(.leading, 14)
-                        .padding(.top, 12)
+        VStack(spacing: 0) {
+            HStack(spacing: 16) {
+                // Hyperchat logo
+                Image("HyperchatIcon")
+                    .resizable()
+                    .aspectRatio(contentMode: .fit)
+                    .frame(width: 48, height: 48)
+                    .cornerRadius(10)
+                    .shadow(color: Color.black.opacity(0.1), radius: 2, x: 0, y: 1)
+                
+                // Input field section - fills remaining space
+                HStack(spacing: 0) {
+                    ZStack(alignment: .topLeading) {
+                        if promptText.isEmpty {
+                            Text("Ask your AIs anything")
+                                .foregroundColor(.secondary.opacity(0.4))
+                                .font(.system(size: 14))
+                                .padding(.leading, 17)  // Adjusted to align with cursor
+                                .padding(.top, 5)
+                        }
+                        
+                        CustomTextEditor(text: $promptText, onSubmit: {
+                            submitWithAnimation()
+                        })
+                        .font(.system(size: 14))
+                        .frame(minHeight: 36, maxHeight: 36)
+                        .padding(.horizontal, 12)
+                        .padding(.vertical, 5)
+                        .focused($isInputFocused)
+                    }
+                    .frame(minHeight: 44)
+                    
+                    // Action buttons
+                    HStack(spacing: 8) {
+                        if !promptText.isEmpty {
+                            Button(action: {
+                                promptText = ""
+                            }) {
+                                Image(systemName: "xmark.circle.fill")
+                                    .foregroundColor(.secondary.opacity(0.6))
+                                    .font(.system(size: 16))
+                            }
+                            .buttonStyle(.plain)
+                            .transition(.scale.combined(with: .opacity))
+                        }
+                        
+                        Button(action: {
+                            submitWithAnimation()
+                        }) {
+                            ZStack {
+                                if !promptText.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty || showFlameIcon {
+                                    LinearGradient(
+                                        gradient: Gradient(colors: [
+                                            Color(red: 0.0, green: 0.6, blue: 1.0),  // Blue
+                                            Color(red: 1.0, green: 0.0, blue: 0.8)   // Pink/Magenta
+                                        ]),
+                                        startPoint: .bottomLeading,
+                                        endPoint: .topTrailing
+                                    )
+                                    .mask(
+                                        Image(systemName: showFlameIcon ? "flame.fill" : "chevron.up.2")
+                                            .font(.system(size: 18, weight: .bold))
+                                    )
+                                    .scaleEffect(isSubmitHovering ? 1.15 : 1.0)
+                                    .scaleEffect(showFlameIcon ? 1.2 : 1.0)
+                                } else {
+                                    Image(systemName: "chevron.up.2")
+                                        .font(.system(size: 18, weight: .bold))
+                                        .foregroundColor(.secondary.opacity(0.7))
+                                }
+                            }
+                            .frame(width: 24, height: 24)
+                        }
+                        .buttonStyle(.plain)
+                        .disabled(promptText.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty)
+                        .animation(.easeInOut(duration: 0.2), value: promptText.isEmpty)
+                        .animation(.easeInOut(duration: 0.2), value: isSubmitHovering)
+                        .onHover { hovering in
+                            isSubmitHovering = hovering
+                        }
+                    }
+                    .padding(.trailing, 8)
                 }
+                .background(Color(NSColor.controlBackgroundColor))
+                .cornerRadius(10)
+                .overlay(
+                    RoundedRectangle(cornerRadius: 10)
+                        .stroke(Color(NSColor.separatorColor).opacity(0.3), lineWidth: 1)
+                )
+                .frame(maxWidth: .infinity)
             }
-            .padding(0)
-
-            HStack {
-                Button("Cancel", role: .cancel, action: closeWindow)
-                Spacer()
-                Button("Ask All Services", action: handleSubmit)
-                    .buttonStyle(.borderedProminent)
-                    .disabled(promptText.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty)
-            }
+            .padding(.horizontal, 20)
+            .padding(.vertical, 12)
+            .frame(height: 72)
+            .background(
+                VisualEffectBackground()
+            )
         }
-        .padding(20)
-        .frame(width: 500)
-        .background(Color(NSColor.windowBackgroundColor))
+        .frame(width: 800)
         .cornerRadius(12)
         .shadow(radius: 20)
         .overlay(
@@ -236,9 +296,28 @@ struct PromptView: View {
                 onHeightChange(newTotalHeight)
             }
         }
-        .onAppear { isEditorFocused = true }
+        .onAppear { isInputFocused = true }
         .onReceive(NotificationCenter.default.publisher(for: .submitPrompt)) { _ in
             handleSubmit()
+        }
+    }
+    
+    private func submitWithAnimation() {
+        // Trigger flame animation
+        withAnimation(.easeInOut(duration: 0.2)) {
+            showFlameIcon = true
+        }
+        
+        // Delay execution to ensure animation is visible
+        DispatchQueue.main.asyncAfter(deadline: .now() + 0.3) {
+            handleSubmit()
+        }
+        
+        // Reset icon after animation
+        DispatchQueue.main.asyncAfter(deadline: .now() + 1.0) {
+            withAnimation(.easeInOut(duration: 0.2)) {
+                showFlameIcon = false
+            }
         }
     }
 
