@@ -584,7 +584,15 @@ struct UnifiedInputBar: View {
             .padding(.vertical, 12)
             .frame(height: 72)
             .background(
-                VisualEffectBackground()
+                LinearGradient(
+                    gradient: Gradient(stops: [
+                        .init(color: Color(red: 0.0, green: 0.6, blue: 1.0), location: 0.0),  // Blue at bottom
+                        .init(color: Color(red: 0.4, green: 0.3, blue: 0.9), location: 0.5),  // Purple blend in middle
+                        .init(color: Color(red: 1.0, green: 0.0, blue: 0.8), location: 1.0)   // Pink/Magenta at top
+                    ]),
+                    startPoint: .bottom,
+                    endPoint: .top
+                )
             )
         }
         .onReceive(NotificationCenter.default.publisher(for: .focusUnifiedInput)) { _ in
