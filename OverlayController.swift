@@ -5,6 +5,12 @@ class OverlayWindow: NSWindow {
     weak var overlayController: OverlayController?
 
     override var canBecomeKey: Bool { true }
+    
+    // Allow window to be moved by dragging anywhere
+    override var isMovableByWindowBackground: Bool {
+        get { return true }
+        set { }
+    }
 
     override func keyDown(with event: NSEvent) {
         print("🔵 OverlayWindow.keyDown: keyCode=\(event.keyCode)")
@@ -92,24 +98,40 @@ class OverlayController {
         
         let window = OverlayWindow(
             contentRect: windowRect,
-            styleMask: [.titled, .closable, .miniaturizable, .resizable],
+            styleMask: [.titled, .closable, .miniaturizable, .resizable, .fullSizeContentView],
             backing: .buffered,
             defer: false
         )
         window.overlayController = self
         overlayWindow = window
 
-        window.title = "Hyperchat"
+        // Configure window for full-size content view with visible buttons
+        window.titleVisibility = .hidden
+        window.titlebarAppearsTransparent = true
+        window.styleMask.insert(.fullSizeContentView)
         window.minSize = NSSize(width: 800, height: 600)
         window.level = .normal
         window.collectionBehavior = [.managed, .fullScreenPrimary]
-        window.backgroundColor = NSColor.windowBackgroundColor
+        window.isMovable = true
+        // Set contrasting background color based on system appearance
+        let systemIsDarkMode = NSApp.effectiveAppearance.bestMatch(from: [.darkAqua, .aqua]) == .darkAqua
+        window.backgroundColor = systemIsDarkMode ? 
+            NSColor(calibratedWhite: 0.08, alpha: 1.0) : // Very dark gray for dark mode
+            NSColor(calibratedWhite: 0.85, alpha: 1.0)   // Medium light gray for light mode
 
         let containerView = NSView(frame: window.contentView!.bounds)
         containerView.autoresizingMask = [.width, .height]
         window.contentView = containerView
 
         setupBrowserViews(in: containerView)
+        
+        // Register for appearance change notifications
+        DistributedNotificationCenter.default.addObserver(
+            self, 
+            selector: #selector(appearanceChanged(_:)), 
+            name: NSNotification.Name("AppleInterfaceThemeChangedNotification"), 
+            object: nil
+        )
 
         window.makeKeyAndOrderFront(nil)
     }
@@ -123,7 +145,7 @@ class OverlayController {
         let browserStackView = NSStackView(views: browserViews)
         browserStackView.distribution = .fillEqually
         browserStackView.orientation = .horizontal
-        browserStackView.spacing = 10
+        browserStackView.spacing = 8
         browserStackView.translatesAutoresizingMaskIntoConstraints = false
         browserStackView.identifier = NSUserInterfaceItemIdentifier("browserStackView")
         
@@ -143,13 +165,13 @@ class OverlayController {
         containerView.addSubview(mainStackView)
         
         let constraints = [
-            mainStackView.topAnchor.constraint(equalTo: containerView.topAnchor, constant: 10),
-            mainStackView.bottomAnchor.constraint(equalTo: containerView.bottomAnchor, constant: -10),
-            mainStackView.leadingAnchor.constraint(equalTo: containerView.leadingAnchor, constant: 10),
-            mainStackView.trailingAnchor.constraint(equalTo: containerView.trailingAnchor, constant: -10),
+            mainStackView.topAnchor.constraint(equalTo: containerView.topAnchor, constant: 0), // Minimal spacing
+            mainStackView.bottomAnchor.constraint(equalTo: containerView.bottomAnchor, constant: -5),
+            mainStackView.leadingAnchor.constraint(equalTo: containerView.leadingAnchor, constant: 2),
+            mainStackView.trailingAnchor.constraint(equalTo: containerView.trailingAnchor, constant: -2),
             
             // Set input bar height constraint
-            inputBarHostingView.heightAnchor.constraint(equalToConstant: 60)
+            inputBarHostingView.heightAnchor.constraint(equalToConstant: 44)
         ]
         NSLayoutConstraint.activate(constraints)
         stackViewConstraints = constraints
@@ -243,7 +265,7 @@ class OverlayController {
             stackView.trailingAnchor.constraint(equalTo: contentView.trailingAnchor, constant: -40),
             
             // Keep the input bar height constraint
-            inputBarHostingView?.heightAnchor.constraint(equalToConstant: 60)
+            inputBarHostingView?.heightAnchor.constraint(equalToConstant: 44)
         ].compactMap { $0 }
         NSLayoutConstraint.activate(newConstraints)
         stackViewConstraints = newConstraints
@@ -284,7 +306,7 @@ class OverlayController {
                 stackView.trailingAnchor.constraint(equalTo: contentView.trailingAnchor, constant: -10),
                 
                 // Keep the input bar height constraint
-                inputBarHostingView?.heightAnchor.constraint(equalToConstant: 60)
+                inputBarHostingView?.heightAnchor.constraint(equalToConstant: 44)
             ].compactMap { $0 }
             print("🟡 Activating \(newConstraints.count) new constraints")
             NSLayoutConstraint.activate(newConstraints)
@@ -327,7 +349,7 @@ class OverlayController {
             print("🟡 Animation completed")
             self.logMemoryUsage("After exit animation")
             self.isHiding = false
-            window.title = "Hyperchat"
+            // Remove title - using borderless window
             // Make sure the window can receive key events again
             print("🟡 Making window key and ordering front")
             window.makeKeyAndOrderFront(nil)
@@ -349,6 +371,23 @@ class OverlayController {
         // It should not be called when just exiting full-screen mode.
         overlayWindow?.close() // This will trigger the close logic in OverlayWindow
         overlayWindow = nil
+    }
+    
+    private func updateBackgroundColorForAppearance() {
+        guard let window = overlayWindow else { return }
+        let systemIsDarkMode = NSApp.effectiveAppearance.bestMatch(from: [.darkAqua, .aqua]) == .darkAqua
+        window.backgroundColor = systemIsDarkMode ? 
+            NSColor(calibratedWhite: 0.08, alpha: 1.0) : 
+            NSColor(calibratedWhite: 0.85, alpha: 1.0)
+        
+        // Update tint view for overlay mode if present
+        if let tintView = tintView {
+            tintView.layer?.backgroundColor = NSColor.black.withAlphaComponent(0.8).cgColor
+        }
+    }
+    
+    @objc private func appearanceChanged(_ notification: Notification) {
+        updateBackgroundColorForAppearance()
     }
 }
 
@@ -423,17 +462,14 @@ struct UnifiedInputBar: View {
                     .buttonStyle(.plain)
                     .disabled(serviceManager.sharedPrompt.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty)
                 }
-                .padding(.horizontal, 12)
-                .padding(.vertical, 8)
-                .background(Color(NSColor.controlBackgroundColor))
-                .cornerRadius(8)
-                .overlay(
-                    RoundedRectangle(cornerRadius: 8)
-                        .stroke(Color(NSColor.separatorColor), lineWidth: 1)
-                )
+                .padding(.horizontal, 10)
+                .padding(.vertical, 6)
+                .background(Color(NSColor.controlBackgroundColor).opacity(0.6))
+                .cornerRadius(6)
             }
-            .padding(12)
-            .background(.regularMaterial)
+            .padding(.horizontal, 8)
+            .padding(.vertical, 6)
+            .background(Color(NSColor.windowBackgroundColor).opacity(0.8))
         }
         .onReceive(NotificationCenter.default.publisher(for: .focusUnifiedInput)) { _ in
             isInputFocused = true

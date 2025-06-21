@@ -8,19 +8,32 @@ class BrowserView: NSView {
     let webView: WKWebView
     private let urlField: NSTextField
     private let backButton: NSButton
+    private let forwardButton: NSButton
     private let reloadButton: NSButton
+    private let copyButton: NSButton
     private let service: AIService
+    private var topToolbar: NSStackView!
+    private var bottomToolbar: NSStackView!
+    private let isFirstService: Bool
     
-    init(webView: WKWebView, service: AIService) {
+    init(webView: WKWebView, service: AIService, isFirstService: Bool = false) {
         self.webView = webView
         self.service = service
+        self.isFirstService = isFirstService
         
         // Create controls
         self.backButton = NSButton()
+        self.forwardButton = NSButton()
         self.reloadButton = NSButton()
+        self.copyButton = NSButton()
         self.urlField = NSTextField()
         
         super.init(frame: .zero)
+        
+        // Add visual styling
+        self.wantsLayer = true
+        self.layer?.cornerRadius = 8
+        self.layer?.masksToBounds = true
         
         setupControls()
         setupLayout()
@@ -46,21 +59,42 @@ class BrowserView: NSView {
     
     private func setupControls() {
         // Back button
-        backButton.title = "←"
-        backButton.bezelStyle = .rounded
+        if let backImage = NSImage(systemSymbolName: "chevron.left", accessibilityDescription: "Go Back") {
+            let config = NSImage.SymbolConfiguration(pointSize: 14, weight: .medium)
+            backButton.image = backImage.withSymbolConfiguration(config)
+        }
+        backButton.bezelStyle = .regularSquare
+        backButton.isBordered = false
         backButton.target = self
         backButton.action = #selector(goBack)
         
+        // Forward button
+        if let forwardImage = NSImage(systemSymbolName: "chevron.right", accessibilityDescription: "Go Forward") {
+            let config = NSImage.SymbolConfiguration(pointSize: 14, weight: .medium)
+            forwardButton.image = forwardImage.withSymbolConfiguration(config)
+        }
+        forwardButton.bezelStyle = .regularSquare
+        forwardButton.isBordered = false
+        forwardButton.target = self
+        forwardButton.action = #selector(goForward)
+        
         // Reload button
-        reloadButton.title = "↻"
-        reloadButton.bezelStyle = .rounded
+        if let reloadImage = NSImage(systemSymbolName: "arrow.clockwise", accessibilityDescription: "Reload") {
+            let config = NSImage.SymbolConfiguration(pointSize: 14, weight: .medium)
+            reloadButton.image = reloadImage.withSymbolConfiguration(config)
+        }
+        reloadButton.bezelStyle = .regularSquare
+        reloadButton.isBordered = false
         reloadButton.target = self
         reloadButton.action = #selector(reload)
         
         // Copy button
-        let copyButton = NSButton()
-        copyButton.title = "📋"
-        copyButton.bezelStyle = .rounded
+        if let copyImage = NSImage(systemSymbolName: "doc.on.doc", accessibilityDescription: "Copy URL") {
+            let config = NSImage.SymbolConfiguration(pointSize: 14, weight: .medium)
+            copyButton.image = copyImage.withSymbolConfiguration(config)
+        }
+        copyButton.bezelStyle = .regularSquare
+        copyButton.isBordered = false
         copyButton.target = self
         copyButton.action = #selector(copyURL)
         
@@ -70,37 +104,58 @@ class BrowserView: NSView {
         urlField.target = self
         urlField.action = #selector(loadURL)
         urlField.placeholderString = "Enter URL..."
+        urlField.font = NSFont.systemFont(ofSize: 11)
+        urlField.bezelStyle = .roundedBezel
+        urlField.focusRingType = .none
+        urlField.backgroundColor = NSColor.controlBackgroundColor.withAlphaComponent(0.5)
+        urlField.maximumNumberOfLines = 1
+        urlField.lineBreakMode = .byTruncatingTail
         
-        // Service label
-        let serviceLabel = NSTextField(labelWithString: service.name)
-        serviceLabel.font = NSFont.boldSystemFont(ofSize: 12)
-        serviceLabel.textColor = .secondaryLabelColor
+        // Create top toolbar - different layout for first service
+        let topToolbar: NSStackView
+        if isFirstService {
+            // For Google: add spacing for traffic lights, then nav buttons
+            let spacer = NSView()
+            spacer.widthAnchor.constraint(equalToConstant: 70).isActive = true // Space for traffic lights
+            
+            topToolbar = NSStackView(views: [spacer, backButton, forwardButton, reloadButton, urlField, copyButton])
+        } else {
+            // Standard toolbar for other services
+            topToolbar = NSStackView(views: [backButton, forwardButton, reloadButton, urlField, copyButton])
+        }
+        topToolbar.orientation = .horizontal
+        topToolbar.spacing = 6
+        topToolbar.distribution = .fill
         
-        // Create toolbar
-        let toolbar = NSStackView(views: [serviceLabel, backButton, reloadButton, copyButton, urlField])
-        toolbar.orientation = .horizontal
-        toolbar.spacing = 8
-        toolbar.distribution = .fill
+        // Make URL field take up available space
+        urlField.setContentCompressionResistancePriority(.defaultLow, for: .horizontal)
         
         // Set priorities to make URL field expand
         urlField.setContentHuggingPriority(NSLayoutConstraint.Priority(249), for: .horizontal)
+        backButton.setContentHuggingPriority(.defaultHigh, for: .horizontal)
+        forwardButton.setContentHuggingPriority(.defaultHigh, for: .horizontal)
+        reloadButton.setContentHuggingPriority(.defaultHigh, for: .horizontal)
+        copyButton.setContentHuggingPriority(.defaultHigh, for: .horizontal)
         
-        addSubview(toolbar)
+        addSubview(topToolbar)
         addSubview(webView)
         
+        self.topToolbar = topToolbar
+        self.bottomToolbar = nil
+        
         // Layout constraints
-        toolbar.translatesAutoresizingMaskIntoConstraints = false
+        topToolbar.translatesAutoresizingMaskIntoConstraints = false
         webView.translatesAutoresizingMaskIntoConstraints = false
         
         NSLayoutConstraint.activate([
-            // Toolbar at top
-            toolbar.topAnchor.constraint(equalTo: topAnchor, constant: 8),
-            toolbar.leadingAnchor.constraint(equalTo: leadingAnchor, constant: 8),
-            toolbar.trailingAnchor.constraint(equalTo: trailingAnchor, constant: -8),
-            toolbar.heightAnchor.constraint(equalToConstant: 24),
+            // Top toolbar with URL
+            topToolbar.topAnchor.constraint(equalTo: topAnchor, constant: 2),
+            topToolbar.leadingAnchor.constraint(equalTo: leadingAnchor, constant: 8),
+            topToolbar.trailingAnchor.constraint(equalTo: trailingAnchor, constant: -8),
+            topToolbar.heightAnchor.constraint(equalToConstant: 24),
             
-            // WebView below toolbar
-            webView.topAnchor.constraint(equalTo: toolbar.bottomAnchor, constant: 8),
+            // WebView fills remaining space
+            webView.topAnchor.constraint(equalTo: topToolbar.bottomAnchor, constant: 2),
             webView.leadingAnchor.constraint(equalTo: leadingAnchor),
             webView.trailingAnchor.constraint(equalTo: trailingAnchor),
             webView.bottomAnchor.constraint(equalTo: bottomAnchor)
@@ -117,6 +172,10 @@ class BrowserView: NSView {
     
     @objc private func goBack() {
         webView.goBack()
+    }
+    
+    @objc private func goForward() {
+        webView.goForward()
     }
     
     @objc private func reload() {
@@ -856,9 +915,10 @@ class ServiceManager: NSObject, ObservableObject {
     }
     
     private func setupServices() {
-        for service in defaultServices where service.enabled {
+        for (index, service) in defaultServices.enumerated() where service.enabled {
             let webView = createWebView(for: service)
-            let browserView = BrowserView(webView: webView, service: service)
+            let isFirstService = index == 0
+            let browserView = BrowserView(webView: webView, service: service, isFirstService: isFirstService)
             
             let webService: WebService
             switch service.activationMethod {
