@@ -26,6 +26,9 @@ class AppDelegate: NSObject, NSApplicationDelegate, SPUUpdaterDelegate {
         // Setup minimal menu bar for Edit menu (copy/paste support)
         setupMenuBar()
         
+        // Check for auto-installation on first launch
+        AutoInstaller.shared.checkAndPromptInstallation()
+        
         // Show the window in normal view on startup
         overlayController.showOverlay()
         
