@@ -13,43 +13,28 @@ class OverlayWindow: NSWindow {
     }
 
     override func keyDown(with event: NSEvent) {
-        print("🔵 OverlayWindow.keyDown: keyCode=\(event.keyCode)")
-        if event.keyCode == 53 { // ESC key
-            print("🔵 ESC key detected, isInOverlayMode=\(overlayController?.isInOverlayMode ?? false)")
-            // Only handle ESC if we're in overlay mode
-            if overlayController?.isInOverlayMode == true {
-                print("🔵 Calling exitFullScreenOverlay()")
-                overlayController?.exitFullScreenOverlay()
-            }
-        } else if event.keyCode == 45 && event.modifierFlags.contains(.command) { // Cmd+N
+        if event.keyCode == 45 && event.modifierFlags.contains(.command) { // Cmd+N
             NotificationCenter.default.post(name: .focusUnifiedInput, object: nil)
         } else {
             super.keyDown(with: event)
         }
     }
-
-    override func cancelOperation(_ sender: Any?) {
-        overlayController?.exitFullScreenOverlay()
-    }
     
     override func close() {
         super.close()
+        // Remove this window from the controller's list
+        if let controller = overlayController {
+            controller.removeWindow(self)
+        }
         NotificationCenter.default.post(name: .overlayDidHide, object: nil)
     }
 }
 
 class OverlayController {
-    private var overlayWindow: OverlayWindow?
+    private var windows: [OverlayWindow] = []
     var serviceManager: ServiceManager
     private var isHiding = false
     
-    // Store the normal window state
-    private var savedWindowFrame: NSRect?
-    private var savedWindowLevel: NSWindow.Level?
-    private var savedStyleMask: NSWindow.StyleMask?
-    var isInOverlayMode = false  // Made public for OverlayWindow access
-    private var blurView: NSVisualEffectView?
-    private var tintView: NSView?
     private var stackViewConstraints: [NSLayoutConstraint] = []
     private var inputBarHostingView: NSHostingView<UnifiedInputBar>?
 
@@ -64,18 +49,11 @@ class OverlayController {
 
     // New unified API
     func showOverlay(with prompt: String?) {
-        if let existingWindow = overlayWindow, existingWindow.isVisible {
-            enterFullScreenOverlay()
-            if let p = prompt {
-                serviceManager.executePrompt(p)
-            }
-            return
-        }
-
+        // Always create a new window in the current space
+        // This prevents switching to other spaces
         createNormalWindow()
         
         if let p = prompt {
-            enterFullScreenOverlay()
             DispatchQueue.main.asyncAfter(deadline: .now() + 0.1) {
                 self.serviceManager.executePrompt(p)
             }
@@ -103,7 +81,7 @@ class OverlayController {
             defer: false
         )
         window.overlayController = self
-        overlayWindow = window
+        windows.append(window)
 
         // Configure window for full-size content view with visible buttons
         window.titleVisibility = .hidden
@@ -111,6 +89,7 @@ class OverlayController {
         window.styleMask.insert(.fullSizeContentView)
         window.minSize = NSSize(width: 800, height: 600)
         window.level = .normal
+        // Don't use canJoinAllSpaces - we want window to stay in current space
         window.collectionBehavior = [.managed, .fullScreenPrimary]
         window.isMovable = true
         // Make window background transparent so visual effect shows through
@@ -186,213 +165,21 @@ class OverlayController {
         NSLayoutConstraint.activate(constraints)
         stackViewConstraints = constraints
     }
-    
-    private func enterFullScreenOverlay() {
-        print("🟢 enterFullScreenOverlay() called")
-        guard let window = overlayWindow, !isInOverlayMode else { 
-            print("🟢 Enter blocked: window=\(overlayWindow != nil), isInOverlayMode=\(isInOverlayMode)")
-            return 
-        }
-        
-        print("🟢 Saving window state...")
-        savedWindowFrame = window.frame
-        savedWindowLevel = window.level
-        savedStyleMask = window.styleMask
-        isInOverlayMode = true
-        
-        let targetScreen = NSScreen.screenWithMouse() ?? window.screen ?? NSScreen.main!
-        print("🟢 Target screen: \(targetScreen.frame)")
-        
-        // Log memory before transition
-        logMemoryUsage("Before enter animation")
-        
-        print("🟢 Starting enter animation...")
-        NSAnimationContext.runAnimationGroup({ context in
-            context.duration = 0.25
-            context.timingFunction = CAMediaTimingFunction(name: .easeInEaseOut)
-            
-            print("🟢 Setting borderless style")
-            window.styleMask = [.borderless]
-            window.level = .floating
-            window.collectionBehavior = [.canJoinAllSpaces, .fullScreenAuxiliary]
-            window.animator().setFrame(targetScreen.frame, display: true)
-            
-        }, completionHandler: {
-            print("🟢 Enter animation completed, adding overlay effects")
-            self.addOverlayEffects()
-            self.logMemoryUsage("After enter animation")
-        })
-        
-        // Remove the local monitor since we're handling ESC in the window's keyDown method
-        // This prevents double handling and potential conflicts
-    }
-    
-    private func logMemoryUsage(_ context: String) {
-        var info = mach_task_basic_info()
-        var count = mach_msg_type_number_t(MemoryLayout<mach_task_basic_info>.size) / 4
-        
-        let result = withUnsafeMutablePointer(to: &info) {
-            $0.withMemoryRebound(to: integer_t.self, capacity: 1) {
-                task_info(mach_task_self_,
-                         task_flavor_t(MACH_TASK_BASIC_INFO),
-                         $0,
-                         &count)
-            }
-        }
-        
-        if result == KERN_SUCCESS {
-            let memoryMB = Double(info.resident_size) / 1024.0 / 1024.0
-            print("💾 Memory usage (\(context)): \(String(format: "%.1f", memoryMB)) MB")
-        }
-    }
-    
-    private func addOverlayEffects() {
-        guard let window = overlayWindow, let contentView = window.contentView else { return }
-        guard let browserStackView = contentView.subviews.first(where: { 
-            $0.identifier == NSUserInterfaceItemIdentifier("browserStackView") 
-        }) as? NSStackView else { return }
-        
-        let blur = NSVisualEffectView(frame: contentView.bounds)
-        blur.material = .hudWindow
-        blur.blendingMode = .behindWindow
-        blur.state = .active
-        blur.autoresizingMask = [.width, .height]
-        contentView.addSubview(blur, positioned: .below, relativeTo: browserStackView)
-        self.blurView = blur
-        
-        let tint = NSView(frame: contentView.bounds)
-        tint.wantsLayer = true
-        tint.layer?.backgroundColor = NSColor.black.withAlphaComponent(0.8).cgColor
-        tint.autoresizingMask = [.width, .height]
-        contentView.addSubview(tint, positioned: .below, relativeTo: browserStackView)
-        self.tintView = tint
-        
-        NSLayoutConstraint.deactivate(stackViewConstraints)
-        let newConstraints = [
-            // Browser stack with margins in overlay mode
-            browserStackView.topAnchor.constraint(equalTo: contentView.topAnchor, constant: 40),
-            browserStackView.leadingAnchor.constraint(equalTo: contentView.leadingAnchor, constant: 40),
-            browserStackView.trailingAnchor.constraint(equalTo: contentView.trailingAnchor, constant: -40),
-            browserStackView.bottomAnchor.constraint(equalTo: inputBarHostingView!.topAnchor),
-            
-            // Input bar still full width in overlay mode
-            inputBarHostingView!.leadingAnchor.constraint(equalTo: contentView.leadingAnchor),
-            inputBarHostingView!.trailingAnchor.constraint(equalTo: contentView.trailingAnchor),
-            inputBarHostingView!.bottomAnchor.constraint(equalTo: contentView.bottomAnchor, constant: -40),
-            inputBarHostingView!.heightAnchor.constraint(equalToConstant: 72)
-        ]
-        NSLayoutConstraint.activate(newConstraints)
-        stackViewConstraints = newConstraints
-    }
-    
-    func exitFullScreenOverlay() {
-        print("🟡 exitFullScreenOverlay() called")
-        guard let window = overlayWindow, isInOverlayMode, !isHiding else { 
-            print("🟡 Exit blocked: window=\(overlayWindow != nil), isInOverlayMode=\(isInOverlayMode), isHiding=\(isHiding)")
-            return 
-        }
-        
-        print("🟡 Starting exit transition...")
-        isHiding = true
-        
-        // Immediately update the flag to prevent re-entry
-        isInOverlayMode = false
-        
-        print("🟡 Removing blur and tint views...")
-        blurView?.removeFromSuperview()
-        tintView?.removeFromSuperview()
-        blurView = nil
-        tintView = nil
-        
-        // ESC monitoring is handled in the window's keyDown method
-        
-        print("🟡 Updating constraints...")
-        if let contentView = window.contentView,
-           let stackView = contentView.subviews.first(where: { 
-               $0.identifier == NSUserInterfaceItemIdentifier("mainStackView") 
-           }) as? NSStackView {
-            print("🟡 Deactivating \(stackViewConstraints.count) constraints")
-            NSLayoutConstraint.deactivate(stackViewConstraints)
-            let newConstraints = [
-                stackView.topAnchor.constraint(equalTo: contentView.topAnchor, constant: 10),
-                stackView.bottomAnchor.constraint(equalTo: contentView.bottomAnchor, constant: -10),
-                stackView.leadingAnchor.constraint(equalTo: contentView.leadingAnchor, constant: 10),
-                stackView.trailingAnchor.constraint(equalTo: contentView.trailingAnchor, constant: -10),
-                
-                // Keep the input bar height constraint
-                inputBarHostingView?.heightAnchor.constraint(equalToConstant: 44)
-            ].compactMap { $0 }
-            print("🟡 Activating \(newConstraints.count) new constraints")
-            NSLayoutConstraint.activate(newConstraints)
-            stackViewConstraints = newConstraints
-        }
-        
-        // Log WebView states before animation
-        print("🟡 Active WebViews: \(serviceManager.activeServices.count)")
-        for service in serviceManager.activeServices {
-            if let webService = serviceManager.webServices[service.id] {
-                let isLoading = webService.browserView.webView.isLoading
-                let url = webService.browserView.webView.url?.absoluteString ?? "nil"
-                print("🟡   - \(service.name): loading=\(isLoading), url=\(url)")
-            }
-        }
-        
-        logMemoryUsage("Before exit animation")
-        
-        print("🟡 Starting animation...")
-        NSAnimationContext.runAnimationGroup({ context in
-            context.duration = 0.25
-            context.timingFunction = CAMediaTimingFunction(name: .easeInEaseOut)
-            
-            print("🟡 Setting window properties in animation block")
-            if let savedStyle = self.savedStyleMask { 
-                print("🟡 Restoring style mask")
-                window.styleMask = savedStyle 
-            }
-            if let savedLevel = self.savedWindowLevel { 
-                print("🟡 Restoring window level")
-                window.level = savedLevel 
-            }
-            window.collectionBehavior = [.managed, .fullScreenPrimary]
-            
-            if let savedFrame = self.savedWindowFrame {
-                print("🟡 Animating to saved frame: \(savedFrame)")
-                window.animator().setFrame(savedFrame, display: true)
-            }
-        }, completionHandler: {
-            print("🟡 Animation completed")
-            self.logMemoryUsage("After exit animation")
-            self.isHiding = false
-            // Remove title - using borderless window
-            // Make sure the window can receive key events again
-            print("🟡 Making window key and ordering front")
-            window.makeKeyAndOrderFront(nil)
-            print("🟡 exitFullScreenOverlay() completed")
-            
-            // Final WebView state check
-            print("🟡 Final WebView states:")
-            for service in self.serviceManager.activeServices {
-                if let webService = self.serviceManager.webServices[service.id] {
-                    let isLoading = webService.browserView.webView.isLoading
-                    print("🟡   - \(service.name): loading=\(isLoading)")
-                }
-            }
-        })
-    }
 
     func hideOverlay() {
-        // This function is now only responsible for closing the window entirely.
-        // It should not be called when just exiting full-screen mode.
-        overlayWindow?.close() // This will trigger the close logic in OverlayWindow
-        overlayWindow = nil
+        // Close all windows
+        for window in windows {
+            window.close()
+        }
+        windows.removeAll()
+    }
+    
+    func removeWindow(_ window: OverlayWindow) {
+        windows.removeAll { $0 == window }
     }
     
     private func updateBackgroundColorForAppearance() {
         // Window now uses visual effect background instead of solid color
-        // Update tint view for overlay mode if present
-        if let tintView = tintView {
-            tintView.layer?.backgroundColor = NSColor.black.withAlphaComponent(0.8).cgColor
-        }
     }
     
     @objc private func appearanceChanged(_ notification: Notification) {
@@ -672,4 +459,4 @@ struct CustomTextEditor: NSViewRepresentable {
             return false
         }
     }
-} 
+}
