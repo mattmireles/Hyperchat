@@ -134,6 +134,12 @@ class OverlayController {
         )
 
         window.makeKeyAndOrderFront(nil)
+        
+        // Focus the input field after all web views have loaded
+        // This delay allows web views to do their initial setup
+        DispatchQueue.main.asyncAfter(deadline: .now() + 2.5) {
+            NotificationCenter.default.post(name: .focusUnifiedInput, object: nil)
+        }
     }
     
     private func setupBrowserViews(in containerView: NSView) {
@@ -437,7 +443,7 @@ struct UnifiedInputBar: View {
                     ZStack(alignment: .topLeading) {
                         if serviceManager.sharedPrompt.isEmpty {
                             Text("Ask your AIs anything")
-                                .foregroundColor(.secondary)
+                                .foregroundColor(.secondary.opacity(0.4))
                                 .font(.system(size: 14))
                                 .padding(.leading, 17)  // Adjusted to align with cursor
                                 .padding(.top, 5)
@@ -587,6 +593,7 @@ struct CustomTextEditor: NSViewRepresentable {
         textView.allowsUndo = true
         textView.drawsBackground = false
         textView.textContainerInset = NSSize(width: 0, height: 0)
+        textView.insertionPointColor = NSColor(red: 1.0, green: 0.0, blue: 0.8, alpha: 1.0)
         
         // Set up for 2 lines
         textView.textContainer?.containerSize = NSSize(width: scrollView.frame.width, height: 36)
