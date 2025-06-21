@@ -403,6 +403,7 @@ struct UnifiedInputBar: View {
     @ObservedObject var serviceManager: ServiceManager
     @FocusState private var isInputFocused: Bool
     @State private var isRefreshHovering = false
+    @State private var isSubmitHovering = false
     
     var body: some View {
         VStack(spacing: 0) {
@@ -435,7 +436,7 @@ struct UnifiedInputBar: View {
                 HStack(spacing: 0) {
                     ZStack(alignment: .topLeading) {
                         if serviceManager.sharedPrompt.isEmpty {
-                            Text("Ask all your AIs...")
+                            Text("Ask your AIs anything")
                                 .foregroundColor(.secondary)
                                 .font(.system(size: 14))
                                 .padding(.leading, 17)  // Adjusted to align with cursor
@@ -471,9 +472,27 @@ struct UnifiedInputBar: View {
                         Button(action: {
                             serviceManager.reloadAllServices()
                         }) {
-                            Image(systemName: "arrow.trianglehead.clockwise")
-                                .foregroundColor(.secondary.opacity(isRefreshHovering ? 1.0 : 0.4))
-                                .font(.system(size: 16, weight: .medium))
+                            ZStack {
+                                if isRefreshHovering {
+                                    LinearGradient(
+                                        gradient: Gradient(colors: [
+                                            Color(red: 0.0, green: 0.6, blue: 1.0),  // Blue
+                                            Color(red: 1.0, green: 0.0, blue: 0.8)   // Pink/Magenta
+                                        ]),
+                                        startPoint: .bottomLeading,
+                                        endPoint: .topTrailing
+                                    )
+                                    .mask(
+                                        Image(systemName: "arrow.clockwise")
+                                            .font(.system(size: 18, weight: .semibold))
+                                    )
+                                } else {
+                                    Image(systemName: "arrow.clockwise")
+                                        .font(.system(size: 18, weight: .semibold))
+                                        .foregroundColor(.secondary.opacity(0.4))
+                                }
+                            }
+                            .frame(width: 24, height: 24)
                         }
                         .buttonStyle(.plain)
                         .help("Refresh all services")
@@ -486,14 +505,36 @@ struct UnifiedInputBar: View {
                         Button(action: {
                             serviceManager.executeSharedPrompt()
                         }) {
-                            Image(systemName: "chevron.up.dotted.2")
-                                .foregroundColor(serviceManager.sharedPrompt.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty ? 
-                                              .secondary.opacity(0.4) : .accentColor)
-                                .font(.system(size: 16, weight: .medium))
+                            ZStack {
+                                if !serviceManager.sharedPrompt.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty {
+                                    LinearGradient(
+                                        gradient: Gradient(colors: [
+                                            Color(red: 0.0, green: 0.6, blue: 1.0),  // Blue
+                                            Color(red: 1.0, green: 0.0, blue: 0.8)   // Pink/Magenta
+                                        ]),
+                                        startPoint: .bottomLeading,
+                                        endPoint: .topTrailing
+                                    )
+                                    .mask(
+                                        Image(systemName: "chevron.up.2")
+                                            .font(.system(size: 18, weight: .bold))
+                                    )
+                                    .scaleEffect(isSubmitHovering ? 1.15 : 1.0)
+                                } else {
+                                    Image(systemName: "chevron.up.2")
+                                        .font(.system(size: 18, weight: .bold))
+                                        .foregroundColor(.secondary.opacity(0.7))
+                                }
+                            }
+                            .frame(width: 24, height: 24)
                         }
                         .buttonStyle(.plain)
                         .disabled(serviceManager.sharedPrompt.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty)
                         .animation(.easeInOut(duration: 0.2), value: serviceManager.sharedPrompt.isEmpty)
+                        .animation(.easeInOut(duration: 0.2), value: isSubmitHovering)
+                        .onHover { hovering in
+                            isSubmitHovering = hovering
+                        }
                     }
                     .padding(.trailing, 8)
                 }
