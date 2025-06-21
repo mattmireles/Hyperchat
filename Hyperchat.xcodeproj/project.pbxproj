@@ -10,7 +10,7 @@
 		3EE13B9B2C4F6B2900A8A61E /* AppDelegate.swift in Sources */ = {isa = PBXBuildFile; fileRef = 3EE13B8E2C4F6B2900A8A61E /* AppDelegate.swift */; };
 		3EE13B9C2C4F6B2900A8A61E /* Assets.xcassets in Resources */ = {isa = PBXBuildFile; fileRef = 3EE13B932C4F6B2900A8A61E /* Assets.xcassets */; };
 		3EE13B9D2C4F6B2900A8A61E /* FloatingButtonManager.swift in Sources */ = {isa = PBXBuildFile; fileRef = 3EE13B8F2C4F6B2900A8A61E /* FloatingButtonManager.swift */; };
-		3EE13B9E2C4F6B2900A8A61E /* HyperChatApp.swift in Sources */ = {isa = PBXBuildFile; fileRef = 3EE13B902C4F6B2900A8A61E /* HyperChatApp.swift */; };
+		3EE13B9E2C4F6B2900A8A61E /* HyperchatApp.swift in Sources */ = {isa = PBXBuildFile; fileRef = 3EE13B902C4F6B2900A8A61E /* HyperchatApp.swift */; };
 		3EE13B9F2C4F6B2900A8A61E /* MainMenu.xib in Resources */ = {isa = PBXBuildFile; fileRef = 3EE13B942C4F6B2900A8A61E /* MainMenu.xib */; };
 		3EE13BA92C4F6B2900A8A61E /* OverlayController.swift in Sources */ = {isa = PBXBuildFile; fileRef = 3EE13BA32C4F6B2900A8A61E /* OverlayController.swift */; };
 		3EE13BAA2C4F6B2900A8A61E /* PromptWindowController.swift in Sources */ = {isa = PBXBuildFile; fileRef = 3EE13BA42C4F6B2900A8A61E /* PromptWindowController.swift */; };
@@ -23,11 +23,11 @@
 /* End PBXBuildFile section */
 
 /* Begin PBXFileReference section */
-		3EE13B8B2C4F6B2900A8A61E /* HyperChat.app */ = {isa = PBXFileReference; explicitFileType = wrapper.application; includeInIndex = 0; path = HyperChat.app; sourceTree = BUILT_PRODUCTS_DIR; };
+		3EE13B8B2C4F6B2900A8A61E /* Hyperchat.app */ = {isa = PBXFileReference; explicitFileType = wrapper.application; includeInIndex = 0; path = Hyperchat.app; sourceTree = BUILT_PRODUCTS_DIR; };
 		3EE13B8E2C4F6B2900A8A61E /* AppDelegate.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = AppDelegate.swift; sourceTree = "<group>"; };
 		3EE13B8F2C4F6B2900A8A61E /* FloatingButtonManager.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = FloatingButtonManager.swift; sourceTree = "<group>"; };
-		3EE13B902C4F6B2900A8A61E /* HyperChatApp.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = HyperChatApp.swift; sourceTree = "<group>"; };
-		3EE13B912C4F6B2900A8A61E /* HyperChat.entitlements */ = {isa = PBXFileReference; lastKnownFileType = text.plist.entitlements; path = HyperChat.entitlements; sourceTree = "<group>"; };
+		3EE13B902C4F6B2900A8A61E /* HyperchatApp.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = HyperchatApp.swift; sourceTree = "<group>"; };
+		3EE13B912C4F6B2900A8A61E /* Hyperchat.entitlements */ = {isa = PBXFileReference; lastKnownFileType = text.plist.entitlements; path = Hyperchat.entitlements; sourceTree = "<group>"; };
 		3EE13B922C4F6B2900A8A61E /* Info.plist */ = {isa = PBXFileReference; lastKnownFileType = text.plist.xml; path = Info.plist; sourceTree = "<group>"; };
 		3EE13B932C4F6B2900A8A61E /* Assets.xcassets */ = {isa = PBXFileReference; lastKnownFileType = folder.assetcatalog; path = Assets.xcassets; sourceTree = "<group>"; };
 		3EE13B942C4F6B2900A8A61E /* MainMenu.xib */ = {isa = PBXFileReference; lastKnownFileType = file.xib; path = MainMenu.xib; sourceTree = "<group>"; };
@@ -63,7 +63,7 @@
 		3EE13B8C2C4F6B2900A8A61E /* Products */ = {
 			isa = PBXGroup;
 			children = (
-				3EE13B8B2C4F6B2900A8A61E /* HyperChat.app */,
+				3EE13B8B2C4F6B2900A8A61E /* Hyperchat.app */,
 			);
 			name = Products;
 			sourceTree = "<group>";
@@ -73,8 +73,8 @@
 			children = (
 				3EE13B8E2C4F6B2900A8A61E /* AppDelegate.swift */,
 				3EE13B8F2C4F6B2900A8A61E /* FloatingButtonManager.swift */,
-				3EE13B902C4F6B2900A8A61E /* HyperChatApp.swift */,
-				3EE13B912C4F6B2900A8A61E /* HyperChat.entitlements */,
+				3EE13B902C4F6B2900A8A61E /* HyperchatApp.swift */,
+				3EE13B912C4F6B2900A8A61E /* Hyperchat.entitlements */,
 				3EE13B922C4F6B2900A8A61E /* Info.plist */,
 				3EE13B932C4F6B2900A8A61E /* Assets.xcassets */,
 				3EE13B942C4F6B2900A8A61E /* MainMenu.xib */,
@@ -92,9 +92,9 @@
 /* End PBXGroup section */
 
 /* Begin PBXNativeTarget section */
-		3EE13B8A2C4F6B2900A8A61E /* HyperChat */ = {
+		3EE13B8A2C4F6B2900A8A61E /* Hyperchat */ = {
 			isa = PBXNativeTarget;
-			buildConfigurationList = 3EE13BA22C4F6B2900A8A61E /* Build configuration list for PBXNativeTarget "HyperChat" */;
+			buildConfigurationList = 3EE13BA22C4F6B2900A8A61E /* Build configuration list for PBXNativeTarget "Hyperchat" */;
 			buildPhases = (
 				3EE13B872C4F6B2900A8A61E /* Sources */,
 				3EE13B882C4F6B2900A8A61E /* Frameworks */,
@@ -104,9 +104,9 @@
 			);
 			dependencies = (
 			);
-			name = HyperChat;
-			productName = HyperChat;
-			productReference = 3EE13B8B2C4F6B2900A8A61E /* HyperChat.app */;
+			name = Hyperchat;
+			productName = Hyperchat;
+			productReference = 3EE13B8B2C4F6B2900A8A61E /* Hyperchat.app */;
 			productType = "com.apple.product-type.application";
 		};
 /* End PBXNativeTarget section */
@@ -124,7 +124,7 @@
 					};
 				};
 			};
-			buildConfigurationList = 3EE13B9A2C4F6B2900A8A61E /* Build configuration list for PBXProject "HyperChat" */;
+			buildConfigurationList = 3EE13B9A2C4F6B2900A8A61E /* Build configuration list for PBXProject "Hyperchat" */;
 			compatibilityVersion = "Xcode 15.0";
 			developmentRegion = en;
 			hasScannedForEncodings = 0;
@@ -140,7 +140,7 @@
 			projectDirPath = "";
 			projectRoot = "";
 			targets = (
-				3EE13B8A2C4F6B2900A8A61E /* HyperChat */,
+				3EE13B8A2C4F6B2900A8A61E /* Hyperchat */,
 			);
 		};
 /* End PBXProject section */
@@ -162,7 +162,7 @@
 			isa = PBXSourcesBuildPhase;
 			buildActionMask = 2147483647;
 			files = (
-				3EE13B9E2C4F6B2900A8A61E /* HyperChatApp.swift in Sources */,
+				3EE13B9E2C4F6B2900A8A61E /* HyperchatApp.swift in Sources */,
 				3EE13B9B2C4F6B2900A8A61E /* AppDelegate.swift in Sources */,
 				3EE13B9D2C4F6B2900A8A61E /* FloatingButtonManager.swift in Sources */,
 				3EE13BA92C4F6B2900A8A61E /* OverlayController.swift in Sources */,
@@ -191,7 +191,7 @@
 				CLANG_ENABLE_OBJC_WEAK = YES;
 				CLANG_WARN_DOCUMENTATION_COMMENTS = YES;
 				CLANG_WARN_UNGUARDED_AVAILABILITY = YES_AGGRESSIVE;
-				CODE_SIGN_ENTITLEMENTS = HyperChat.entitlements;
+				CODE_SIGN_ENTITLEMENTS = Hyperchat.entitlements;
 				CODE_SIGN_STYLE = Automatic;
 				COPY_PHASE_STRIP = NO;
 				CURRENT_PROJECT_VERSION = 1;
@@ -232,7 +232,7 @@
 				CLANG_ENABLE_OBJC_WEAK = YES;
 				CLANG_WARN_DOCUMENTATION_COMMENTS = YES;
 				CLANG_WARN_UNGUARDED_AVAILABILITY = YES_AGGRESSIVE;
-				CODE_SIGN_ENTITLEMENTS = HyperChat.entitlements;
+				CODE_SIGN_ENTITLEMENTS = Hyperchat.entitlements;
 				CODE_SIGN_STYLE = Automatic;
 				COPY_PHASE_STRIP = YES;
 				CURRENT_PROJECT_VERSION = 1;
@@ -264,7 +264,7 @@
 /* End XCBuildConfiguration section */
 
 /* Begin XCConfigurationList section */
-		3EE13B9A2C4F6B2900A8A61E /* Build configuration list for PBXProject "HyperChat" */ = {
+		3EE13B9A2C4F6B2900A8A61E /* Build configuration list for PBXProject "Hyperchat" */ = {
 			isa = XCConfigurationList;
 			buildConfigurations = (
 				3EE13B982C4F6B2900A8A61E /* Debug */,
@@ -273,7 +273,7 @@
 			defaultConfigurationIsVisible = 0;
 			defaultConfigurationName = Release;
 		};
-		3EE13BA22C4F6B2900A8A61E /* Build configuration list for PBXNativeTarget "HyperChat" */ = {
+		3EE13BA22C4F6B2900A8A61E /* Build configuration list for PBXNativeTarget "Hyperchat" */ = {
 			isa = XCConfigurationList;
 			buildConfigurations = (
 				3EE13B982C4F6B2900A8A61E /* Debug */,

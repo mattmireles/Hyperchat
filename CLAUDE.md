@@ -7,30 +7,30 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 ### Building the Application
 ```bash
 # Build for debug
-xcodebuild -scheme HyperChat -configuration Debug
+xcodebuild -scheme Hyperchat -configuration Debug
 
 # Build for release
-xcodebuild -scheme HyperChat -configuration Release
+xcodebuild -scheme Hyperchat -configuration Release
 
 # Clean build
-xcodebuild -scheme HyperChat clean
+xcodebuild -scheme Hyperchat clean
 
 # Build and archive for distribution
-xcodebuild -scheme HyperChat -configuration Release archive
+xcodebuild -scheme Hyperchat -configuration Release archive
 ```
 
 ### Running the Application
 ```bash
 # Run the debug build
-open build/Debug/HyperChat.app
+open build/Debug/Hyperchat.app
 
 # Run from Xcode (recommended for development)
-open HyperChat.xcodeproj
+open Hyperchat.xcodeproj
 ```
 
 ## High-Level Architecture
 
-HyperChat is a native macOS app that provides instant access to multiple AI services (ChatGPT, Claude, Perplexity, Google) via a floating button or global hotkey. The app uses WebKit to display AI services side-by-side in a dual-mode interface (normal window or full-screen overlay).
+Hyperchat is a native macOS app that provides instant access to multiple AI services (ChatGPT, Claude, Perplexity, Google) via a floating button or global hotkey. The app uses WebKit to display AI services side-by-side in a dual-mode interface (normal window or full-screen overlay).
 
 ### Core Components
 
@@ -72,7 +72,7 @@ Services are configured in `ServiceConfiguration.swift` with the following struc
 If services fail to load with WebKit errors:
 1. Ensure entitlements include all required permissions (audio, camera, network, Apple Events)
 2. Use persistent data store (`WKWebsiteDataStore.default()`) for AI services that require authentication
-3. Clean build with `xcodebuild -scheme HyperChat clean` before rebuilding
+3. Clean build with `xcodebuild -scheme Hyperchat clean` before rebuilding
 
 ### Service URL Parameters
 - ChatGPT: Uses URL parameter `q` at `https://chatgpt.com`

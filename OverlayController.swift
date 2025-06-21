@@ -99,7 +99,7 @@ class OverlayController {
         window.overlayController = self
         overlayWindow = window
 
-        window.title = "HyperChat"
+        window.title = "Hyperchat"
         window.minSize = NSSize(width: 800, height: 600)
         window.level = .normal
         window.collectionBehavior = [.managed, .fullScreenPrimary]
@@ -327,7 +327,7 @@ class OverlayController {
             print("🟡 Animation completed")
             self.logMemoryUsage("After exit animation")
             self.isHiding = false
-            window.title = "HyperChat"
+            window.title = "Hyperchat"
             // Make sure the window can receive key events again
             print("🟡 Making window key and ordering front")
             window.makeKeyAndOrderFront(nil)
