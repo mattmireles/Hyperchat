@@ -92,7 +92,7 @@ struct GradientToolbarButton: View {
             }
             .buttonStyle(.plain)
             .disabled(!state.isEnabled)
-            .offset(y: systemName == "clipboard" ? -12 : -11)  // Extra 2px up for clipboard
+            .offset(y: systemName == "clipboard" ? -9 : -8)  // Offset 3px lower (was -12/-11, now -9/-8)
             .onHover { hovering in
                 withAnimation(.easeInOut(duration: 0.2)) {
                     isHovering = hovering
@@ -151,8 +151,6 @@ class BrowserView: NSView {
         self.wantsLayer = true
         self.layer?.cornerRadius = 8
         self.layer?.masksToBounds = true
-        self.layer?.borderWidth = 0.5
-        self.layer?.borderColor = NSColor.separatorColor.cgColor
         
         setupControls()
         setupLayout()
@@ -243,28 +241,32 @@ class BrowserView: NSView {
         urlField.lineBreakMode = .byTruncatingTail
         urlField.alignment = .left
         
-        // Create top toolbar - different layout for first service
+        // Create top toolbar - all services use same layout with flexible spacer
+        let flexibleSpacer = NSView()
+        flexibleSpacer.setContentHuggingPriority(.init(1), for: .horizontal)
+        flexibleSpacer.setContentCompressionResistancePriority(.init(1), for: .horizontal)
+        
         let topToolbar: NSStackView
         if isFirstService {
-            // For Google: add spacing for traffic lights, then nav buttons
-            let spacer = NSView()
-            spacer.widthAnchor.constraint(equalToConstant: 70).isActive = true // Space for traffic lights
+            // For Google: add fixed spacing for traffic lights
+            let trafficLightSpacer = NSView()
+            trafficLightSpacer.widthAnchor.constraint(equalToConstant: 70).isActive = true
             
-            topToolbar = NSStackView(views: [spacer, backButtonView, forwardButtonView, reloadButtonView, urlField, copyButtonView])
+            topToolbar = NSStackView(views: [trafficLightSpacer, flexibleSpacer, backButtonView, forwardButtonView, reloadButtonView, urlField, copyButtonView])
         } else {
             // Standard toolbar for other services
-            topToolbar = NSStackView(views: [backButtonView, forwardButtonView, reloadButtonView, urlField, copyButtonView])
+            topToolbar = NSStackView(views: [flexibleSpacer, backButtonView, forwardButtonView, reloadButtonView, urlField, copyButtonView])
         }
         topToolbar.orientation = .horizontal
         topToolbar.spacing = 6
         topToolbar.distribution = .fill
         topToolbar.alignment = .centerY
         
-        // Make URL field take up available space
-        urlField.setContentCompressionResistancePriority(.defaultLow, for: .horizontal)
-        
-        // Set priorities to make URL field expand
-        urlField.setContentHuggingPriority(NSLayoutConstraint.Priority(249), for: .horizontal)
+        // Set URL field to fixed width and height
+        NSLayoutConstraint.activate([
+            urlField.widthAnchor.constraint(equalToConstant: 180),
+            urlField.heightAnchor.constraint(equalToConstant: 20)
+        ])
         backButtonView.setContentHuggingPriority(.defaultHigh, for: .horizontal)
         forwardButtonView.setContentHuggingPriority(.defaultHigh, for: .horizontal)
         reloadButtonView.setContentHuggingPriority(.defaultHigh, for: .horizontal)
@@ -278,10 +280,7 @@ class BrowserView: NSView {
             ])
         }
         
-        // Set URL field height to match buttons
-        NSLayoutConstraint.activate([
-            urlField.heightAnchor.constraint(equalToConstant: 20)
-        ])
+        // URL field height is already set above
         
         addSubview(topToolbar)
         addSubview(webView)
@@ -294,8 +293,8 @@ class BrowserView: NSView {
         webView.translatesAutoresizingMaskIntoConstraints = false
         
         NSLayoutConstraint.activate([
-            // Top toolbar with URL
-            topToolbar.topAnchor.constraint(equalTo: topAnchor, constant: 1),
+            // Top toolbar with URL - add padding to show rounded corners
+            topToolbar.topAnchor.constraint(equalTo: topAnchor, constant: 8),
             topToolbar.leadingAnchor.constraint(equalTo: leadingAnchor, constant: 8),
             topToolbar.trailingAnchor.constraint(equalTo: trailingAnchor, constant: -8),
             topToolbar.heightAnchor.constraint(equalToConstant: 32),
@@ -1233,6 +1232,8 @@ class ServiceManager: NSObject, ObservableObject {
         
         // Ensure the WebView can become first responder for text selection
         webView.wantsLayer = true
+        webView.layer?.cornerRadius = 8
+        webView.layer?.masksToBounds = true
         
         // Add navigation delegate to handle errors
         webView.navigationDelegate = self
