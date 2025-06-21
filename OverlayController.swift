@@ -170,7 +170,7 @@ class OverlayController {
             inputBarHostingView.leadingAnchor.constraint(equalTo: containerView.leadingAnchor),
             inputBarHostingView.trailingAnchor.constraint(equalTo: containerView.trailingAnchor),
             inputBarHostingView.bottomAnchor.constraint(equalTo: containerView.bottomAnchor),
-            inputBarHostingView.heightAnchor.constraint(equalToConstant: 56)
+            inputBarHostingView.heightAnchor.constraint(equalToConstant: 72)
         ]
         NSLayoutConstraint.activate(constraints)
         stackViewConstraints = constraints
@@ -268,7 +268,7 @@ class OverlayController {
             inputBarHostingView!.leadingAnchor.constraint(equalTo: contentView.leadingAnchor),
             inputBarHostingView!.trailingAnchor.constraint(equalTo: contentView.trailingAnchor),
             inputBarHostingView!.bottomAnchor.constraint(equalTo: contentView.bottomAnchor, constant: -40),
-            inputBarHostingView!.heightAnchor.constraint(equalToConstant: 56)
+            inputBarHostingView!.heightAnchor.constraint(equalToConstant: 72)
         ]
         NSLayoutConstraint.activate(newConstraints)
         stackViewConstraints = newConstraints
@@ -406,86 +406,198 @@ struct UnifiedInputBar: View {
     var body: some View {
         VStack(spacing: 0) {
             Divider()
+                .background(Color(NSColor.separatorColor))
             
-            HStack(spacing: 12) {
+            HStack(spacing: 16) {
                 // Hyperchat logo
                 Image("HyperchatIcon")
                     .resizable()
                     .aspectRatio(contentMode: .fit)
-                    .frame(width: 24, height: 24)
-                    .opacity(0.7)
+                    .frame(width: 48, height: 48)
+                    .cornerRadius(10)
+                    .shadow(color: Color.black.opacity(0.1), radius: 2, x: 0, y: 1)
                 
-                // Mode toggle with visual feedback
-                HStack(spacing: 8) {
-                    Image(systemName: serviceManager.replyToAll ? 
-                        "bubble.left.and.bubble.right.fill" : "plus.bubble.fill")
-                        .foregroundColor(.secondary)
-                        .font(.system(size: 14))
-                    
-                    Picker("", selection: $serviceManager.replyToAll) {
-                        Text("Reply to All").tag(true)
-                        Text("New Chat").tag(false)
-                    }
-                    .pickerStyle(.segmented)
-                    .frame(width: 180)
-                    
-                    // Show loading indicator when services are loading
-                    if serviceManager.loadingStates.values.contains(true) {
-                        HStack(spacing: 4) {
-                            ProgressView()
-                                .controlSize(.mini)
-                            Text("Loading...")
-                                .font(.caption)
-                                .foregroundColor(.secondary)
-                        }
+                // Refresh button with better styling
+                Button(action: {
+                    serviceManager.reloadAllServices()
+                }) {
+                    ZStack {
+                        Circle()
+                            .fill(Color(NSColor.controlBackgroundColor))
+                            .frame(width: 36, height: 36)
+                        Image(systemName: "arrow.clockwise")
+                            .foregroundColor(.primary)
+                            .font(.system(size: 16, weight: .medium))
                     }
                 }
+                .buttonStyle(.plain)
+                .help("Refresh all services")
                 
-                Spacer()
+                // Show loading indicator when services are loading
+                if serviceManager.loadingStates.values.contains(true) {
+                    HStack(spacing: 6) {
+                        ProgressView()
+                            .controlSize(.small)
+                            .scaleEffect(0.8)
+                        Text("Loading...")
+                            .font(.system(size: 12))
+                            .foregroundColor(.secondary)
+                    }
+                    .transition(.opacity)
+                }
                 
-                // Input field with clear and send buttons
-                HStack(spacing: 8) {
-                    TextField("Ask them all", text: $serviceManager.sharedPrompt)
-                        .textFieldStyle(.plain)
-                        .focused($isInputFocused)
-                        .onSubmit {
-                            serviceManager.executeSharedPrompt()
-                        }
-                        .font(.system(size: 14))
-                    
-                    if !serviceManager.sharedPrompt.isEmpty {
-                        Button(action: {
-                            serviceManager.sharedPrompt = ""
-                        }) {
-                            Image(systemName: "xmark.circle.fill")
+                // Input field section - fills remaining space
+                HStack(spacing: 0) {
+                    ZStack(alignment: .topLeading) {
+                        if serviceManager.sharedPrompt.isEmpty {
+                            Text("Ask them all...")
                                 .foregroundColor(.secondary)
                                 .font(.system(size: 14))
+                                .padding(.leading, 17)  // Adjusted to align with cursor
+                                .padding(.top, 5)
+                        }
+                        
+                        CustomTextEditor(text: $serviceManager.sharedPrompt, onSubmit: {
+                            serviceManager.executeSharedPrompt()
+                        })
+                        .font(.system(size: 14))
+                        .frame(minHeight: 36, maxHeight: 36)
+                        .padding(.horizontal, 12)
+                        .padding(.vertical, 5)
+                        .focused($isInputFocused)
+                    }
+                    .frame(minHeight: 44)
+                    
+                    // Action buttons
+                    HStack(spacing: 8) {
+                        if !serviceManager.sharedPrompt.isEmpty {
+                            Button(action: {
+                                serviceManager.sharedPrompt = ""
+                            }) {
+                                Image(systemName: "xmark.circle.fill")
+                                    .foregroundColor(.secondary.opacity(0.6))
+                                    .font(.system(size: 16))
+                            }
+                            .buttonStyle(.plain)
+                            .transition(.scale.combined(with: .opacity))
+                        }
+                        
+                        Button(action: {
+                            serviceManager.executeSharedPrompt()
+                        }) {
+                            Image(systemName: "paperplane.fill")
+                                .foregroundColor(serviceManager.sharedPrompt.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty ? 
+                                              .secondary.opacity(0.4) : .accentColor)
+                                .font(.system(size: 16, weight: .medium))
+                                .rotationEffect(.degrees(45))
                         }
                         .buttonStyle(.plain)
+                        .disabled(serviceManager.sharedPrompt.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty)
+                        .animation(.easeInOut(duration: 0.2), value: serviceManager.sharedPrompt.isEmpty)
                     }
-                    
-                    Button(action: {
-                        serviceManager.executeSharedPrompt()
-                    }) {
-                        Image(systemName: "paperplane.fill")
-                            .foregroundColor(serviceManager.sharedPrompt.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty ? .secondary : .accentColor)
-                            .font(.system(size: 14))
-                    }
-                    .buttonStyle(.plain)
-                    .disabled(serviceManager.sharedPrompt.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty)
+                    .padding(.trailing, 8)
                 }
-                .frame(width: 600)
-                .padding(.horizontal, 10)
-                .padding(.vertical, 8)
-                .background(Color(NSColor.controlBackgroundColor).opacity(0.6))
-                .cornerRadius(6)
+                .background(Color(NSColor.controlBackgroundColor))
+                .cornerRadius(10)
+                .overlay(
+                    RoundedRectangle(cornerRadius: 10)
+                        .stroke(Color(NSColor.separatorColor).opacity(0.3), lineWidth: 1)
+                )
+                .frame(maxWidth: .infinity)
             }
-            .padding(.horizontal, 12)
-            .padding(.vertical, 10)
-            .background(Color(NSColor.windowBackgroundColor).opacity(0.8))
+            .padding(.horizontal, 20)
+            .padding(.vertical, 12)
+            .frame(height: 72)
+            .background(
+                VisualEffectBackground()
+            )
         }
         .onReceive(NotificationCenter.default.publisher(for: .focusUnifiedInput)) { _ in
             isInputFocused = true
+        }
+    }
+}
+
+struct VisualEffectBackground: NSViewRepresentable {
+    func makeNSView(context: Context) -> NSVisualEffectView {
+        let view = NSVisualEffectView()
+        view.material = .hudWindow
+        view.blendingMode = .behindWindow
+        view.state = .active
+        return view
+    }
+    
+    func updateNSView(_ nsView: NSVisualEffectView, context: Context) {}
+}
+
+struct CustomTextEditor: NSViewRepresentable {
+    @Binding var text: String
+    let onSubmit: () -> Void
+    
+    func makeNSView(context: Context) -> NSScrollView {
+        let scrollView = NSTextView.scrollableTextView()
+        let textView = scrollView.documentView as! NSTextView
+        
+        textView.delegate = context.coordinator
+        textView.string = text
+        textView.font = NSFont.systemFont(ofSize: 14)
+        textView.isRichText = false
+        textView.isAutomaticQuoteSubstitutionEnabled = false
+        textView.allowsUndo = true
+        textView.drawsBackground = false
+        textView.textContainerInset = NSSize(width: 0, height: 0)
+        
+        // Set up for 2 lines
+        textView.textContainer?.containerSize = NSSize(width: scrollView.frame.width, height: 36)
+        textView.textContainer?.widthTracksTextView = true
+        textView.isVerticallyResizable = false
+        
+        scrollView.hasVerticalScroller = false
+        scrollView.hasHorizontalScroller = false
+        scrollView.borderType = .noBorder
+        scrollView.drawsBackground = false
+        
+        return scrollView
+    }
+    
+    func updateNSView(_ scrollView: NSScrollView, context: Context) {
+        let textView = scrollView.documentView as! NSTextView
+        if textView.string != text {
+            textView.string = text
+        }
+    }
+    
+    func makeCoordinator() -> Coordinator {
+        Coordinator(self)
+    }
+    
+    class Coordinator: NSObject, NSTextViewDelegate {
+        var parent: CustomTextEditor
+        
+        init(_ parent: CustomTextEditor) {
+            self.parent = parent
+        }
+        
+        func textDidChange(_ notification: Notification) {
+            guard let textView = notification.object as? NSTextView else { return }
+            parent.text = textView.string
+        }
+        
+        func textView(_ textView: NSTextView, doCommandBy commandSelector: Selector) -> Bool {
+            if commandSelector == #selector(NSResponder.insertNewline(_:)) {
+                // Check if Shift is pressed
+                let modifierFlags = NSEvent.modifierFlags
+                if modifierFlags.contains(.shift) {
+                    // Shift+Enter: Insert newline
+                    textView.insertNewlineIgnoringFieldEditor(nil)
+                    return true
+                } else {
+                    // Enter alone: Submit
+                    parent.onSubmit()
+                    return true
+                }
+            }
+            return false
         }
     }
 } 

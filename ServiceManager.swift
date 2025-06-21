@@ -907,10 +907,11 @@ class ClaudeService: WebService {
 class ServiceManager: NSObject, ObservableObject {
     @Published var activeServices: [AIService] = []
     @Published var sharedPrompt: String = ""
-    @Published var replyToAll: Bool = false
+    @Published var replyToAll: Bool = true
     @Published var loadingStates: [String: Bool] = [:]  // Track loading state per service (for UI only)
     var webServices: [String: WebService] = [:]
     private let processPool = WKProcessPool.shared  // Critical optimization
+    private var isFirstSubmit: Bool = true  // Track if this is the first submit after load/reload
     
     override init() {
         super.init()
@@ -984,6 +985,11 @@ class ServiceManager: NSObject, ObservableObject {
                 }
             }
         }
+        
+        // Refocus the prompt input field after a delay to ensure paste operations complete
+        DispatchQueue.main.asyncAfter(deadline: .now() + 1.5) {
+            NotificationCenter.default.post(name: .focusUnifiedInput, object: nil)
+        }
     }
     
     func executeSharedPrompt() {
@@ -991,7 +997,10 @@ class ServiceManager: NSObject, ObservableObject {
         
         let promptToExecute = sharedPrompt // Store the prompt before clearing
         
-        if replyToAll {
+        // Use "new chat" mode for first submit, then switch to "reply to all"
+        let useReplyToAll = !isFirstSubmit && replyToAll
+        
+        if useReplyToAll {
             // Reply to All Mode: Paste into current pages immediately
             executePrompt(promptToExecute, replyToAll: true)
             // Clear the prompt after sending
@@ -1004,6 +1013,13 @@ class ServiceManager: NSObject, ObservableObject {
             // Execute prompt immediately - no need to reload first
             executePrompt(promptToExecute, replyToAll: false)
         }
+        
+        // After first submit, mark as no longer first
+        if isFirstSubmit {
+            isFirstSubmit = false
+            // Also update the UI to show we're now in reply to all mode
+            replyToAll = true
+        }
     }
     
     func reloadAllServices() {
@@ -1013,6 +1029,10 @@ class ServiceManager: NSObject, ObservableObject {
                 loadDefaultPage(for: service, webView: webService.browserView.webView)
             }
         }
+        
+        // Reset to first submit mode after reload
+        isFirstSubmit = true
+        replyToAll = true  // Reset UI to default state
         
         // Clear loading states after a reasonable delay
         DispatchQueue.main.asyncAfter(deadline: .now() + 3.0) {
