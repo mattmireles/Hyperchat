@@ -4,6 +4,61 @@ import SwiftUI
 
 // MARK: - Browser View with Controls
 
+// MARK: - Gradient Toolbar Button
+
+class ButtonState: ObservableObject {
+    @Published var isEnabled: Bool
+    
+    init(isEnabled: Bool) {
+        self.isEnabled = isEnabled
+    }
+}
+
+struct GradientToolbarButton: View {
+    let systemName: String
+    @ObservedObject var state: ButtonState
+    let action: () -> Void
+    @State private var isHovering = false
+    
+    var body: some View {
+        VStack(spacing: 0) {  // Add this wrapper
+            Button(action: action) {
+                ZStack {
+                    if state.isEnabled && isHovering {
+                        LinearGradient(
+                            gradient: Gradient(colors: [
+                                Color(red: 0.0, green: 0.6, blue: 1.0),  // Blue
+                                Color(red: 1.0, green: 0.0, blue: 0.8)   // Pink/Magenta
+                            ]),
+                            startPoint: .bottomLeading,
+                            endPoint: .topTrailing
+                        )
+                        .mask(
+                            Image(systemName: systemName)
+                                .font(.system(size: 10, weight: .semibold))
+                                .offset(y: -11)  // Move up 11px
+                        )
+                    } else {
+                        Image(systemName: systemName)
+                            .font(.system(size: 10, weight: .semibold))
+                            .foregroundColor(state.isEnabled ? .secondary.opacity(0.4) : .secondary.opacity(0.3))
+                            .offset(y: -11)  // Move up 11px
+                    }
+                }
+                .frame(width: 16, height: 16)
+            }
+            .buttonStyle(.plain)
+            .disabled(!state.isEnabled)
+            .onHover { hovering in
+                withAnimation(.easeInOut(duration: 0.2)) {
+                    isHovering = hovering
+                }
+            }
+        }
+        .frame(width: 20, height: 20, alignment: .center)  // Explicit alignment
+    }
+}
+
 class BrowserView: NSView {
     let webView: WKWebView
     private let urlField: NSTextField
@@ -15,6 +70,17 @@ class BrowserView: NSView {
     private var topToolbar: NSStackView!
     private var bottomToolbar: NSStackView!
     private let isFirstService: Bool
+    private var allowFocusCapture = false
+    
+    // SwiftUI button views
+    private var backButtonView: NSHostingView<GradientToolbarButton>!
+    private var forwardButtonView: NSHostingView<GradientToolbarButton>!
+    private var reloadButtonView: NSHostingView<GradientToolbarButton>!
+    private var copyButtonView: NSHostingView<GradientToolbarButton>!
+    
+    // Button states
+    private let backButtonState = ButtonState(isEnabled: false)
+    private let forwardButtonState = ButtonState(isEnabled: false)
     
     init(webView: WKWebView, service: AIService, isFirstService: Bool = false) {
         self.webView = webView
@@ -40,6 +106,11 @@ class BrowserView: NSView {
         setupControls()
         setupLayout()
         setupWebViewDelegate()
+        
+        // Enable focus capture after initial load delay
+        DispatchQueue.main.asyncAfter(deadline: .now() + 3.0) {
+            self.allowFocusCapture = true
+        }
     }
     
     override var acceptsFirstResponder: Bool {
@@ -51,8 +122,14 @@ class BrowserView: NSView {
     }
     
     override func becomeFirstResponder() -> Bool {
-        // Forward first responder to the webView for text selection
-        return webView.becomeFirstResponder()
+        // Only allow the webView to become first responder if:
+        // 1. It's been explicitly clicked, or
+        // 2. Focus capture is allowed (after initial load period)
+        if allowFocusCapture && (NSApp.currentEvent?.type == .leftMouseDown || 
+                                  NSApp.currentEvent?.type == .rightMouseDown) {
+            return webView.becomeFirstResponder()
+        }
+        return false
     }
     
     required init?(coder: NSCoder) {
@@ -60,45 +137,44 @@ class BrowserView: NSView {
     }
     
     private func setupControls() {
-        // Back button
-        if let backImage = NSImage(systemSymbolName: "chevron.left", accessibilityDescription: "Go Back") {
-            let config = NSImage.SymbolConfiguration(pointSize: 14, weight: .medium)
-            backButton.image = backImage.withSymbolConfiguration(config)
-        }
-        backButton.bezelStyle = .regularSquare
-        backButton.isBordered = false
-        backButton.target = self
-        backButton.action = #selector(goBack)
+        // Create SwiftUI gradient buttons
+        let backButtonView = NSHostingView(rootView: GradientToolbarButton(
+            systemName: "chevron.backward",
+            state: backButtonState,
+            action: { [weak self] in self?.goBack() }
+        ))
+        backButtonView.translatesAutoresizingMaskIntoConstraints = false
+        backButtonView.setFrameSize(NSSize(width: 20, height: 20))  // Explicit size
         
-        // Forward button
-        if let forwardImage = NSImage(systemSymbolName: "chevron.right", accessibilityDescription: "Go Forward") {
-            let config = NSImage.SymbolConfiguration(pointSize: 14, weight: .medium)
-            forwardButton.image = forwardImage.withSymbolConfiguration(config)
-        }
-        forwardButton.bezelStyle = .regularSquare
-        forwardButton.isBordered = false
-        forwardButton.target = self
-        forwardButton.action = #selector(goForward)
+        let forwardButtonView = NSHostingView(rootView: GradientToolbarButton(
+            systemName: "chevron.forward",
+            state: forwardButtonState,
+            action: { [weak self] in self?.goForward() }
+        ))
+        forwardButtonView.translatesAutoresizingMaskIntoConstraints = false
+        forwardButtonView.setFrameSize(NSSize(width: 20, height: 20))  // Explicit size
         
-        // Reload button
-        if let reloadImage = NSImage(systemSymbolName: "arrow.clockwise", accessibilityDescription: "Reload") {
-            let config = NSImage.SymbolConfiguration(pointSize: 14, weight: .medium)
-            reloadButton.image = reloadImage.withSymbolConfiguration(config)
-        }
-        reloadButton.bezelStyle = .regularSquare
-        reloadButton.isBordered = false
-        reloadButton.target = self
-        reloadButton.action = #selector(reload)
+        let reloadButtonView = NSHostingView(rootView: GradientToolbarButton(
+            systemName: "arrow.clockwise",
+            state: ButtonState(isEnabled: true),
+            action: { [weak self] in self?.reload() }
+        ))
+        reloadButtonView.translatesAutoresizingMaskIntoConstraints = false
+        reloadButtonView.setFrameSize(NSSize(width: 20, height: 20))  // Explicit size
         
-        // Copy button
-        if let copyImage = NSImage(systemSymbolName: "doc.on.doc", accessibilityDescription: "Copy URL") {
-            let config = NSImage.SymbolConfiguration(pointSize: 14, weight: .medium)
-            copyButton.image = copyImage.withSymbolConfiguration(config)
-        }
-        copyButton.bezelStyle = .regularSquare
-        copyButton.isBordered = false
-        copyButton.target = self
-        copyButton.action = #selector(copyURL)
+        let copyButtonView = NSHostingView(rootView: GradientToolbarButton(
+            systemName: "document.on.document",
+            state: ButtonState(isEnabled: true),
+            action: { [weak self] in self?.copyURL() }
+        ))
+        copyButtonView.translatesAutoresizingMaskIntoConstraints = false
+        copyButtonView.setFrameSize(NSSize(width: 20, height: 20))  // Explicit size
+        
+        // Store references for later updates
+        self.backButtonView = backButtonView
+        self.forwardButtonView = forwardButtonView
+        self.reloadButtonView = reloadButtonView
+        self.copyButtonView = copyButtonView
         
         // URL field
         urlField.isEditable = true
@@ -113,6 +189,7 @@ class BrowserView: NSView {
         urlField.textColor = NSColor.secondaryLabelColor
         urlField.maximumNumberOfLines = 1
         urlField.lineBreakMode = .byTruncatingTail
+        urlField.alignment = .left
         
         // Create top toolbar - different layout for first service
         let topToolbar: NSStackView
@@ -121,24 +198,38 @@ class BrowserView: NSView {
             let spacer = NSView()
             spacer.widthAnchor.constraint(equalToConstant: 70).isActive = true // Space for traffic lights
             
-            topToolbar = NSStackView(views: [spacer, backButton, forwardButton, reloadButton, urlField, copyButton])
+            topToolbar = NSStackView(views: [spacer, backButtonView, forwardButtonView, reloadButtonView, urlField, copyButtonView])
         } else {
             // Standard toolbar for other services
-            topToolbar = NSStackView(views: [backButton, forwardButton, reloadButton, urlField, copyButton])
+            topToolbar = NSStackView(views: [backButtonView, forwardButtonView, reloadButtonView, urlField, copyButtonView])
         }
         topToolbar.orientation = .horizontal
         topToolbar.spacing = 6
         topToolbar.distribution = .fill
+        topToolbar.alignment = .centerY
         
         // Make URL field take up available space
         urlField.setContentCompressionResistancePriority(.defaultLow, for: .horizontal)
         
         // Set priorities to make URL field expand
         urlField.setContentHuggingPriority(NSLayoutConstraint.Priority(249), for: .horizontal)
-        backButton.setContentHuggingPriority(.defaultHigh, for: .horizontal)
-        forwardButton.setContentHuggingPriority(.defaultHigh, for: .horizontal)
-        reloadButton.setContentHuggingPriority(.defaultHigh, for: .horizontal)
-        copyButton.setContentHuggingPriority(.defaultHigh, for: .horizontal)
+        backButtonView.setContentHuggingPriority(.defaultHigh, for: .horizontal)
+        forwardButtonView.setContentHuggingPriority(.defaultHigh, for: .horizontal)
+        reloadButtonView.setContentHuggingPriority(.defaultHigh, for: .horizontal)
+        copyButtonView.setContentHuggingPriority(.defaultHigh, for: .horizontal)
+        
+        // Set fixed size for button views
+        for buttonView in [backButtonView, forwardButtonView, reloadButtonView, copyButtonView] {
+            NSLayoutConstraint.activate([
+                buttonView.widthAnchor.constraint(equalToConstant: 20),
+                buttonView.heightAnchor.constraint(equalToConstant: 20)
+            ])
+        }
+        
+        // Set URL field height to match buttons
+        NSLayoutConstraint.activate([
+            urlField.heightAnchor.constraint(equalToConstant: 20)
+        ])
         
         addSubview(topToolbar)
         addSubview(webView)
@@ -152,13 +243,13 @@ class BrowserView: NSView {
         
         NSLayoutConstraint.activate([
             // Top toolbar with URL
-            topToolbar.topAnchor.constraint(equalTo: topAnchor, constant: 2),
+            topToolbar.topAnchor.constraint(equalTo: topAnchor, constant: 1),
             topToolbar.leadingAnchor.constraint(equalTo: leadingAnchor, constant: 8),
             topToolbar.trailingAnchor.constraint(equalTo: trailingAnchor, constant: -8),
-            topToolbar.heightAnchor.constraint(equalToConstant: 24),
+            topToolbar.heightAnchor.constraint(equalToConstant: 32),
             
             // WebView fills remaining space
-            webView.topAnchor.constraint(equalTo: topToolbar.bottomAnchor, constant: 2),
+            webView.topAnchor.constraint(equalTo: topToolbar.bottomAnchor, constant: 1),
             webView.leadingAnchor.constraint(equalTo: leadingAnchor),
             webView.trailingAnchor.constraint(equalTo: trailingAnchor),
             webView.bottomAnchor.constraint(equalTo: bottomAnchor)
@@ -198,7 +289,9 @@ class BrowserView: NSView {
     }
     
     func updateBackButton() {
-        backButton.isEnabled = webView.canGoBack
+        // Update the SwiftUI button states
+        backButtonState.isEnabled = webView.canGoBack
+        forwardButtonState.isEnabled = webView.canGoForward
     }
 }
 
@@ -1057,6 +1150,10 @@ class ServiceManager: NSObject, ObservableObject {
         
         let webView = WKWebView(frame: .zero, configuration: configuration)
         
+        // Prevent web view from taking focus during initial load
+        webView.isHidden = false
+        webView.allowsBackForwardNavigationGestures = false  // Temporarily disable
+        
         // Set user agent from service configuration
         if let config = ServiceConfigurations.config(for: service.id),
            let userAgent = config.userAgent {
@@ -1075,8 +1172,7 @@ class ServiceManager: NSObject, ObservableObject {
             configuration.applicationNameForUserAgent = userAgent.applicationName
         }
         
-        // Enable interactions
-        webView.allowsBackForwardNavigationGestures = true
+        // Enable interactions (navigation gestures will be enabled after initial load)
         webView.allowsMagnification = true
         
         // Enable text selection
@@ -1091,6 +1187,11 @@ class ServiceManager: NSObject, ObservableObject {
         
         // Add UI delegate for context menus
         webView.uiDelegate = self
+        
+        // Re-enable navigation gestures after initial load
+        DispatchQueue.main.asyncAfter(deadline: .now() + 3.0) {
+            webView.allowsBackForwardNavigationGestures = true
+        }
         
         return webView
     }
