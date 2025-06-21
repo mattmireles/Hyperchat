@@ -300,7 +300,7 @@ class BrowserView: NSView {
             topToolbar.heightAnchor.constraint(equalToConstant: 32),
             
             // WebView fills remaining space
-            webView.topAnchor.constraint(equalTo: topToolbar.bottomAnchor, constant: 1),
+            webView.topAnchor.constraint(equalTo: topToolbar.bottomAnchor, constant: 8),
             webView.leadingAnchor.constraint(equalTo: leadingAnchor),
             webView.trailingAnchor.constraint(equalTo: trailingAnchor),
             webView.bottomAnchor.constraint(equalTo: bottomAnchor)
