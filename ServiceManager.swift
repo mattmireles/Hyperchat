@@ -328,21 +328,50 @@ class BrowserView: NSView {
     }
     
     @objc private func loadURL() {
-        guard let urlString = urlField.stringValue.isEmpty ? nil : urlField.stringValue,
-              let url = URL(string: urlString.hasPrefix("http") ? urlString : "https://\(urlString)") else { return }
+        guard let urlString = urlField.stringValue.isEmpty ? nil : urlField.stringValue else { return }
+        
+        // Reconstruct full URL if user entered a cleaned version
+        var fullURLString = urlString
+        if !urlString.hasPrefix("http://") && !urlString.hasPrefix("https://") {
+            // Default to https://
+            fullURLString = "https://\(urlString)"
+        }
+        
+        guard let url = URL(string: fullURLString) else { return }
         webView.load(URLRequest(url: url))
     }
     
     @objc private func copyURL() {
         let pasteboard = NSPasteboard.general
         pasteboard.clearContents()
-        pasteboard.setString(urlField.stringValue, forType: .string)
+        // Copy the full URL, not the cleaned display version
+        if let fullURL = webView.url?.absoluteString {
+            pasteboard.setString(fullURL, forType: .string)
+        }
     }
     
     func updateBackButton() {
         // Update the SwiftUI button states
         backButtonState.isEnabled = webView.canGoBack
         forwardButtonState.isEnabled = webView.canGoForward
+    }
+    
+    private func cleanURLForDisplay(_ urlString: String?) -> String {
+        guard let urlString = urlString else { return "" }
+        
+        // Remove https:// and https://www. prefixes
+        var cleanedURL = urlString
+        if cleanedURL.hasPrefix("https://www.") {
+            cleanedURL = String(cleanedURL.dropFirst(12))
+        } else if cleanedURL.hasPrefix("https://") {
+            cleanedURL = String(cleanedURL.dropFirst(8))
+        } else if cleanedURL.hasPrefix("http://www.") {
+            cleanedURL = String(cleanedURL.dropFirst(11))
+        } else if cleanedURL.hasPrefix("http://") {
+            cleanedURL = String(cleanedURL.dropFirst(7))
+        }
+        
+        return cleanedURL
     }
 }
 
@@ -356,7 +385,7 @@ extension BrowserView: WKNavigationDelegate {
         
         // Update URL as soon as navigation starts
         DispatchQueue.main.async { [weak self] in
-            self?.urlField.stringValue = webView.url?.absoluteString ?? ""
+            self?.urlField.stringValue = self?.cleanURLForDisplay(webView.url?.absoluteString) ?? ""
             self?.updateBackButton()
         }
     }
@@ -366,7 +395,7 @@ extension BrowserView: WKNavigationDelegate {
         
         // Update URL when navigation commits
         DispatchQueue.main.async { [weak self] in
-            self?.urlField.stringValue = webView.url?.absoluteString ?? ""
+            self?.urlField.stringValue = self?.cleanURLForDisplay(webView.url?.absoluteString) ?? ""
             self?.updateBackButton()
         }
     }
@@ -376,7 +405,7 @@ extension BrowserView: WKNavigationDelegate {
         
         // Final update when navigation finishes
         DispatchQueue.main.async { [weak self] in
-            self?.urlField.stringValue = webView.url?.absoluteString ?? ""
+            self?.urlField.stringValue = self?.cleanURLForDisplay(webView.url?.absoluteString) ?? ""
             self?.updateBackButton()
         }
     }
@@ -386,7 +415,7 @@ extension BrowserView: WKNavigationDelegate {
         
         // Update even on failure
         DispatchQueue.main.async { [weak self] in
-            self?.urlField.stringValue = webView.url?.absoluteString ?? ""
+            self?.urlField.stringValue = self?.cleanURLForDisplay(webView.url?.absoluteString) ?? ""
             self?.updateBackButton()
         }
     }
@@ -396,7 +425,7 @@ extension BrowserView: WKNavigationDelegate {
         
         // Handle provisional navigation failures
         DispatchQueue.main.async { [weak self] in
-            self?.urlField.stringValue = webView.url?.absoluteString ?? ""
+            self?.urlField.stringValue = self?.cleanURLForDisplay(webView.url?.absoluteString) ?? ""
             self?.updateBackButton()
         }
     }
