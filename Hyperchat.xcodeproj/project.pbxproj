@@ -20,6 +20,7 @@
 		3EE13BAE2C4F6B2900A8A61E /* ServiceConfiguration.swift in Sources */ = {isa = PBXBuildFile; fileRef = 3EE13BA82C4F6B2900A8A61E /* ServiceConfiguration.swift */; };
 		BE8135E42E01E24D0059C681 /* Sparkle in Frameworks */ = {isa = PBXBuildFile; productRef = BE8135E32E01E24D0059C681 /* Sparkle */; };
 		BEE13BAF2C4F6B2900A8A61E /* WebViewLogger.swift in Sources */ = {isa = PBXBuildFile; fileRef = BEE13BA92C4F6B2900A8A61E /* WebViewLogger.swift */; };
+		BEE13BB02C4F6B2900A8A61E /* AutoInstaller.swift in Sources */ = {isa = PBXBuildFile; fileRef = BEE13BB12C4F6B2900A8A61E /* AutoInstaller.swift */; };
 /* End PBXBuildFile section */
 
 /* Begin PBXFileReference section */
@@ -38,6 +39,7 @@
 		3EE13BA72C4F6B2900A8A61E /* NSScreen+Extensions.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = "NSScreen+Extensions.swift"; sourceTree = "<group>"; };
 		3EE13BA82C4F6B2900A8A61E /* ServiceConfiguration.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ServiceConfiguration.swift; sourceTree = "<group>"; };
 		BEE13BA92C4F6B2900A8A61E /* WebViewLogger.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = WebViewLogger.swift; sourceTree = "<group>"; };
+		BEE13BB12C4F6B2900A8A61E /* AutoInstaller.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = AutoInstaller.swift; sourceTree = "<group>"; };
 /* End PBXFileReference section */
 
 /* Begin PBXFrameworksBuildPhase section */
@@ -85,6 +87,7 @@
 				3EE13BA72C4F6B2900A8A61E /* NSScreen+Extensions.swift */,
 				3EE13BA82C4F6B2900A8A61E /* ServiceConfiguration.swift */,
 				BEE13BA92C4F6B2900A8A61E /* WebViewLogger.swift */,
+				BEE13BB12C4F6B2900A8A61E /* AutoInstaller.swift */,
 			);
 			path = .;
 			sourceTree = "<group>";
@@ -172,6 +175,7 @@
 				3EE13BAD2C4F6B2900A8A61E /* NSScreen+Extensions.swift in Sources */,
 				3EE13BAE2C4F6B2900A8A61E /* ServiceConfiguration.swift in Sources */,
 				BEE13BAF2C4F6B2900A8A61E /* WebViewLogger.swift in Sources */,
+				BEE13BB02C4F6B2900A8A61E /* AutoInstaller.swift in Sources */,
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 		};
