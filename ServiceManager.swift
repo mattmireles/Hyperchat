@@ -1169,7 +1169,6 @@ class ServiceManager: NSObject, ObservableObject {
     func reloadAllServices() {
         for service in activeServices {
             if let webService = webServices[service.id] {
-                loadingStates[service.id] = true
                 loadDefaultPage(for: service, webView: webService.browserView.webView)
             }
         }
@@ -1177,13 +1176,6 @@ class ServiceManager: NSObject, ObservableObject {
         // Reset to first submit mode after reload
         isFirstSubmit = true
         replyToAll = true  // Reset UI to default state
-        
-        // Clear loading states after a reasonable delay
-        DispatchQueue.main.asyncAfter(deadline: .now() + 3.0) {
-            for service in self.activeServices {
-                self.loadingStates[service.id] = false
-            }
-        }
     }
     
     private func createWebView(for service: AIService) -> WKWebView {
