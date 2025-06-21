@@ -238,7 +238,7 @@ class BrowserView: NSView {
         urlField.bezelStyle = .roundedBezel
         urlField.focusRingType = .none
         urlField.backgroundColor = NSColor.controlBackgroundColor.withAlphaComponent(0.3)
-        urlField.textColor = NSColor.secondaryLabelColor
+        urlField.textColor = NSColor.secondaryLabelColor.withAlphaComponent(0.4)
         urlField.maximumNumberOfLines = 1
         urlField.lineBreakMode = .byTruncatingTail
         urlField.alignment = .left
