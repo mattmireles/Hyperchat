@@ -33,6 +33,21 @@ struct GradientToolbarButton: View {
         self.action = action
     }
     
+    private var tooltipText: String {
+        switch systemName {
+        case "chevron.backward":
+            return "Go back to previous page"
+        case "chevron.forward":
+            return "Go forward to next page"
+        case "arrow.clockwise":
+            return "Reload current page"
+        case "clipboard":
+            return "Copy current URL to clipboard"
+        default:
+            return ""
+        }
+    }
+    
     var body: some View {
         VStack(spacing: 0) {  // Add this wrapper
             Button(action: {
@@ -98,6 +113,7 @@ struct GradientToolbarButton: View {
                     isHovering = hovering
                 }
             }
+            .help(tooltipText)
         }
         .frame(width: 20, height: 20, alignment: .center)  // Explicit alignment
     }
@@ -240,6 +256,7 @@ class BrowserView: NSView {
         urlField.maximumNumberOfLines = 1
         urlField.lineBreakMode = .byTruncatingTail
         urlField.alignment = .left
+        urlField.toolTip = ""
         
         // Create top toolbar - all services use same layout with flexible spacer
         let flexibleSpacer = NSView()
@@ -385,7 +402,9 @@ extension BrowserView: WKNavigationDelegate {
         
         // Update URL as soon as navigation starts
         DispatchQueue.main.async { [weak self] in
-            self?.urlField.stringValue = self?.cleanURLForDisplay(webView.url?.absoluteString) ?? ""
+            let fullURL = webView.url?.absoluteString ?? ""
+            self?.urlField.stringValue = self?.cleanURLForDisplay(fullURL) ?? ""
+            self?.urlField.toolTip = fullURL.isEmpty ? "Enter URL..." : fullURL
             self?.updateBackButton()
         }
     }
@@ -395,7 +414,9 @@ extension BrowserView: WKNavigationDelegate {
         
         // Update URL when navigation commits
         DispatchQueue.main.async { [weak self] in
-            self?.urlField.stringValue = self?.cleanURLForDisplay(webView.url?.absoluteString) ?? ""
+            let fullURL = webView.url?.absoluteString ?? ""
+            self?.urlField.stringValue = self?.cleanURLForDisplay(fullURL) ?? ""
+            self?.urlField.toolTip = fullURL.isEmpty ? "Enter URL..." : fullURL
             self?.updateBackButton()
         }
     }
@@ -405,7 +426,9 @@ extension BrowserView: WKNavigationDelegate {
         
         // Final update when navigation finishes
         DispatchQueue.main.async { [weak self] in
-            self?.urlField.stringValue = self?.cleanURLForDisplay(webView.url?.absoluteString) ?? ""
+            let fullURL = webView.url?.absoluteString ?? ""
+            self?.urlField.stringValue = self?.cleanURLForDisplay(fullURL) ?? ""
+            self?.urlField.toolTip = fullURL.isEmpty ? "Enter URL..." : fullURL
             self?.updateBackButton()
         }
     }
@@ -415,7 +438,9 @@ extension BrowserView: WKNavigationDelegate {
         
         // Update even on failure
         DispatchQueue.main.async { [weak self] in
-            self?.urlField.stringValue = self?.cleanURLForDisplay(webView.url?.absoluteString) ?? ""
+            let fullURL = webView.url?.absoluteString ?? ""
+            self?.urlField.stringValue = self?.cleanURLForDisplay(fullURL) ?? ""
+            self?.urlField.toolTip = fullURL.isEmpty ? "Enter URL..." : fullURL
             self?.updateBackButton()
         }
     }
@@ -425,7 +450,9 @@ extension BrowserView: WKNavigationDelegate {
         
         // Handle provisional navigation failures
         DispatchQueue.main.async { [weak self] in
-            self?.urlField.stringValue = self?.cleanURLForDisplay(webView.url?.absoluteString) ?? ""
+            let fullURL = webView.url?.absoluteString ?? ""
+            self?.urlField.stringValue = self?.cleanURLForDisplay(fullURL) ?? ""
+            self?.urlField.toolTip = fullURL.isEmpty ? "Enter URL..." : fullURL
             self?.updateBackButton()
         }
     }

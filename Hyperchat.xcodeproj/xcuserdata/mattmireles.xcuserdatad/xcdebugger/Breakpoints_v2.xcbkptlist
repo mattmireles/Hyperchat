@@ -16,7 +16,7 @@
             endingColumnNumber = "9223372036854775807"
             startingLineNumber = "226"
             endingLineNumber = "226"
-            landmarkName = "addOverlayEffects()"
+            landmarkName = "enterFullScreenOverlay()"
             landmarkType = "7">
          </BreakpointContent>
       </BreakpointProxy>

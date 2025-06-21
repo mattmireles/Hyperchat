@@ -124,7 +124,7 @@
 					};
 				};
 			};
-			buildConfigurationList = 3EE13B9A2C4F6B2900A8A61E /* Build configuration list for PBXProject "Hyperchat" */;
+			buildConfigurationList = 3EE13B9A2C4F6B2900A8A61E /* Build configuration list for PBXProject "HyperChat" */;
 			compatibilityVersion = "Xcode 15.0";
 			developmentRegion = en;
 			hasScannedForEncodings = 0;
@@ -264,7 +264,7 @@
 /* End XCBuildConfiguration section */
 
 /* Begin XCConfigurationList section */
-		3EE13B9A2C4F6B2900A8A61E /* Build configuration list for PBXProject "Hyperchat" */ = {
+		3EE13B9A2C4F6B2900A8A61E /* Build configuration list for PBXProject "HyperChat" */ = {
 			isa = XCConfigurationList;
 			buildConfigurations = (
 				3EE13B982C4F6B2900A8A61E /* Debug */,
