@@ -489,6 +489,7 @@ struct UnifiedInputBar: View {
                                     .font(.system(size: 16))
                             }
                             .buttonStyle(.plain)
+                            .help("Clear input field")
                             .transition(.scale.combined(with: .opacity))
                         }
                         
@@ -525,7 +526,7 @@ struct UnifiedInputBar: View {
                             .frame(width: 24, height: 24)
                         }
                         .buttonStyle(.plain)
-                        .help("Refresh all services")
+                        .help("Reload all AI services")
                         .onHover { hovering in
                             withAnimation(.easeInOut(duration: 0.2)) {
                                 isRefreshHovering = hovering
@@ -561,6 +562,7 @@ struct UnifiedInputBar: View {
                         }
                         .buttonStyle(.plain)
                         .disabled(serviceManager.sharedPrompt.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty)
+                        .help("Send prompt to all AI services")
                         .animation(.easeInOut(duration: 0.2), value: serviceManager.sharedPrompt.isEmpty)
                         .animation(.easeInOut(duration: 0.2), value: isSubmitHovering)
                         .onHover { hovering in
