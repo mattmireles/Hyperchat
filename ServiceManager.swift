@@ -18,12 +18,20 @@ struct GradientToolbarButton: View {
     let systemName: String
     @ObservedObject var state: ButtonState
     let action: () -> Void
+    let fontSize: CGFloat
     @State private var isHovering = false
     @State private var isPressed = false
     @State private var rotationAngle: Double = 0
     @State private var bounceOffset: CGFloat = 0
     @State private var wigglePhase: Double = 0
     @State private var showReplaceIcon = false
+    
+    init(systemName: String, state: ButtonState, fontSize: CGFloat = 14, action: @escaping () -> Void) {
+        self.systemName = systemName
+        self.state = state
+        self.fontSize = fontSize
+        self.action = action
+    }
     
     var body: some View {
         VStack(spacing: 0) {  // Add this wrapper
@@ -43,7 +51,7 @@ struct GradientToolbarButton: View {
                     withAnimation(.spring(response: 0.3, dampingFraction: 0.5).delay(0.1)) {
                         bounceOffset = 0
                     }
-                case "document.on.document":
+                case "clipboard":
                     // Replace animation
                     withAnimation(.easeInOut(duration: 0.3)) {
                         showReplaceIcon = true
@@ -68,13 +76,13 @@ struct GradientToolbarButton: View {
                         )
                         .mask(
                             Image(systemName: currentIconName)
-                                .font(.system(size: 14, weight: .semibold))
+                                .font(.system(size: fontSize, weight: .semibold))
                                 .rotationEffect(.degrees(systemName == "arrow.clockwise" ? rotationAngle : 0))
                                 .offset(y: systemName == "chevron.backward" || systemName == "chevron.forward" ? bounceOffset : 0)
                         )
                     } else {
                         Image(systemName: currentIconName)
-                            .font(.system(size: 14, weight: .semibold))
+                            .font(.system(size: fontSize, weight: .semibold))
                             .foregroundColor(state.isEnabled ? .secondary.opacity(0.7) : .secondary.opacity(0.7))
                             .rotationEffect(.degrees(systemName == "arrow.clockwise" ? rotationAngle : 0))
                             .offset(y: systemName == "chevron.backward" || systemName == "chevron.forward" ? bounceOffset : 0)
@@ -84,7 +92,7 @@ struct GradientToolbarButton: View {
             }
             .buttonStyle(.plain)
             .disabled(!state.isEnabled)
-            .offset(y: -11)  // Move the offset here instead
+            .offset(y: systemName == "clipboard" ? -12 : -11)  // Extra 2px up for clipboard
             .onHover { hovering in
                 withAnimation(.easeInOut(duration: 0.2)) {
                     isHovering = hovering
@@ -95,8 +103,8 @@ struct GradientToolbarButton: View {
     }
     
     private var currentIconName: String {
-        if systemName == "document.on.document" && showReplaceIcon {
-            return "square.and.arrow.up"
+        if systemName == "clipboard" && showReplaceIcon {
+            return "clipboard.fill"
         }
         return systemName
     }
@@ -206,8 +214,9 @@ class BrowserView: NSView {
         reloadButtonView.setFrameSize(NSSize(width: 20, height: 20))  // Explicit size
         
         let copyButtonView = NSHostingView(rootView: GradientToolbarButton(
-            systemName: "document.on.document",
+            systemName: "clipboard",
             state: ButtonState(isEnabled: true),
+            fontSize: 12,
             action: { [weak self] in self?.copyURL() }
         ))
         copyButtonView.translatesAutoresizingMaskIntoConstraints = false
