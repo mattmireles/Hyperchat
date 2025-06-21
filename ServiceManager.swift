@@ -19,10 +19,43 @@ struct GradientToolbarButton: View {
     @ObservedObject var state: ButtonState
     let action: () -> Void
     @State private var isHovering = false
+    @State private var isPressed = false
+    @State private var rotationAngle: Double = 0
+    @State private var bounceOffset: CGFloat = 0
+    @State private var wigglePhase: Double = 0
+    @State private var showReplaceIcon = false
     
     var body: some View {
         VStack(spacing: 0) {  // Add this wrapper
-            Button(action: action) {
+            Button(action: {
+                // Trigger animations based on icon type
+                switch systemName {
+                case "arrow.clockwise":
+                    // Rotate animation
+                    withAnimation(.easeInOut(duration: 0.6)) {
+                        rotationAngle += 360
+                    }
+                case "chevron.backward", "chevron.forward":
+                    // Bounce animation
+                    withAnimation(.spring(response: 0.3, dampingFraction: 0.5)) {
+                        bounceOffset = -5
+                    }
+                    withAnimation(.spring(response: 0.3, dampingFraction: 0.5).delay(0.1)) {
+                        bounceOffset = 0
+                    }
+                case "document.on.document":
+                    // Replace animation
+                    withAnimation(.easeInOut(duration: 0.3)) {
+                        showReplaceIcon = true
+                    }
+                    withAnimation(.easeInOut(duration: 0.3).delay(0.6)) {
+                        showReplaceIcon = false
+                    }
+                default:
+                    break
+                }
+                action()
+            }) {
                 ZStack {
                     if state.isEnabled && isHovering {
                         LinearGradient(
@@ -34,15 +67,17 @@ struct GradientToolbarButton: View {
                             endPoint: .topTrailing
                         )
                         .mask(
-                            Image(systemName: systemName)
+                            Image(systemName: currentIconName)
                                 .font(.system(size: 14, weight: .semibold))
-                                // Remove offset from here
+                                .rotationEffect(.degrees(systemName == "arrow.clockwise" ? rotationAngle : 0))
+                                .offset(y: systemName == "chevron.backward" || systemName == "chevron.forward" ? bounceOffset : 0)
                         )
                     } else {
-                        Image(systemName: systemName)
+                        Image(systemName: currentIconName)
                             .font(.system(size: 14, weight: .semibold))
                             .foregroundColor(state.isEnabled ? .secondary.opacity(0.7) : .secondary.opacity(0.7))
-                            // Remove offset from here
+                            .rotationEffect(.degrees(systemName == "arrow.clockwise" ? rotationAngle : 0))
+                            .offset(y: systemName == "chevron.backward" || systemName == "chevron.forward" ? bounceOffset : 0)
                     }
                 }
                 .frame(width: 16, height: 16)
@@ -57,6 +92,13 @@ struct GradientToolbarButton: View {
             }
         }
         .frame(width: 20, height: 20, alignment: .center)  // Explicit alignment
+    }
+    
+    private var currentIconName: String {
+        if systemName == "document.on.document" && showReplaceIcon {
+            return "square.and.arrow.up"
+        }
+        return systemName
     }
 }
 
