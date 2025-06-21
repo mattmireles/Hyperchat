@@ -410,6 +410,27 @@ struct UnifiedInputBar: View {
     @FocusState private var isInputFocused: Bool
     @State private var isRefreshHovering = false
     @State private var isSubmitHovering = false
+    @State private var rotationAngle: Double = 0
+    @State private var showFlameIcon = false
+    
+    private func submitWithAnimation() {
+        // Trigger flame animation
+        withAnimation(.easeInOut(duration: 0.2)) {
+            showFlameIcon = true
+        }
+        
+        // Delay execution to ensure animation is visible
+        DispatchQueue.main.asyncAfter(deadline: .now() + 0.3) {
+            serviceManager.executeSharedPrompt()
+        }
+        
+        // Reset icon after animation
+        DispatchQueue.main.asyncAfter(deadline: .now() + 1.0) {
+            withAnimation(.easeInOut(duration: 0.2)) {
+                showFlameIcon = false
+            }
+        }
+    }
     
     var body: some View {
         VStack(spacing: 0) {
@@ -450,7 +471,7 @@ struct UnifiedInputBar: View {
                         }
                         
                         CustomTextEditor(text: $serviceManager.sharedPrompt, onSubmit: {
-                            serviceManager.executeSharedPrompt()
+                            submitWithAnimation()
                         })
                         .font(.system(size: 14))
                         .frame(minHeight: 36, maxHeight: 36)
@@ -476,6 +497,10 @@ struct UnifiedInputBar: View {
                         
                         // Refresh button
                         Button(action: {
+                            // Trigger rotation animation
+                            withAnimation(.easeInOut(duration: 0.6)) {
+                                rotationAngle += 360
+                            }
                             serviceManager.reloadAllServices()
                         }) {
                             ZStack {
@@ -492,10 +517,12 @@ struct UnifiedInputBar: View {
                                         Image(systemName: "arrow.clockwise")
                                             .font(.system(size: 18, weight: .semibold))
                                     )
+                                    .rotationEffect(.degrees(rotationAngle))
                                 } else {
                                     Image(systemName: "arrow.clockwise")
                                         .font(.system(size: 18, weight: .semibold))
                                         .foregroundColor(.secondary.opacity(0.4))
+                                        .rotationEffect(.degrees(rotationAngle))
                                 }
                             }
                             .frame(width: 24, height: 24)
@@ -509,10 +536,10 @@ struct UnifiedInputBar: View {
                         }
                         
                         Button(action: {
-                            serviceManager.executeSharedPrompt()
+                            submitWithAnimation()
                         }) {
                             ZStack {
-                                if !serviceManager.sharedPrompt.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty {
+                                if !serviceManager.sharedPrompt.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty || showFlameIcon {
                                     LinearGradient(
                                         gradient: Gradient(colors: [
                                             Color(red: 0.0, green: 0.6, blue: 1.0),  // Blue
@@ -522,10 +549,11 @@ struct UnifiedInputBar: View {
                                         endPoint: .topTrailing
                                     )
                                     .mask(
-                                        Image(systemName: "chevron.up.2")
+                                        Image(systemName: showFlameIcon ? "flame.fill" : "chevron.up.2")
                                             .font(.system(size: 18, weight: .bold))
                                     )
                                     .scaleEffect(isSubmitHovering ? 1.15 : 1.0)
+                                    .scaleEffect(showFlameIcon ? 1.2 : 1.0)
                                 } else {
                                     Image(systemName: "chevron.up.2")
                                         .font(.system(size: 18, weight: .bold))
