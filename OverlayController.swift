@@ -113,15 +113,20 @@ class OverlayController {
         window.level = .normal
         window.collectionBehavior = [.managed, .fullScreenPrimary]
         window.isMovable = true
-        // Set contrasting background color based on system appearance
-        let systemIsDarkMode = NSApp.effectiveAppearance.bestMatch(from: [.darkAqua, .aqua]) == .darkAqua
-        window.backgroundColor = systemIsDarkMode ? 
-            NSColor(calibratedWhite: 0.08, alpha: 1.0) : // Very dark gray for dark mode
-            NSColor(calibratedWhite: 0.85, alpha: 1.0)   // Medium light gray for light mode
+        // Make window background transparent so visual effect shows through
+        window.backgroundColor = NSColor.clear
 
         let containerView = NSView(frame: window.contentView!.bounds)
         containerView.autoresizingMask = [.width, .height]
         window.contentView = containerView
+        
+        // Add visual effect background to entire window
+        let backgroundEffectView = NSVisualEffectView(frame: containerView.bounds)
+        backgroundEffectView.material = .hudWindow
+        backgroundEffectView.blendingMode = .behindWindow
+        backgroundEffectView.state = .active
+        backgroundEffectView.autoresizingMask = [.width, .height]
+        containerView.addSubview(backgroundEffectView)
 
         setupBrowserViews(in: containerView)
         
@@ -151,7 +156,7 @@ class OverlayController {
         let browserStackView = NSStackView(views: browserViews)
         browserStackView.distribution = .fillEqually
         browserStackView.orientation = .horizontal
-        browserStackView.spacing = 8
+        browserStackView.spacing = 20
         browserStackView.translatesAutoresizingMaskIntoConstraints = false
         browserStackView.identifier = NSUserInterfaceItemIdentifier("browserStackView")
         
@@ -161,22 +166,22 @@ class OverlayController {
         inputBarHostingView.translatesAutoresizingMaskIntoConstraints = false
         self.inputBarHostingView = inputBarHostingView
         
-        // Add browser stack and input bar separately to container
+        // Add browser stack and input bar on top of the background effect view
         containerView.addSubview(browserStackView)
         containerView.addSubview(inputBarHostingView)
         
         let constraints = [
             // Browser stack with margins
             browserStackView.topAnchor.constraint(equalTo: containerView.topAnchor, constant: 0),
-            browserStackView.leadingAnchor.constraint(equalTo: containerView.leadingAnchor, constant: 2),
-            browserStackView.trailingAnchor.constraint(equalTo: containerView.trailingAnchor, constant: -2),
+            browserStackView.leadingAnchor.constraint(equalTo: containerView.leadingAnchor, constant: 20),
+            browserStackView.trailingAnchor.constraint(equalTo: containerView.trailingAnchor, constant: -20),
             browserStackView.bottomAnchor.constraint(equalTo: inputBarHostingView.topAnchor),
             
             // Input bar full width
             inputBarHostingView.leadingAnchor.constraint(equalTo: containerView.leadingAnchor),
             inputBarHostingView.trailingAnchor.constraint(equalTo: containerView.trailingAnchor),
             inputBarHostingView.bottomAnchor.constraint(equalTo: containerView.bottomAnchor),
-            inputBarHostingView.heightAnchor.constraint(equalToConstant: 72)
+            inputBarHostingView.heightAnchor.constraint(equalToConstant: 94)
         ]
         NSLayoutConstraint.activate(constraints)
         stackViewConstraints = constraints
@@ -383,12 +388,7 @@ class OverlayController {
     }
     
     private func updateBackgroundColorForAppearance() {
-        guard let window = overlayWindow else { return }
-        let systemIsDarkMode = NSApp.effectiveAppearance.bestMatch(from: [.darkAqua, .aqua]) == .darkAqua
-        window.backgroundColor = systemIsDarkMode ? 
-            NSColor(calibratedWhite: 0.08, alpha: 1.0) : 
-            NSColor(calibratedWhite: 0.85, alpha: 1.0)
-        
+        // Window now uses visual effect background instead of solid color
         // Update tint view for overlay mode if present
         if let tintView = tintView {
             tintView.layer?.backgroundColor = NSColor.black.withAlphaComponent(0.8).cgColor
@@ -434,16 +434,13 @@ struct UnifiedInputBar: View {
     
     var body: some View {
         VStack(spacing: 0) {
-            Divider()
-                .background(Color(NSColor.separatorColor))
-            
             HStack(spacing: 16) {
                 // Hyperchat logo
                 Image("HyperchatIcon")
                     .resizable()
                     .aspectRatio(contentMode: .fit)
-                    .frame(width: 48, height: 48)
-                    .cornerRadius(10)
+                    .frame(width: 62, height: 62)
+                    .cornerRadius(13)
                     .shadow(color: Color.black.opacity(0.1), radius: 2, x: 0, y: 1)
                 
                 // Show loading indicator when services are loading
@@ -466,20 +463,20 @@ struct UnifiedInputBar: View {
                             Text("Ask your AIs anything")
                                 .foregroundColor(.secondary.opacity(0.4))
                                 .font(.system(size: 14))
-                                .padding(.leading, 17)  // Adjusted to align with cursor
-                                .padding(.top, 5)
+                                .padding(.leading, 20)  // Adjusted to align with cursor
+                                .padding(.top, 8)
                         }
                         
                         CustomTextEditor(text: $serviceManager.sharedPrompt, onSubmit: {
                             submitWithAnimation()
                         })
                         .font(.system(size: 14))
-                        .frame(minHeight: 36, maxHeight: 36)
-                        .padding(.horizontal, 12)
-                        .padding(.vertical, 5)
+                        .frame(minHeight: 47, maxHeight: 47)
+                        .padding(.horizontal, 16)
+                        .padding(.vertical, 8)
                         .focused($isInputFocused)
                     }
-                    .frame(minHeight: 44)
+                    .frame(minHeight: 63)
                     
                     // Action buttons
                     HStack(spacing: 8) {
@@ -582,10 +579,7 @@ struct UnifiedInputBar: View {
             }
             .padding(.horizontal, 20)
             .padding(.vertical, 12)
-            .frame(height: 72)
-            .background(
-                VisualEffectBackground()
-            )
+            .frame(height: 94)
         }
         .onReceive(NotificationCenter.default.publisher(for: .focusUnifiedInput)) { _ in
             isInputFocused = true
