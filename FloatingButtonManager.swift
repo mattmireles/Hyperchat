@@ -6,7 +6,7 @@ import os.log
 class FloatingPanel: NSPanel {
     override var canBecomeKey: Bool { false }
     override var canBecomeMain: Bool { false }
-    override var acceptsFirstResponder: Bool { false }
+    override var acceptsFirstResponder: Bool { true }  // Changed to true to accept mouse events properly
     
     override func makeKey() {
         // Ignore all attempts to make this key window
@@ -28,12 +28,18 @@ class DraggableButton: NSButton {
         super.init(frame: frame)
     }
     
+    override func acceptsFirstMouse(for event: NSEvent?) -> Bool {
+        return true  // Always accept first mouse click
+    }
+    
     required init?(coder: NSCoder) {
         fatalError("init(coder:) has not been implemented")
     }
     
     override func mouseDown(with event: NSEvent) {
         initialLocation = event.locationInWindow
+        // Make the window accept mouse events
+        self.window?.makeFirstResponder(self)
     }
     
     override func mouseDragged(with event: NSEvent) {
