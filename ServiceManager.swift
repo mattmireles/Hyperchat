@@ -1567,6 +1567,13 @@ extension ServiceManager: WKNavigationDelegate {
             if !urlString.contains("?q=") {
                 perplexityInitialLoadComplete = true
                 print("✅ Perplexity: Initial load complete, ready for queries")
+                
+                // Return focus to main prompt bar after Perplexity loads
+                // Wait 2 seconds to ensure Perplexity's JavaScript has executed
+                DispatchQueue.main.asyncAfter(deadline: .now() + 2.0) {
+                    print("🎯 Returning focus to main prompt bar after Perplexity load")
+                    NotificationCenter.default.post(name: .focusUnifiedInput, object: nil)
+                }
             }
             
             // Update loading state
