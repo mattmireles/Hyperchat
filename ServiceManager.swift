@@ -1116,7 +1116,13 @@ class ServiceManager: NSObject, ObservableObject {
     var webServices: [String: WebService] = [:]
     private let processPool = WKProcessPool.shared  // Critical optimization
     private let perplexityProcessPool = WKProcessPool()  // Dedicated pool for Perplexity
-    private var isFirstSubmit: Bool = true  // Track if this is the first submit after load/reload
+    
+    // Share prompt execution state across all ServiceManager instances
+    private static var globalIsFirstSubmit: Bool = true
+    private var isFirstSubmit: Bool {
+        get { ServiceManager.globalIsFirstSubmit }
+        set { ServiceManager.globalIsFirstSubmit = newValue }
+    }
     private var perplexityRetryCount: [WKWebView: Int] = [:]  // Track retry attempts for Perplexity
     private var perplexityLoadTimers: [WKWebView: Timer] = [:]  // Timeout timers for Perplexity
     private var perplexityInitialLoadComplete: Bool = false  // Track if Perplexity has completed initial load
@@ -1126,7 +1132,17 @@ class ServiceManager: NSObject, ObservableObject {
     
     override init() {
         super.init()
+        
+        // Initialize logging configuration for minimal output
+        LoggingSettings.shared.setMinimalLogging()
+        
+        // Log ServiceManager creation for debugging
+        if LoggingSettings.shared.debugPrompts {
+            WebViewLogger.shared.log("🚀 ServiceManager created - globalIsFirstSubmit: \(ServiceManager.globalIsFirstSubmit)", for: "system", type: .info)
+        }
+        
         setupServices()
+        registerManager()
     }
     
     private func setupServices() {
@@ -1301,6 +1317,10 @@ class ServiceManager: NSObject, ObservableObject {
     }
     
     func executePrompt(_ prompt: String, replyToAll: Bool = false) {
+        if LoggingSettings.shared.debugPrompts {
+            WebViewLogger.shared.log("🔄 executePrompt called - replyToAll: \(replyToAll), services: \(activeServices.map { $0.id }.joined(separator: ", "))", for: "system", type: .info)
+        }
+        
         // Execute prompt on all services
         for service in activeServices {
             if let webService = webServices[service.id] {
@@ -1330,6 +1350,11 @@ class ServiceManager: NSObject, ObservableObject {
         // Use "new chat" mode for first submit, then switch to "reply to all"
         let useReplyToAll = !isFirstSubmit && replyToAll
         
+        // Debug logging for prompt execution
+        if LoggingSettings.shared.debugPrompts {
+            WebViewLogger.shared.log("📝 Executing prompt - isFirstSubmit: \(isFirstSubmit), replyToAll: \(replyToAll), useReplyToAll: \(useReplyToAll), windowCount: \(getAllServiceManagers().count)", for: "system", type: .info)
+        }
+        
         if useReplyToAll {
             // Reply to All Mode: Paste into current pages immediately
             executePrompt(promptToExecute, replyToAll: true)
@@ -1349,6 +1374,10 @@ class ServiceManager: NSObject, ObservableObject {
             isFirstSubmit = false
             // Also update the UI to show we're now in reply to all mode
             replyToAll = true
+            
+            if LoggingSettings.shared.debugPrompts {
+                WebViewLogger.shared.log("✅ First submit completed - switching to reply-to-all mode", for: "system", type: .info)
+            }
         }
     }
     
@@ -1550,6 +1579,28 @@ class ServiceManager: NSObject, ObservableObject {
 
 extension WKProcessPool {
     static let shared = WKProcessPool()
+}
+
+// MARK: - Global ServiceManager Tracking
+extension ServiceManager {
+    private static var allManagers: [WeakServiceManagerWrapper] = []
+    
+    private class WeakServiceManagerWrapper {
+        weak var manager: ServiceManager?
+        init(_ manager: ServiceManager) {
+            self.manager = manager
+        }
+    }
+    
+    private func registerManager() {
+        ServiceManager.allManagers.append(WeakServiceManagerWrapper(self))
+        // Clean up nil references
+        ServiceManager.allManagers = ServiceManager.allManagers.filter { $0.manager != nil }
+    }
+    
+    private func getAllServiceManagers() -> [ServiceManager] {
+        ServiceManager.allManagers.compactMap { $0.manager }
+    }
 }
 
 // MARK: - WKNavigationDelegate for ServiceManager

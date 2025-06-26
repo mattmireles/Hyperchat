@@ -1,6 +1,74 @@
 import Foundation
 import WebKit
 import os.log
+import SwiftUI
+
+// MARK: - Logging Settings
+class LoggingSettings: ObservableObject {
+    static let shared = LoggingSettings()
+    
+    @AppStorage("logging.networkRequests") var networkRequests = false
+    @AppStorage("logging.userInteractions") var userInteractions = false
+    @AppStorage("logging.consoleMessages") var consoleMessages = true
+    @AppStorage("logging.domChanges") var domChanges = false
+    @AppStorage("logging.navigation") var navigation = true
+    @AppStorage("logging.debugPrompts") var debugPrompts = true
+    @AppStorage("logging.analyticsFilter") var analyticsFilter = true
+    
+    // Convenience methods for preset configurations
+    func setMinimalLogging() {
+        networkRequests = false
+        userInteractions = false
+        consoleMessages = true
+        domChanges = false
+        navigation = true
+        debugPrompts = false
+        analyticsFilter = true
+        objectWillChange.send()
+    }
+    
+    func setDebugReplyToAll() {
+        networkRequests = false
+        userInteractions = false
+        consoleMessages = true
+        domChanges = false
+        navigation = true
+        debugPrompts = true
+        analyticsFilter = true
+        objectWillChange.send()
+    }
+    
+    func setVerboseLogging() {
+        networkRequests = true
+        userInteractions = true
+        consoleMessages = true
+        domChanges = true
+        navigation = true
+        debugPrompts = true
+        analyticsFilter = false
+        objectWillChange.send()
+    }
+}
+
+// MARK: - Analytics Domains
+// Analytics domains to filter when analyticsFilter is enabled
+private let analyticsDomains = [
+    "googletagmanager.com",
+    "google-analytics.com", 
+    "datadoghq.com",
+    "browser-intake-datadoghq.com",
+    "amazon-adsystem.com",
+    "doubleclick.net",
+    "facebook.com",
+    "play.google.com/log",
+    "accounts.google.com/gsi/log",
+    "reddit.com",
+    "redditstatic.com",
+    "singular.net",
+    "eppo.cloud",
+    "ipv4.podscribe.com",
+    "ab.chatgpt.com"
+]
 
 class WebViewLogger: NSObject {
     static let shared = WebViewLogger()
@@ -92,6 +160,8 @@ class WebViewLogger: NSObject {
 // MARK: - WKNavigationDelegate Logging
 extension WebViewLogger {
     func logNavigation(_ navigation: WKNavigation?, request: URLRequest, service: String) {
+        guard LoggingSettings.shared.navigation else { return }
+        
         let message = """
         Navigation Started:
         URL: \(request.url?.absoluteString ?? "unknown")
@@ -102,7 +172,9 @@ extension WebViewLogger {
     }
     
     func logNavigationResponse(_ response: URLResponse?, service: String) {
+        guard LoggingSettings.shared.navigation else { return }
         guard let httpResponse = response as? HTTPURLResponse else { return }
+        
         let message = """
         Navigation Response:
         URL: \(httpResponse.url?.absoluteString ?? "unknown")
@@ -117,6 +189,8 @@ extension WebViewLogger {
     }
     
     func logPageLoad(start: Bool, service: String, url: URL?) {
+        guard LoggingSettings.shared.navigation else { return }
+        
         let status = start ? "Started" : "Finished"
         log("Page Load \(status): \(url?.absoluteString ?? "unknown")", for: service, type: .info)
     }
@@ -191,6 +265,10 @@ extension WebViewLogger {
     
     func handleConsoleMessage(_ message: [String: Any], service: String) {
         let level = message["level"] as? String ?? "log"
+        
+        // Always log errors, check flag for other messages
+        guard level == "error" || LoggingSettings.shared.consoleMessages else { return }
+        
         let content = message["message"] as? String ?? ""
         let url = message["url"] as? String ?? ""
         
@@ -270,16 +348,38 @@ extension WebViewLogger {
     }
     
     func handleNetworkRequest(_ data: [String: Any], service: String) {
-        let url = data["url"] as? String ?? ""
-        let method = data["method"] as? String ?? ""
+        guard LoggingSettings.shared.networkRequests else { return }
         
+        let url = data["url"] as? String ?? ""
+        
+        // Check analytics filter
+        if LoggingSettings.shared.analyticsFilter {
+            for domain in analyticsDomains {
+                if url.contains(domain) {
+                    return  // Skip logging analytics requests
+                }
+            }
+        }
+        
+        let method = data["method"] as? String ?? ""
         log("Network Request: \(method) \(url)", for: service, type: .debug)
     }
     
     func handleNetworkResponse(_ data: [String: Any], service: String) {
-        let url = data["url"] as? String ?? ""
-        let status = data["status"] as? Int ?? 0
+        guard LoggingSettings.shared.networkRequests else { return }
         
+        let url = data["url"] as? String ?? ""
+        
+        // Check analytics filter
+        if LoggingSettings.shared.analyticsFilter {
+            for domain in analyticsDomains {
+                if url.contains(domain) {
+                    return  // Skip logging analytics responses
+                }
+            }
+        }
+        
+        let status = data["status"] as? Int ?? 0
         log("Network Response: \(status) \(url)", for: service, type: .debug)
     }
 }
@@ -430,6 +530,8 @@ extension WebViewLogger {
     }
     
     func handleDOMChange(_ data: [String: Any], service: String) {
+        guard LoggingSettings.shared.domChanges else { return }
+        
         // Handle new summary format
         let mutationCount = data["mutationCount"] as? Int ?? 0
         let childListChanges = data["childListChanges"] as? Int ?? 0
@@ -546,6 +648,8 @@ extension WebViewLogger {
     }
     
     func handleUserInteraction(_ data: [String: Any], service: String) {
+        guard LoggingSettings.shared.userInteractions else { return }
+        
         let type = data["type"] as? String ?? ""
         
         var message = "User Interaction: \(type)"

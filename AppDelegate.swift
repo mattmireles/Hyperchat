@@ -23,9 +23,6 @@ class AppDelegate: NSObject, NSApplicationDelegate, SPUUpdaterDelegate {
         floatingButtonManager.overlayController = self.overlayController
         floatingButtonManager.showFloatingButton()
         
-        // Setup minimal menu bar for Edit menu (copy/paste support)
-        setupMenuBar()
-        
         // Check for auto-installation on first launch
         AutoInstaller.shared.checkAndPromptInstallation()
         
@@ -49,38 +46,9 @@ class AppDelegate: NSObject, NSApplicationDelegate, SPUUpdaterDelegate {
             self?.floatingButtonManager.ensureFloatingButtonVisible()
         }
     }
-
+    
     func applicationWillTerminate(_ aNotification: Notification) {
         // Insert code here to tear down your application
-    }
-    
-    private func setupMenuBar() {
-        let mainMenu = NSMenu()
-        
-        // App menu
-        let appMenuItem = NSMenuItem()
-        mainMenu.addItem(appMenuItem)
-        let appMenu = NSMenu()
-        appMenuItem.submenu = appMenu
-        appMenu.addItem(withTitle: "Check for Updates...", action: #selector(checkForUpdates(_:)), keyEquivalent: "")
-        appMenu.addItem(NSMenuItem.separator())
-        appMenu.addItem(withTitle: "Quit HyperChat", action: #selector(NSApplication.terminate(_:)), keyEquivalent: "q")
-        
-        // Edit menu - this enables copy/paste
-        let editMenuItem = NSMenuItem()
-        mainMenu.addItem(editMenuItem)
-        let editMenu = NSMenu(title: "Edit")
-        editMenuItem.submenu = editMenu
-        
-        editMenu.addItem(withTitle: "Undo", action: #selector(UndoManager.undo), keyEquivalent: "z")
-        editMenu.addItem(withTitle: "Redo", action: #selector(UndoManager.redo), keyEquivalent: "Z")
-        editMenu.addItem(NSMenuItem.separator())
-        editMenu.addItem(withTitle: "Cut", action: #selector(NSText.cut(_:)), keyEquivalent: "x")
-        editMenu.addItem(withTitle: "Copy", action: #selector(NSText.copy(_:)), keyEquivalent: "c")
-        editMenu.addItem(withTitle: "Paste", action: #selector(NSText.paste(_:)), keyEquivalent: "v")
-        editMenu.addItem(withTitle: "Select All", action: #selector(NSText.selectAll(_:)), keyEquivalent: "a")
-        
-        NSApp.mainMenu = mainMenu
     }
     
     @objc func checkForUpdates(_ sender: Any?) {
@@ -122,4 +90,4 @@ class AppDelegate: NSObject, NSApplicationDelegate, SPUUpdaterDelegate {
     func updater(_ updater: SPUUpdater, failedToDownloadUpdate item: SUAppcastItem, error: Error) {
         print("Sparkle: Failed to download update - \(error.localizedDescription)")
     }
-} 
+}
