@@ -32,14 +32,38 @@ class OverlayWindow: NSWindow {
 
 class OverlayController {
     private var windows: [OverlayWindow] = []
-    var serviceManager: ServiceManager
+    var serviceManager: ServiceManager  // Keep for backward compatibility
     private var isHiding = false
+    
+    // Per-window ServiceManager instances
+    private var windowServiceManagers: [NSWindow: ServiceManager] = [:]
+    
+    // Window hibernation support
+    private var windowSnapshots: [NSWindow: NSImageView] = [:]
+    private var hibernatedWindows: Set<NSWindow> = []
     
     private var stackViewConstraints: [NSLayoutConstraint] = []
     private var inputBarHostingView: NSHostingView<UnifiedInputBar>?
 
     init(serviceManager: ServiceManager) {
         self.serviceManager = serviceManager
+        setupWindowNotifications()
+    }
+    
+    private func setupWindowNotifications() {
+        NotificationCenter.default.addObserver(
+            self,
+            selector: #selector(windowDidBecomeKey(_:)),
+            name: NSWindow.didBecomeKeyNotification,
+            object: nil
+        )
+        
+        NotificationCenter.default.addObserver(
+            self,
+            selector: #selector(windowDidResignKey(_:)),
+            name: NSWindow.didResignKeyNotification,
+            object: nil
+        )
     }
 
     // Public entry point when no prompt yet
@@ -53,16 +77,18 @@ class OverlayController {
         // This prevents switching to other spaces
         createNormalWindow()
         
-        if let p = prompt {
+        if let p = prompt, let window = windows.last, 
+           let windowServiceManager = windowServiceManagers[window] {
             DispatchQueue.main.asyncAfter(deadline: .now() + 0.1) {
-                self.serviceManager.executePrompt(p)
+                windowServiceManager.executePrompt(p)
             }
         }
     }
     
     private func createNormalWindow() {
-        // Service manager is now persistent and injected.
-
+        // Create a dedicated ServiceManager for this window
+        let windowServiceManager = ServiceManager()
+        
         let screen = NSScreen.screenWithMouse() ?? NSScreen.main!
         
         let windowWidth: CGFloat = 1200
@@ -82,6 +108,9 @@ class OverlayController {
         )
         window.overlayController = self
         windows.append(window)
+        
+        // Store the window-specific ServiceManager
+        windowServiceManagers[window] = windowServiceManager
 
         // Configure window for full-size content view with visible buttons
         window.titleVisibility = .hidden
@@ -107,7 +136,7 @@ class OverlayController {
         backgroundEffectView.autoresizingMask = [.width, .height]
         containerView.addSubview(backgroundEffectView)
 
-        setupBrowserViews(in: containerView)
+        setupBrowserViews(in: containerView, using: windowServiceManager, for: window)
         
         // Register for appearance change notifications
         DistributedNotificationCenter.default.addObserver(
@@ -117,7 +146,11 @@ class OverlayController {
             object: nil
         )
 
-        window.makeKeyAndOrderFront(nil)
+        // Use gentle activation pattern to prevent WebView disruption
+        window.orderFront(nil)
+        DispatchQueue.main.asyncAfter(deadline: .now() + 0.1) {
+            window.makeKey()
+        }
         
         // Focus the input field after all web views have loaded
         // This delay allows web views to do their initial setup
@@ -126,10 +159,10 @@ class OverlayController {
         }
     }
     
-    private func setupBrowserViews(in containerView: NSView) {
-        let sortedServices = serviceManager.activeServices.sorted { $0.order < $1.order }
+    private func setupBrowserViews(in containerView: NSView, using windowServiceManager: ServiceManager, for window: NSWindow) {
+        let sortedServices = windowServiceManager.activeServices.sorted { $0.order < $1.order }
         let browserViews = sortedServices.compactMap { service in
-            serviceManager.webServices[service.id]?.browserView
+            windowServiceManager.webServices[service.id]?.browserView
         }
         
         let browserStackView = NSStackView(views: browserViews)
@@ -139,8 +172,8 @@ class OverlayController {
         browserStackView.translatesAutoresizingMaskIntoConstraints = false
         browserStackView.identifier = NSUserInterfaceItemIdentifier("browserStackView")
         
-        // Create the UnifiedInputBar SwiftUI view
-        let inputBar = UnifiedInputBar(serviceManager: serviceManager)
+        // Create the UnifiedInputBar SwiftUI view with window-specific ServiceManager
+        let inputBar = UnifiedInputBar(serviceManager: windowServiceManager)
         let inputBarHostingView = NSHostingView(rootView: inputBar)
         inputBarHostingView.translatesAutoresizingMaskIntoConstraints = false
         self.inputBarHostingView = inputBarHostingView
@@ -172,10 +205,20 @@ class OverlayController {
             window.close()
         }
         windows.removeAll()
+        // Clean up all window-specific ServiceManagers
+        windowServiceManagers.removeAll()
+        // Clean up hibernation data
+        windowSnapshots.removeAll()
+        hibernatedWindows.removeAll()
     }
     
     func removeWindow(_ window: OverlayWindow) {
         windows.removeAll { $0 == window }
+        // Clean up the window-specific ServiceManager
+        windowServiceManagers.removeValue(forKey: window)
+        // Clean up hibernation data
+        windowSnapshots.removeValue(forKey: window)
+        hibernatedWindows.remove(window)
     }
     
     private func updateBackgroundColorForAppearance() {
@@ -184,6 +227,72 @@ class OverlayController {
     
     @objc private func appearanceChanged(_ notification: Notification) {
         updateBackgroundColorForAppearance()
+    }
+    
+    // MARK: - Window Hibernation
+    
+    @objc private func windowDidBecomeKey(_ notification: Notification) {
+        guard let window = notification.object as? NSWindow,
+              windows.contains(where: { $0 == window }) else { return }
+        
+        // Restore live WebViews if window was hibernated
+        if hibernatedWindows.contains(window) {
+            restoreWindow(window)
+        }
+    }
+    
+    @objc private func windowDidResignKey(_ notification: Notification) {
+        guard let window = notification.object as? NSWindow,
+              windows.contains(where: { $0 == window }) else { return }
+        
+        // Hibernate the window
+        hibernateWindow(window)
+    }
+    
+    private func hibernateWindow(_ window: NSWindow) {
+        guard let serviceManager = windowServiceManagers[window],
+              !hibernatedWindows.contains(window) else { return }
+        
+        // Capture screenshot of current content
+        if let contentView = window.contentView,
+           let imageRep = contentView.bitmapImageRepForCachingDisplay(in: contentView.bounds) {
+            contentView.cacheDisplay(in: contentView.bounds, to: imageRep)
+            let snapshot = NSImage(size: contentView.bounds.size)
+            snapshot.addRepresentation(imageRep)
+            
+            // Create and add snapshot view
+            let snapshotView = NSImageView(frame: contentView.bounds)
+            snapshotView.image = snapshot
+            snapshotView.imageScaling = .scaleAxesIndependently
+            snapshotView.autoresizingMask = [.width, .height]
+            snapshotView.wantsLayer = true
+            contentView.addSubview(snapshotView)
+            
+            windowSnapshots[window] = snapshotView
+        }
+        
+        // Pause all WebViews to free resources
+        serviceManager.pauseAllWebViews()
+        hibernatedWindows.insert(window)
+        
+        print("🛌 Hibernated window with \(serviceManager.activeServices.count) services")
+    }
+    
+    private func restoreWindow(_ window: NSWindow) {
+        guard let serviceManager = windowServiceManagers[window],
+              hibernatedWindows.contains(window) else { return }
+        
+        // Remove snapshot overlay
+        if let snapshotView = windowSnapshots[window] {
+            snapshotView.removeFromSuperview()
+            windowSnapshots.removeValue(forKey: window)
+        }
+        
+        // Resume all WebViews
+        serviceManager.resumeAllWebViews()
+        hibernatedWindows.remove(window)
+        
+        print("⏰ Restored window with \(serviceManager.activeServices.count) services")
     }
 }
 
