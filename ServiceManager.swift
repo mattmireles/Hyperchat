@@ -329,7 +329,8 @@ class BrowserView: NSView {
     }
     
     private func setupWebViewDelegate() {
-        webView.navigationDelegate = self
+        // Navigation delegate is set by ServiceManager for sequential loading
+        // webView.navigationDelegate = self
     }
     
     @objc private func goBack() {
@@ -1120,6 +1121,8 @@ class ServiceManager: NSObject, ObservableObject {
     private var perplexityLoadTimers: [WKWebView: Timer] = [:]  // Timeout timers for Perplexity
     private var perplexityInitialLoadComplete: Bool = false  // Track if Perplexity has completed initial load
     private var lastAttemptedURLs: [WKWebView: URL] = [:]  // Track last attempted URL per WebView
+    private var serviceLoadingQueue: [AIService] = []  // Queue for sequential loading
+    private var currentlyLoadingService: String? = nil  // Track which service is currently being loaded
     
     override init() {
         super.init()
@@ -1147,12 +1150,39 @@ class ServiceManager: NSObject, ObservableObject {
             activeServices.append(service)
             loadingStates[service.id] = false
             
-            // Stagger loading each service by 1.5 seconds to reduce simultaneous resource demands
-            let loadDelay = Double(index) * 1.5  // 0s, 1s, 2s, 3s for each service
-            DispatchQueue.main.asyncAfter(deadline: .now() + loadDelay) { [weak self] in
-                self?.loadDefaultPage(for: service, webView: webView)
-            }
+            // Add to loading queue for sequential loading
+            serviceLoadingQueue.append(service)
         }
+        
+        // Start loading the first service
+        loadNextServiceFromQueue()
+    }
+    
+    private func loadNextServiceFromQueue() {
+        // Check if we're already loading or if queue is empty
+        guard currentlyLoadingService == nil, !serviceLoadingQueue.isEmpty else {
+            print("⏭️ Skipping loadNextServiceFromQueue - already loading: \(currentlyLoadingService ?? "none"), queue count: \(serviceLoadingQueue.count)")
+            return
+        }
+        
+        // Get the next service to load
+        let service = serviceLoadingQueue.removeFirst()
+        
+        // Get the webView for this service
+        guard let webService = webServices[service.id] else { 
+            print("❌ No webService found for \(service.id)")
+            // Try loading the next one
+            loadNextServiceFromQueue()
+            return 
+        }
+        let webView = webService.browserView.webView
+        
+        // Mark which service we're loading
+        currentlyLoadingService = service.id
+        print("🔄 Loading service from queue: \(service.name)")
+        
+        // Load the service
+        loadDefaultPage(for: service, webView: webView)
     }
     
     private func loadDefaultPage(for service: AIService, webView: WKWebView) {
@@ -1323,15 +1353,19 @@ class ServiceManager: NSObject, ObservableObject {
     }
     
     func reloadAllServices() {
-        for service in activeServices {
-            if let webService = webServices[service.id] {
-                loadDefaultPage(for: service, webView: webService.browserView.webView)
-            }
-        }
+        // Clear and repopulate the loading queue
+        serviceLoadingQueue.removeAll()
+        
+        // Sort services by their order property to ensure correct loading sequence
+        let sortedServices = activeServices.sorted { $0.order < $1.order }
+        serviceLoadingQueue = sortedServices
         
         // Reset to first submit mode after reload
         isFirstSubmit = true
         replyToAll = true  // Reset UI to default state
+        
+        // Start loading the first service
+        loadNextServiceFromQueue()
     }
     
     private func createWebView(for service: AIService) -> WKWebView {
@@ -1557,6 +1591,14 @@ extension ServiceManager: WKNavigationDelegate {
         let urlString = webView.url?.absoluteString ?? "unknown"
         print("SUCCESS WebView loaded successfully: \(urlString)")
         
+        // Forward to BrowserView's delegate method for UI updates
+        for (_, webService) in webServices {
+            if webService.browserView.webView == webView {
+                webService.browserView.webView(webView, didFinish: navigation)
+                break
+            }
+        }
+        
         // Clear Perplexity timers and retry count on successful load
         if urlString.contains("perplexity.ai") {
             perplexityLoadTimers[webView]?.invalidate()
@@ -1587,6 +1629,14 @@ extension ServiceManager: WKNavigationDelegate {
         let urlString = webView.url?.absoluteString ?? "unknown"
         print("🔄 WebView started loading: \(urlString)")
         
+        // Forward to BrowserView's delegate method for UI updates
+        for (_, webService) in webServices {
+            if webService.browserView.webView == webView {
+                webService.browserView.webView(webView, didStartProvisionalNavigation: navigation)
+                break
+            }
+        }
+        
         // Track the URL being loaded
         if let url = webView.url {
             lastAttemptedURLs[webView] = url
@@ -1596,6 +1646,29 @@ extension ServiceManager: WKNavigationDelegate {
         if urlString.contains("perplexity.ai"),
            let service = activeServices.first(where: { $0.id == "perplexity" }) {
             loadingStates[service.id] = true
+        }
+        
+        // Check if this is the service we're expecting to load
+        if let loadingServiceId = currentlyLoadingService {
+            // Find which service this webView belongs to
+            var foundService: AIService? = nil
+            for (serviceId, webService) in webServices {
+                if webService.browserView.webView == webView {
+                    foundService = activeServices.first { $0.id == serviceId }
+                    break
+                }
+            }
+            
+            // Only proceed with next service if this is the one we were loading
+            if let service = foundService, service.id == loadingServiceId {
+                print("✅ Service \(service.name) started loading successfully")
+                currentlyLoadingService = nil
+                
+                // Load the next service after a small delay to ensure smooth loading
+                DispatchQueue.main.asyncAfter(deadline: .now() + 0.5) { [weak self] in
+                    self?.loadNextServiceFromQueue()
+                }
+            }
         }
     }
 }
