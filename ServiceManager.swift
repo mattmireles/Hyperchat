@@ -560,7 +560,10 @@ class URLParameterService: WebService {
             print("🔗 \(service.name): Loading URL: \(urlString)")
             
             if let url = URL(string: urlString) {
-                browserView.webView.load(URLRequest(url: url))
+                print("🔍 \(service.name): URL object created: \(url.absoluteString)")
+                let request = URLRequest(url: url)
+                print("📋 \(service.name): URLRequest created: \(request.url?.absoluteString ?? "nil")")
+                browserView.webView.load(request)
                 
                 // Add debugging to monitor when services auto-submit
                 DispatchQueue.main.asyncAfter(deadline: .now() + 2.0) {
@@ -1115,6 +1118,7 @@ class ServiceManager: NSObject, ObservableObject {
     private var isFirstSubmit: Bool = true  // Track if this is the first submit after load/reload
     private var perplexityRetryCount: [WKWebView: Int] = [:]  // Track retry attempts for Perplexity
     private var perplexityLoadTimers: [WKWebView: Timer] = [:]  // Timeout timers for Perplexity
+    private var perplexityInitialLoadComplete: Bool = false  // Track if Perplexity has completed initial load
     
     override init() {
         super.init()
@@ -1152,6 +1156,18 @@ class ServiceManager: NSObject, ObservableObject {
     }
     
     private func loadDefaultPage(for service: AIService, webView: WKWebView) {
+        // Check if WebView is already loading or has a URL with query params
+        if webView.isLoading {
+            print("⏭️ \(service.name): Skipping default page load - already loading")
+            return
+        }
+        
+        if let currentURL = webView.url?.absoluteString,
+           currentURL.contains("?q=") {
+            print("⏭️ \(service.name): Skipping default page load - already has query params")
+            return
+        }
+        
         let defaultURL: String
         
         switch service.id {
@@ -1175,11 +1191,14 @@ class ServiceManager: NSObject, ObservableObject {
             
             // Add minimal delay to prevent race conditions
             DispatchQueue.main.asyncAfter(deadline: .now() + 0.01) {
-                webView.load(request)
-                
-                // For Perplexity, set up timeout monitoring
-                if service.id == "perplexity" {
-                    self.startPerplexityLoadTimeout(for: webView, service: service)
+                // Double-check before loading in case state changed
+                if !webView.isLoading && webView.url?.absoluteString.contains("?q=") != true {
+                    webView.load(request)
+                    
+                    // For Perplexity, set up timeout monitoring
+                    if service.id == "perplexity" {
+                        self.startPerplexityLoadTimeout(for: webView, service: service)
+                    }
                 }
             }
         }
@@ -1519,6 +1538,12 @@ extension ServiceManager: WKNavigationDelegate {
             perplexityLoadTimers[webView]?.invalidate()
             perplexityLoadTimers[webView] = nil
             perplexityRetryCount[webView] = 0
+            
+            // Mark Perplexity as ready to accept queries
+            if !urlString.contains("?q=") {
+                perplexityInitialLoadComplete = true
+                print("✅ Perplexity: Initial load complete, ready for queries")
+            }
             
             // Update loading state
             if let service = activeServices.first(where: { $0.id == "perplexity" }) {
