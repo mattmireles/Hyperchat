@@ -1243,6 +1243,9 @@ class ServiceManager: NSObject, ObservableObject {
                     
                     // For Perplexity, set up timeout monitoring
                     if service.id == "perplexity" {
+                        if LoggingSettings.shared.debugPerplexity {
+                            WebViewLogger.shared.log("🔵 Perplexity: Starting default page load - \(defaultURL)", for: "perplexity", type: .info)
+                        }
                         self.startPerplexityLoadTimeout(for: webView, service: service)
                     }
                 }
@@ -1257,8 +1260,14 @@ class ServiceManager: NSObject, ObservableObject {
         // Don't set timeout for query parameter URLs
         if let currentURL = webView.url?.absoluteString,
            currentURL.contains("?q=") {
-            print("⏭️ Perplexity: Skipping timeout for query URL")
+            if LoggingSettings.shared.debugPerplexity {
+                WebViewLogger.shared.log("⏭️ Perplexity: Skipping timeout for query URL: \(currentURL)", for: "perplexity", type: .info)
+            }
             return
+        }
+        
+        if LoggingSettings.shared.debugPerplexity {
+            WebViewLogger.shared.log("⏱️ Perplexity: Starting 10-second load timeout timer", for: "perplexity", type: .info)
         }
         
         // Start a 10-second timeout timer
@@ -1267,13 +1276,19 @@ class ServiceManager: NSObject, ObservableObject {
             
             // Check if the page is still loading
             if webView.isLoading {
-                print("⏱️ Perplexity: Load timeout after 10 seconds, attempting retry")
+                if LoggingSettings.shared.debugPerplexity {
+                    WebViewLogger.shared.log("⏱️ Perplexity: Load timeout after 10 seconds, attempting retry", for: "perplexity", type: .warning)
+                }
                 
                 // Stop the current load
                 webView.stopLoading()
                 
                 // Attempt retry
                 self.retryPerplexityLoad(for: webView, service: service)
+            } else {
+                if LoggingSettings.shared.debugPerplexity {
+                    WebViewLogger.shared.log("✅ Perplexity: Page loaded before timeout expired", for: "perplexity", type: .info)
+                }
             }
         }
         
@@ -1285,31 +1300,33 @@ class ServiceManager: NSObject, ObservableObject {
         
         if retryCount < 3 {
             perplexityRetryCount[webView] = retryCount + 1
-            print("🔄 Perplexity: Retry attempt \(retryCount + 1) of 3")
+            if LoggingSettings.shared.debugPerplexity {
+                WebViewLogger.shared.log("🔄 Perplexity: Retry attempt \(retryCount + 1) of 3", for: "perplexity", type: .info)
+            }
             
-            // Clear cookies/cache for fresh attempt
-            let dataStore = webView.configuration.websiteDataStore
-            dataStore.fetchDataRecords(ofTypes: WKWebsiteDataStore.allWebsiteDataTypes()) { records in
-                let perplexityRecords = records.filter { $0.displayName.contains("perplexity") }
-                dataStore.removeData(ofTypes: WKWebsiteDataStore.allWebsiteDataTypes(), for: perplexityRecords) {
-                    // Retry with exponential backoff
-                    let delay = Double(retryCount + 1) * 2.0
-                    DispatchQueue.main.asyncAfter(deadline: .now() + delay) { [weak self] in
-                        guard let self = self else { return }
-                        
-                        // Retry with the last attempted URL if available
-                        if let lastURL = self.lastAttemptedURLs[webView] {
-                            print("🔄 Perplexity: Retrying with last URL: \(lastURL.absoluteString)")
-                            webView.load(URLRequest(url: lastURL))
-                        } else {
-                            // Fallback to default page if no URL tracked
-                            self.loadDefaultPage(for: service, webView: webView)
-                        }
+            // Retry with exponential backoff (without clearing data)
+            let delay = Double(retryCount + 1) * 2.0
+            DispatchQueue.main.asyncAfter(deadline: .now() + delay) { [weak self] in
+                guard let self = self else { return }
+                
+                // Retry with the last attempted URL if available
+                if let lastURL = self.lastAttemptedURLs[webView] {
+                    if LoggingSettings.shared.debugPerplexity {
+                        WebViewLogger.shared.log("🔄 Perplexity: Retrying with last URL: \(lastURL.absoluteString) after \(delay)s delay", for: "perplexity", type: .info)
                     }
+                    webView.load(URLRequest(url: lastURL))
+                } else {
+                    if LoggingSettings.shared.debugPerplexity {
+                        WebViewLogger.shared.log("🔄 Perplexity: No last URL tracked, falling back to default page", for: "perplexity", type: .info)
+                    }
+                    // Fallback to default page if no URL tracked
+                    self.loadDefaultPage(for: service, webView: webView)
                 }
             }
         } else {
-            print("❌ Perplexity: Failed to load after 3 retries")
+            if LoggingSettings.shared.debugPerplexity {
+                WebViewLogger.shared.log("❌ Perplexity: Failed to load after 3 retries - giving up", for: "perplexity", type: .error)
+            }
             loadingStates[service.id] = false
             // Clear retry count
             perplexityRetryCount[webView] = 0
@@ -1623,6 +1640,9 @@ extension ServiceManager: WKNavigationDelegate {
         if nsError.code == NSURLErrorTimedOut,
            let service = activeServices.first(where: { webServices[$0.id]?.browserView.webView == webView }),
            service.id == "perplexity" {
+            if LoggingSettings.shared.debugPerplexity {
+                WebViewLogger.shared.log("🔴 Perplexity: Navigation failed with timeout error - triggering retry", for: "perplexity", type: .warning)
+            }
             retryPerplexityLoad(for: webView, service: service)
         }
     }
@@ -1643,7 +1663,9 @@ extension ServiceManager: WKNavigationDelegate {
         if nsError.code == NSURLErrorCancelled,
            let failedURL = lastAttemptedURLs[webView],
            failedURL.absoluteString.contains("?q=") {
-            print("⚠️ Ignoring cancelled navigation for query URL: \(failedURL.absoluteString)")
+            if LoggingSettings.shared.debugPerplexity && failedURL.absoluteString.contains("perplexity") {
+                WebViewLogger.shared.log("⚠️ Perplexity: Ignoring cancelled navigation for query URL: \(failedURL.absoluteString)", for: "perplexity", type: .info)
+            }
             return
         }
         
@@ -1651,6 +1673,9 @@ extension ServiceManager: WKNavigationDelegate {
         if nsError.code == NSURLErrorTimedOut,
            let service = activeServices.first(where: { webServices[$0.id]?.browserView.webView == webView }),
            service.id == "perplexity" {
+            if LoggingSettings.shared.debugPerplexity {
+                WebViewLogger.shared.log("🔴 Perplexity: Provisional navigation failed with timeout error - triggering retry", for: "perplexity", type: .warning)
+            }
             retryPerplexityLoad(for: webView, service: service)
         }
     }
@@ -1683,10 +1708,16 @@ extension ServiceManager: WKNavigationDelegate {
             perplexityLoadTimers[webView] = nil
             perplexityRetryCount[webView] = 0
             
+            if LoggingSettings.shared.debugPerplexity {
+                WebViewLogger.shared.log("✅ Perplexity: Page loaded successfully - \(urlString)", for: "perplexity", type: .info)
+            }
+            
             // Mark Perplexity as ready to accept queries
             if !urlString.contains("?q=") {
                 perplexityInitialLoadComplete = true
-                print("✅ Perplexity: Initial load complete, ready for queries")
+                if LoggingSettings.shared.debugPerplexity {
+                    WebViewLogger.shared.log("✅ Perplexity: Initial load complete, ready for queries", for: "perplexity", type: .info)
+                }
                 
                 // Return focus to main prompt bar after Perplexity loads
                 // Wait 2 seconds to ensure Perplexity's JavaScript has executed
@@ -1724,6 +1755,9 @@ extension ServiceManager: WKNavigationDelegate {
         if urlString.contains("perplexity.ai"),
            let service = activeServices.first(where: { $0.id == "perplexity" }) {
             loadingStates[service.id] = true
+            if LoggingSettings.shared.debugPerplexity {
+                WebViewLogger.shared.log("🔄 Perplexity: Started loading - \(urlString)", for: "perplexity", type: .info)
+            }
         }
         
         // Check if this is the service we're expecting to load
