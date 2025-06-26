@@ -1111,7 +1111,10 @@ class ServiceManager: NSObject, ObservableObject {
     @Published var loadingStates: [String: Bool] = [:]  // Track loading state per service (for UI only)
     var webServices: [String: WebService] = [:]
     private let processPool = WKProcessPool.shared  // Critical optimization
+    private let perplexityProcessPool = WKProcessPool()  // Dedicated pool for Perplexity
     private var isFirstSubmit: Bool = true  // Track if this is the first submit after load/reload
+    private var perplexityRetryCount: [WKWebView: Int] = [:]  // Track retry attempts for Perplexity
+    private var perplexityLoadTimers: [WKWebView: Timer] = [:]  // Timeout timers for Perplexity
     
     override init() {
         super.init()
@@ -1136,8 +1139,15 @@ class ServiceManager: NSObject, ObservableObject {
             activeServices.append(service)
             loadingStates[service.id] = false
             
-            // Load default homepage for each service
-            loadDefaultPage(for: service, webView: webView)
+            // Stagger Perplexity loading to reduce simultaneous resource demands
+            if service.id == "perplexity" {
+                DispatchQueue.main.asyncAfter(deadline: .now() + 0.5) { [weak self] in
+                    self?.loadDefaultPage(for: service, webView: webView)
+                }
+            } else {
+                // Load other services immediately
+                loadDefaultPage(for: service, webView: webView)
+            }
         }
     }
     
@@ -1166,7 +1176,62 @@ class ServiceManager: NSObject, ObservableObject {
             // Add minimal delay to prevent race conditions
             DispatchQueue.main.asyncAfter(deadline: .now() + 0.01) {
                 webView.load(request)
+                
+                // For Perplexity, set up timeout monitoring
+                if service.id == "perplexity" {
+                    self.startPerplexityLoadTimeout(for: webView, service: service)
+                }
             }
+        }
+    }
+    
+    private func startPerplexityLoadTimeout(for webView: WKWebView, service: AIService) {
+        // Cancel any existing timer
+        perplexityLoadTimers[webView]?.invalidate()
+        
+        // Start a 10-second timeout timer
+        let timer = Timer.scheduledTimer(withTimeInterval: 10.0, repeats: false) { [weak self] _ in
+            guard let self = self else { return }
+            
+            // Check if the page is still loading
+            if webView.isLoading {
+                print("⏱️ Perplexity: Load timeout after 10 seconds, attempting retry")
+                
+                // Stop the current load
+                webView.stopLoading()
+                
+                // Attempt retry
+                self.retryPerplexityLoad(for: webView, service: service)
+            }
+        }
+        
+        perplexityLoadTimers[webView] = timer
+    }
+    
+    private func retryPerplexityLoad(for webView: WKWebView, service: AIService) {
+        let retryCount = perplexityRetryCount[webView] ?? 0
+        
+        if retryCount < 3 {
+            perplexityRetryCount[webView] = retryCount + 1
+            print("🔄 Perplexity: Retry attempt \(retryCount + 1) of 3")
+            
+            // Clear cookies/cache for fresh attempt
+            let dataStore = webView.configuration.websiteDataStore
+            dataStore.fetchDataRecords(ofTypes: WKWebsiteDataStore.allWebsiteDataTypes()) { records in
+                let perplexityRecords = records.filter { $0.displayName.contains("perplexity") }
+                dataStore.removeData(ofTypes: WKWebsiteDataStore.allWebsiteDataTypes(), for: perplexityRecords) {
+                    // Retry with exponential backoff
+                    let delay = Double(retryCount + 1) * 2.0
+                    DispatchQueue.main.asyncAfter(deadline: .now() + delay) { [weak self] in
+                        self?.loadDefaultPage(for: service, webView: webView)
+                    }
+                }
+            }
+        } else {
+            print("❌ Perplexity: Failed to load after 3 retries")
+            loadingStates[service.id] = false
+            // Clear retry count
+            perplexityRetryCount[webView] = 0
         }
     }
     
@@ -1239,7 +1304,13 @@ class ServiceManager: NSObject, ObservableObject {
         if #available(macOS 11.0, *) {
             configuration.defaultWebpagePreferences.allowsContentJavaScript = true
         }
-        configuration.processPool = processPool
+        
+        // Use dedicated process pool for Perplexity to isolate crashes
+        if service.id == "perplexity" {
+            configuration.processPool = perplexityProcessPool
+        } else {
+            configuration.processPool = processPool
+        }
         
         // Prevent loading cancellations
         configuration.suppressesIncrementalRendering = false
@@ -1352,6 +1423,60 @@ class ServiceManager: NSObject, ObservableObject {
         
         WebViewLogger.shared.log("Logging initialized for \(service.name)", for: service.name, type: .info)
     }
+    
+    // MARK: - Window Hibernation Support
+    
+    func pauseAllWebViews() {
+        for (_, webService) in webServices {
+            let webView = webService.browserView.webView
+            
+            // Pause execution by injecting JavaScript
+            webView.evaluateJavaScript("""
+                // Pause all timers and animations
+                if (typeof window._hibernateState === 'undefined') {
+                    window._hibernateState = {
+                        setInterval: window.setInterval,
+                        setTimeout: window.setTimeout,
+                        requestAnimationFrame: window.requestAnimationFrame
+                    };
+                    window.setInterval = function() { return 0; };
+                    window.setTimeout = function() { return 0; };
+                    window.requestAnimationFrame = function() { return 0; };
+                }
+            """)
+            
+            // Stop any ongoing loads
+            if webView.isLoading {
+                webView.stopLoading()
+            }
+            
+            // Hide the WebView to prevent rendering
+            webView.isHidden = true
+        }
+    }
+    
+    func resumeAllWebViews() {
+        for (_, webService) in webServices {
+            let webView = webService.browserView.webView
+            
+            // Resume execution by restoring JavaScript functions
+            webView.evaluateJavaScript("""
+                // Restore all timers and animations
+                if (typeof window._hibernateState !== 'undefined') {
+                    window.setInterval = window._hibernateState.setInterval;
+                    window.setTimeout = window._hibernateState.setTimeout;
+                    window.requestAnimationFrame = window._hibernateState.requestAnimationFrame;
+                    delete window._hibernateState;
+                }
+            """)
+            
+            // Show the WebView
+            webView.isHidden = false
+            
+            // Optionally trigger a small scroll to force re-render
+            webView.evaluateJavaScript("window.scrollBy(0, 1); window.scrollBy(0, -1);")
+        }
+    }
 }
 
 extension WKProcessPool {
@@ -1364,18 +1489,53 @@ extension ServiceManager: WKNavigationDelegate {
     func webView(_ webView: WKWebView, didFail navigation: WKNavigation!, withError error: Error) {
         let nsError = error as NSError
         print("ERROR WebView navigation failed: \(nsError.code) - \(nsError.localizedDescription)")
-        // Don't retry automatically to prevent unresponsive processes
+        
+        // For Perplexity timeout errors, attempt retry
+        if nsError.code == NSURLErrorTimedOut,
+           let service = activeServices.first(where: { webServices[$0.id]?.browserView.webView == webView }),
+           service.id == "perplexity" {
+            retryPerplexityLoad(for: webView, service: service)
+        }
     }
     
     func webView(_ webView: WKWebView, didFailProvisionalNavigation navigation: WKNavigation!, withError error: Error) {
         let nsError = error as NSError
         print("ERROR WebView provisional navigation failed: \(nsError.code) - \(nsError.localizedDescription)")
-        // Don't retry automatically to prevent unresponsive processes
+        
+        // For Perplexity timeout errors, attempt retry
+        if nsError.code == NSURLErrorTimedOut,
+           let service = activeServices.first(where: { webServices[$0.id]?.browserView.webView == webView }),
+           service.id == "perplexity" {
+            retryPerplexityLoad(for: webView, service: service)
+        }
     }
     
     func webView(_ webView: WKWebView, didFinish navigation: WKNavigation!) {
         let urlString = webView.url?.absoluteString ?? "unknown"
         print("SUCCESS WebView loaded successfully: \(urlString)")
+        
+        // Clear Perplexity timers and retry count on successful load
+        if urlString.contains("perplexity.ai") {
+            perplexityLoadTimers[webView]?.invalidate()
+            perplexityLoadTimers[webView] = nil
+            perplexityRetryCount[webView] = 0
+            
+            // Update loading state
+            if let service = activeServices.first(where: { $0.id == "perplexity" }) {
+                loadingStates[service.id] = false
+            }
+        }
+    }
+    
+    func webView(_ webView: WKWebView, didStartProvisionalNavigation navigation: WKNavigation!) {
+        let urlString = webView.url?.absoluteString ?? "unknown"
+        print("🔄 WebView started loading: \(urlString)")
+        
+        // Update loading state for Perplexity
+        if urlString.contains("perplexity.ai"),
+           let service = activeServices.first(where: { $0.id == "perplexity" }) {
+            loadingStates[service.id] = true
+        }
     }
 }
 
