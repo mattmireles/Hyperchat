@@ -489,7 +489,7 @@ let defaultServices = [
             parameter: "placeholder"
         ),
         enabled: true,
-        order: 1
+        order: 3
     ),
     AIService(
         id: "perplexity",
@@ -511,7 +511,7 @@ let defaultServices = [
             parameter: "placeholder"
         ),
         enabled: true,
-        order: 3
+        order: 1
     ),
     AIService(
         id: "claude",
@@ -1119,6 +1119,7 @@ class ServiceManager: NSObject, ObservableObject {
     private var perplexityRetryCount: [WKWebView: Int] = [:]  // Track retry attempts for Perplexity
     private var perplexityLoadTimers: [WKWebView: Timer] = [:]  // Timeout timers for Perplexity
     private var perplexityInitialLoadComplete: Bool = false  // Track if Perplexity has completed initial load
+    private var lastAttemptedURLs: [WKWebView: URL] = [:]  // Track last attempted URL per WebView
     
     override init() {
         super.init()
@@ -1126,7 +1127,10 @@ class ServiceManager: NSObject, ObservableObject {
     }
     
     private func setupServices() {
-        for (index, service) in defaultServices.enumerated() where service.enabled {
+        // Sort services by their order property to ensure correct loading sequence
+        let sortedServices = defaultServices.filter { $0.enabled }.sorted { $0.order < $1.order }
+        
+        for (index, service) in sortedServices.enumerated() {
             let webView = createWebView(for: service)
             let isFirstService = index == 0
             let browserView = BrowserView(webView: webView, service: service, isFirstService: isFirstService)
@@ -1143,14 +1147,10 @@ class ServiceManager: NSObject, ObservableObject {
             activeServices.append(service)
             loadingStates[service.id] = false
             
-            // Stagger Perplexity loading to reduce simultaneous resource demands
-            if service.id == "perplexity" {
-                DispatchQueue.main.asyncAfter(deadline: .now() + 0.5) { [weak self] in
-                    self?.loadDefaultPage(for: service, webView: webView)
-                }
-            } else {
-                // Load other services immediately
-                loadDefaultPage(for: service, webView: webView)
+            // Stagger loading each service by 1.5 seconds to reduce simultaneous resource demands
+            let loadDelay = Double(index) * 1.5  // 0s, 1s, 2s, 3s for each service
+            DispatchQueue.main.asyncAfter(deadline: .now() + loadDelay) { [weak self] in
+                self?.loadDefaultPage(for: service, webView: webView)
             }
         }
     }
@@ -1170,17 +1170,17 @@ class ServiceManager: NSObject, ObservableObject {
         
         let defaultURL: String
         
-        switch service.id {
-        case "google":
-            defaultURL = "https://www.google.com"
-        case "perplexity":
-            defaultURL = "https://www.perplexity.ai"
-        case "chatgpt":
-            defaultURL = "https://chatgpt.com"
-        case "claude":
-            defaultURL = "https://claude.ai"
-        default:
-            return
+        // Use ServiceConfiguration for URL parameter services
+        if let config = ServiceConfigurations.config(for: service.id) {
+            defaultURL = config.homeURL
+        } else {
+            // Fallback for services without config (e.g., Claude if not using URL params)
+            switch service.id {
+            case "claude":
+                defaultURL = "https://claude.ai"
+            default:
+                return
+            }
         }
         
         if let url = URL(string: defaultURL) {
@@ -1207,6 +1207,13 @@ class ServiceManager: NSObject, ObservableObject {
     private func startPerplexityLoadTimeout(for webView: WKWebView, service: AIService) {
         // Cancel any existing timer
         perplexityLoadTimers[webView]?.invalidate()
+        
+        // Don't set timeout for query parameter URLs
+        if let currentURL = webView.url?.absoluteString,
+           currentURL.contains("?q=") {
+            print("⏭️ Perplexity: Skipping timeout for query URL")
+            return
+        }
         
         // Start a 10-second timeout timer
         let timer = Timer.scheduledTimer(withTimeInterval: 10.0, repeats: false) { [weak self] _ in
@@ -1242,7 +1249,16 @@ class ServiceManager: NSObject, ObservableObject {
                     // Retry with exponential backoff
                     let delay = Double(retryCount + 1) * 2.0
                     DispatchQueue.main.asyncAfter(deadline: .now() + delay) { [weak self] in
-                        self?.loadDefaultPage(for: service, webView: webView)
+                        guard let self = self else { return }
+                        
+                        // Retry with the last attempted URL if available
+                        if let lastURL = self.lastAttemptedURLs[webView] {
+                            print("🔄 Perplexity: Retrying with last URL: \(lastURL.absoluteString)")
+                            webView.load(URLRequest(url: lastURL))
+                        } else {
+                            // Fallback to default page if no URL tracked
+                            self.loadDefaultPage(for: service, webView: webView)
+                        }
                     }
                 }
             }
@@ -1521,6 +1537,14 @@ extension ServiceManager: WKNavigationDelegate {
         let nsError = error as NSError
         print("ERROR WebView provisional navigation failed: \(nsError.code) - \(nsError.localizedDescription)")
         
+        // Don't retry if this was a query parameter URL that failed (likely due to cancellation)
+        if nsError.code == NSURLErrorCancelled,
+           let failedURL = lastAttemptedURLs[webView],
+           failedURL.absoluteString.contains("?q=") {
+            print("⚠️ Ignoring cancelled navigation for query URL: \(failedURL.absoluteString)")
+            return
+        }
+        
         // For Perplexity timeout errors, attempt retry
         if nsError.code == NSURLErrorTimedOut,
            let service = activeServices.first(where: { webServices[$0.id]?.browserView.webView == webView }),
@@ -1555,6 +1579,11 @@ extension ServiceManager: WKNavigationDelegate {
     func webView(_ webView: WKWebView, didStartProvisionalNavigation navigation: WKNavigation!) {
         let urlString = webView.url?.absoluteString ?? "unknown"
         print("🔄 WebView started loading: \(urlString)")
+        
+        // Track the URL being loaded
+        if let url = webView.url {
+            lastAttemptedURLs[webView] = url
+        }
         
         // Update loading state for Perplexity
         if urlString.contains("perplexity.ai"),

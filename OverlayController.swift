@@ -232,21 +232,28 @@ class OverlayController {
     // MARK: - Window Hibernation
     
     @objc private func windowDidBecomeKey(_ notification: Notification) {
-        guard let window = notification.object as? NSWindow,
+        // Only handle OverlayWindow instances, not PromptWindow
+        guard let window = notification.object as? OverlayWindow,
               windows.contains(where: { $0 == window }) else { return }
         
-        // Restore live WebViews if window was hibernated
+        // Restore this window if it was hibernated
         if hibernatedWindows.contains(window) {
             restoreWindow(window)
+        }
+        
+        // Hibernate other OverlayWindows when this one gains focus
+        // This ensures only one full window is active at a time
+        for otherWindow in windows where otherWindow != window {
+            if otherWindow.isVisible && !hibernatedWindows.contains(otherWindow) {
+                hibernateWindow(otherWindow)
+            }
         }
     }
     
     @objc private func windowDidResignKey(_ notification: Notification) {
-        guard let window = notification.object as? NSWindow,
-              windows.contains(where: { $0 == window }) else { return }
-        
-        // Hibernate the window
-        hibernateWindow(window)
+        // Don't automatically hibernate when window loses focus
+        // Hibernation now only happens when another OverlayWindow gains focus
+        // This prevents hibernation when the prompt window appears or when switching to other apps
     }
     
     private func hibernateWindow(_ window: NSWindow) {
