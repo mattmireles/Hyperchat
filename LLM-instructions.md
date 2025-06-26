@@ -65,6 +65,21 @@ Hyperchat is a native macOS app that provides instant access to multiple AI serv
 - Service enable/disable controls
 - Window layout preferences
 
+### Window Layout
+- Window width: 600-800px (min/max)
+- Window padding: 50px between services
+- Window height: 80% of screen height
+- Vertical centering with breathing room
+
+### Settings Panel
+- **Floating Button**: Position preference, enable/disable
+- **Global Hotkey**: Key combination picker
+- **Service Management**: Enable/disable services, reorder services
+- **Claude Configuration**: Timing adjustment for paste delay
+- **Appearance**: Theme selection (dark/light/system)
+- **Keyboard Shortcuts**: Display current shortcuts
+- **About**: Version, credits, privacy policy
+
 ## Technical Requirements
 
 ### Platform
