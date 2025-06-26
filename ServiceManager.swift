@@ -1734,6 +1734,70 @@ extension ServiceManager: WKNavigationDelegate {
         }
     }
     
+    func webView(_ webView: WKWebView, decidePolicyFor navigationAction: WKNavigationAction, decisionHandler: @escaping (WKNavigationActionPolicy) -> Void) {
+        guard let url = navigationAction.request.url else {
+            decisionHandler(.cancel)
+            return
+        }
+        
+        // Allow special schemes
+        let scheme = url.scheme?.lowercased() ?? ""
+        if ["javascript", "data", "about", "blob"].contains(scheme) {
+            decisionHandler(.allow)
+            return
+        }
+        
+        // Find which service this webView belongs to
+        var allowedHosts: [String] = []
+        for (serviceId, webService) in webServices {
+            if webService.browserView.webView == webView {
+                // Get the allowed domains for this service
+                switch serviceId {
+                case "google":
+                    allowedHosts = ["google.com", "gstatic.com", "googleapis.com", "googleusercontent.com"]
+                case "perplexity":
+                    allowedHosts = ["perplexity.ai"]
+                case "chatgpt":
+                    allowedHosts = ["chatgpt.com", "openai.com", "oaistatic.com", "oaiusercontent.com"]
+                case "claude":
+                    allowedHosts = ["claude.ai", "anthropic.com"]
+                default:
+                    break
+                }
+                break
+            }
+        }
+        
+        // If we can't determine the allowed hosts, allow the navigation
+        if allowedHosts.isEmpty {
+            decisionHandler(.allow)
+            return
+        }
+        
+        let currentHost = url.host?.lowercased() ?? ""
+        
+        // Allow navigation within the same service domain or subdomains
+        let isAllowedHost = allowedHosts.contains { allowedHost in
+            currentHost == allowedHost || currentHost.hasSuffix(".\(allowedHost)")
+        }
+        
+        if isAllowedHost {
+            decisionHandler(.allow)
+            return
+        }
+        
+        // For external links, open in default browser
+        if navigationAction.navigationType == .linkActivated {
+            print("🔗 Opening external link in browser: \(url.absoluteString)")
+            NSWorkspace.shared.open(url)
+            decisionHandler(.cancel)
+            return
+        }
+        
+        // Allow other types of navigation (redirects, form submissions, etc.)
+        decisionHandler(.allow)
+    }
+    
     func webView(_ webView: WKWebView, didStartProvisionalNavigation navigation: WKNavigation!) {
         let urlString = webView.url?.absoluteString ?? "unknown"
         print("🔄 WebView started loading: \(urlString)")
