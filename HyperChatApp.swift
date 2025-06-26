@@ -18,7 +18,7 @@ struct HyperchatApp: App {
             // Remove all default SwiftUI commands to prevent menu interference
             CommandGroup(replacing: .appInfo) { }
             CommandGroup(replacing: .newItem) { }
-            CommandGroup(replacing: .pasteboard) { }
+            // Keep pasteboard commands to enable copy/paste in WebViews
             CommandGroup(replacing: .undoRedo) { }
             CommandGroup(replacing: .systemServices) { }
             CommandGroup(replacing: .textEditing) { }
