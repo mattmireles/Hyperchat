@@ -1559,6 +1559,14 @@ extension ServiceManager: WKNavigationDelegate {
         let nsError = error as NSError
         print("ERROR WebView navigation failed: \(nsError.code) - \(nsError.localizedDescription)")
         
+        // Forward to BrowserView's delegate method for UI updates
+        for (_, webService) in webServices {
+            if webService.browserView.webView == webView {
+                webService.browserView.webView(webView, didFail: navigation, withError: error)
+                break
+            }
+        }
+        
         // For Perplexity timeout errors, attempt retry
         if nsError.code == NSURLErrorTimedOut,
            let service = activeServices.first(where: { webServices[$0.id]?.browserView.webView == webView }),
@@ -1570,6 +1578,14 @@ extension ServiceManager: WKNavigationDelegate {
     func webView(_ webView: WKWebView, didFailProvisionalNavigation navigation: WKNavigation!, withError error: Error) {
         let nsError = error as NSError
         print("ERROR WebView provisional navigation failed: \(nsError.code) - \(nsError.localizedDescription)")
+        
+        // Forward to BrowserView's delegate method for UI updates
+        for (_, webService) in webServices {
+            if webService.browserView.webView == webView {
+                webService.browserView.webView(webView, didFailProvisionalNavigation: navigation, withError: error)
+                break
+            }
+        }
         
         // Don't retry if this was a query parameter URL that failed (likely due to cancellation)
         if nsError.code == NSURLErrorCancelled,
@@ -1584,6 +1600,16 @@ extension ServiceManager: WKNavigationDelegate {
            let service = activeServices.first(where: { webServices[$0.id]?.browserView.webView == webView }),
            service.id == "perplexity" {
             retryPerplexityLoad(for: webView, service: service)
+        }
+    }
+    
+    func webView(_ webView: WKWebView, didCommit navigation: WKNavigation!) {
+        // Forward to BrowserView's delegate method for UI updates
+        for (_, webService) in webServices {
+            if webService.browserView.webView == webView {
+                webService.browserView.webView(webView, didCommit: navigation)
+                break
+            }
         }
     }
     
