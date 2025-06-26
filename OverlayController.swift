@@ -89,6 +89,11 @@ class OverlayController {
         // Create a dedicated ServiceManager for this window
         let windowServiceManager = ServiceManager()
         
+        // Debug logging for new window creation
+        if LoggingSettings.shared.debugPrompts {
+            WebViewLogger.shared.log("🪟 New window created with dedicated ServiceManager", for: "system", type: .info)
+        }
+        
         let screen = NSScreen.screenWithMouse() ?? NSScreen.main!
         
         let windowWidth: CGFloat = 1200

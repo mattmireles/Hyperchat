@@ -109,8 +109,11 @@ class PromptWindowController: NSWindowController {
         }
 
         super.showWindow(nil)
-        NSApp.activate(ignoringOtherApps: true)
-        window.makeKeyAndOrderFront(nil)
+        // Use gentle activation pattern to prevent menu bar reset
+        window.orderFront(nil)
+        DispatchQueue.main.asyncAfter(deadline: .now() + 0.1) {
+            window.makeKey()
+        }
     }
     
     private func getMaxHeight() -> CGFloat {
