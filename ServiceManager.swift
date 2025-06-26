@@ -1399,6 +1399,7 @@ class ServiceManager: NSObject, ObservableObject {
     
     private func createWebView(for service: AIService) -> WKWebView {
         let configuration = WKWebViewConfiguration()
+        configuration.websiteDataStore = .default()  // Share cookies, passwords, and login state with Safari
         if #available(macOS 11.0, *) {
             configuration.defaultWebpagePreferences.allowsContentJavaScript = true
         }
