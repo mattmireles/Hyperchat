@@ -6,35 +6,32 @@ import SwiftUI
 // The NSWindow subclass for our prompt.
 // This is where we handle window-level keyboard events.
 class PromptWindow: NSWindow {
-    private var enterMonitor: Any?
+    private var enterKeyMonitor: Any?
     
     override var canBecomeKey: Bool { true }
     override var canBecomeMain: Bool { true }
 
-    override func makeKeyAndOrderFront(_ sender: Any?) {
-        super.makeKeyAndOrderFront(sender)
-        
-        // Install local event monitor for Enter key
-        enterMonitor = NSEvent.addLocalMonitorForEvents(matching: .keyDown) { event in
-            if event.keyCode == 36 && !event.modifierFlags.contains(.shift) {
-                // Enter pressed without Shift
-                NotificationCenter.default.post(name: .submitPrompt, object: nil)
-                return nil // Swallow the event
-            }
-            return event // Let other keys through (including Shift+Enter)
-        }
-    }
-    
-    override func close() {
-        if let monitor = enterMonitor {
-            NSEvent.removeMonitor(monitor)
-        }
-        super.close()
-    }
-
     // Make the ESC key close the window, which is standard AppKit behavior.
     override func cancelOperation(_ sender: Any?) {
         close()
+    }
+    
+    override func close() {
+        // Clean up event monitor when window closes
+        if let monitor = enterKeyMonitor {
+            NSEvent.removeMonitor(monitor)
+            enterKeyMonitor = nil
+        }
+        super.close()
+    }
+    
+    override func resignKey() {
+        // Clean up event monitor when window loses key status
+        if let monitor = enterKeyMonitor {
+            NSEvent.removeMonitor(monitor)
+            enterKeyMonitor = nil
+        }
+        super.resignKey()
     }
 
     // Manually handle command-key shortcuts to ensure they work in a borderless window.
@@ -297,9 +294,6 @@ struct PromptView: View {
             }
         }
         .onAppear { isInputFocused = true }
-        .onReceive(NotificationCenter.default.publisher(for: .submitPrompt)) { _ in
-            handleSubmit()
-        }
     }
     
     private func submitWithAnimation() {

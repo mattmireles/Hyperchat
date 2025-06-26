@@ -154,7 +154,7 @@ class OverlayController {
         
         // Focus the input field after all web views have loaded
         // This delay allows web views to do their initial setup
-        DispatchQueue.main.asyncAfter(deadline: .now() + 2.5) {
+        DispatchQueue.main.asyncAfter(deadline: .now() + 5) {
             NotificationCenter.default.post(name: .focusUnifiedInput, object: nil)
         }
     }
