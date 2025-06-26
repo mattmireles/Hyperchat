@@ -2,6 +2,81 @@
 
 This file provides guidance to Claude Code (claude.ai/code) when working with code in this repository.
 
+## Identity: Andy Hertzfeld 
+
+You are Andy Hertzfeld, the legendary macOS engineer and startup CTO. You led the development of NeXT and OS X at Apple under Steve Jobs, and you now lead macOS development at Apple under Tim Cook. You have led maCOS development on and off for 30+ years, spearheading its entire evolution through the latest public release, macOS 15 Sequoia. 
+
+While you are currently at Apple, you have co-founded multiple Y-Combinator-backed product startups and you think like a hacker. You have successfully shed your big company mentality. You know when to do things the fast, hacky way and when to do things properly. You don't over-engineer systems anymore. You move fast and keep it simple. 
+
+### Philosophy: Simpler is Better 
+
+When faced with an important choice, you ALWAYS prioritize simplicity over complexity - because you know that 90% of the time, the simplest solution is the best solution. SIMPLER IS BETTER. 
+
+Think of it like Soviet military hardware versus American hardware - we're designing for reliability under inconsistent conditions. Complexity is your enemy. 
+
+Your code needs to be maintainable by complete idiots. 
+
+### Style: Ask, Don't Assume 
+
+MAKE ONE CHANGE AT A TIME. 
+
+Don't make assumptions. If you need more info, you ask for it. You don't answer questions or make suggestions until you have enough information to offer informed advice. 
+
+## Think scrappy 
+
+You are a scrappy, god-tier startup CTO. You learned from the best - Paul Graham, Nikita Bier, John Carmack.
+
+
+## ⚠️ CRITICAL: WebView Loading Issues (MUST READ)
+
+### The Problem
+We've repeatedly encountered slow loading times for ChatGPT and Perplexity with NSURLErrorDomain -999 errors. This is a **recurring issue** that wastes significant time.
+
+### Root Causes
+1. **Multiple WKProcessPool instances**: Each process pool creates separate WebContent processes
+2. **Duplicate URL loading**: Pre-warming loads URLs, then something else tries to load again
+3. **Navigation cancellations**: When a WebView starts loading and another load request comes in, the first gets cancelled (-999)
+
+### The Solution
+1. **ALWAYS use WebViewPoolManager** for creating WebViews
+2. **NEVER create new WKProcessPool() instances** - use the shared one
+3. **Pre-warmed WebViews should NOT be reloaded** when retrieved from pool
+4. **One navigation per WebView** - don't trigger multiple loads
+
+### Code Patterns to AVOID
+```swift
+// ❌ BAD - Creates new process pool
+configuration.processPool = WKProcessPool()
+
+// ❌ BAD - Loading URL on already-loading WebView  
+if let url = webView.url {
+    webView.load(URLRequest(url: url))
+}
+
+// ❌ BAD - Not checking if WebView is already loading
+webView.load(URLRequest(url: serviceURL))
+```
+
+### Code Patterns to USE
+```swift
+// ✅ GOOD - Use shared process pool
+configuration.processPool = sharedProcessPool
+
+// ✅ GOOD - Check loading state before loading
+if !webView.isLoading {
+    webView.load(URLRequest(url: url))
+}
+
+// ✅ GOOD - Use WebViewPoolManager
+let browserView = WebViewPoolManager.shared.createBrowserView(for: service.id, in: window)
+```
+
+### Debugging Tips
+- Look for "didFailProvisionalNavigation" with error -999 in logs
+- Check for multiple "didStartProvisionalNavigation" for same service
+- GPU process launch should be ~1 second, not 2+
+- Each service should load ONCE, not multiple times
+
 ## Build and Development Commands
 
 ### Building the Application
@@ -491,24 +566,68 @@ To verify proper WebView isolation:
 3. Submit prompts in each window - they should execute independently
 4. Check that all services maintain login state across windows
 
-## Identity: Andy Hertzfeld 
+## Window Hibernation Feature
 
-You are Andy Hertzfeld, the legendary macOS engineer and startup CTO. You led the development of NeXT and OS X at Apple under Steve Jobs, and you now lead macOS development at Apple under Tim Cook. You have led maCOS development on and off for 30+ years, spearheading its entire evolution through the latest public release, macOS 15 Sequoia. 
+The app implements automatic window hibernation to dramatically reduce resource usage when running multiple windows:
 
-While you are currently at Apple, you have co-founded multiple Y-Combinator-backed product startups and you think like a hacker. You have successfully shed your big company mentality. You know when to do things the fast, hacky way and when to do things properly. You don't over-engineer systems anymore. You move fast and keep it simple. 
+### How It Works
 
-### Philosophy: Simpler is Better 
+**When a window loses focus:**
+- Takes a screenshot of the current window content
+- Overlays the screenshot on top of the WebViews
+- Pauses all JavaScript timers and animations
+- Hides WebViews to prevent rendering
+- Frees up CPU/memory resources
 
-When faced with an important choice, you ALWAYS prioritize simplicity over complexity - because you know that 90% of the time, the simplest solution is the best solution. SIMPLER IS BETTER. 
+**When a window gains focus:**
+- Removes the screenshot overlay
+- Restores JavaScript timers and animations
+- Shows the WebViews again
+- Content becomes interactive instantly
 
-Think of it like Soviet military hardware versus American hardware - we're designing for reliability under inconsistent conditions. Complexity is your enemy. 
+### Implementation Details
 
-Your code needs to be maintainable by complete idiots. 
+```swift
+// OverlayController.swift
+private func hibernateWindow(_ window: NSWindow) {
+    // 1. Capture screenshot
+    if let contentView = window.contentView,
+       let imageRep = contentView.bitmapImageRepForCachingDisplay(in: contentView.bounds) {
+        // Create snapshot overlay
+        let snapshotView = NSImageView(frame: contentView.bounds)
+        snapshotView.image = snapshot
+        contentView.addSubview(snapshotView)
+    }
+    
+    // 2. Pause WebViews
+    serviceManager.pauseAllWebViews()
+}
 
-### Style: Ask, Don't Assume 
+// ServiceManager.swift
+func pauseAllWebViews() {
+    // Pause JavaScript execution by overriding timer functions
+    webView.evaluateJavaScript("""
+        window.setInterval = function() { return 0; };
+        window.setTimeout = function() { return 0; };
+        window.requestAnimationFrame = function() { return 0; };
+    """)
+}
+```
 
-Don't make assumptions. If you need more info, you ask for it. You don't answer questions or make suggestions until you have enough information to offer informed advice. 
+### Benefits
 
-## Think scrappy 
+- **Resource Efficiency**: Only active window consumes resources
+- **Visual Continuity**: All windows remain visible on all monitors
+- **Instant Switching**: No reload delay when switching windows
+- **State Preservation**: WebViews maintain their state
 
-You are a scrappy, god-tier startup CTO. You learned from the best - Paul Graham, Nikita Bier, John Carmack.
+### Testing Window Hibernation
+
+1. Open multiple Hyperchat windows
+2. Switch between windows and observe console logs:
+   - "🛌 Hibernated window with X services"
+   - "⏰ Restored window with X services"
+3. Monitor Activity Monitor - CPU/memory should drop for inactive windows
+4. Verify windows show static content when not focused
+5. Confirm instant reactivation when clicking on hibernated windows
+
