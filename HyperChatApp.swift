@@ -7,12 +7,10 @@ struct HyperchatApp: App {
     @StateObject private var loggingSettings = LoggingSettings.shared
 
     var body: some Scene {
-        // No scenes needed - we're managing everything through AppDelegate
-        // This prevents SwiftUI from interfering with our custom menu bar
-        WindowGroup {
+        // Use Settings scene instead of WindowGroup to prevent default window
+        // This allows us to keep SwiftUI menu commands without creating a visible window
+        Settings {
             EmptyView()
-                .frame(width: 0, height: 0)
-                .hidden()
         }
         .commands {
             // Remove all default SwiftUI commands to prevent menu interference
@@ -67,6 +65,10 @@ struct HyperchatApp: App {
                 Toggle("Prompt Debugging", isOn: $loggingSettings.debugPrompts)
                     .onChange(of: loggingSettings.debugPrompts) { newValue in
                         WebViewLogger.shared.log("Prompt debugging: \(newValue ? "enabled" : "disabled")", for: "system", type: .info)
+                    }
+                Toggle("Debug Perplexity Loading", isOn: $loggingSettings.debugPerplexity)
+                    .onChange(of: loggingSettings.debugPerplexity) { newValue in
+                        WebViewLogger.shared.log("Perplexity debug logging: \(newValue ? "enabled" : "disabled")", for: "system", type: .info)
                     }
                 Toggle("Filter Analytics", isOn: $loggingSettings.analyticsFilter)
                     .onChange(of: loggingSettings.analyticsFilter) { newValue in
