@@ -1391,6 +1391,11 @@ class ServiceManager: NSObject, ObservableObject {
         
         let webView = WKWebView(frame: .zero, configuration: configuration)
         
+        // Set the background to black to prevent white flash
+        if #available(macOS 12.0, *) {
+            webView.underPageBackgroundColor = NSColor.black
+        }
+        
         // Prevent web view from taking focus during initial load
         webView.isHidden = false
         webView.allowsBackForwardNavigationGestures = false  // Temporarily disable
