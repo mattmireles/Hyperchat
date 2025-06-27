@@ -1129,6 +1129,7 @@ class ServiceManager: NSObject, ObservableObject {
     private var lastAttemptedURLs: [WKWebView: URL] = [:]  // Track last attempted URL per WebView
     private var serviceLoadingQueue: [AIService] = []  // Queue for sequential loading
     private var currentlyLoadingService: String? = nil  // Track which service is currently being loaded
+    private var isForceReloading: Bool = false  // Track if we're in force reload mode
     
     override init() {
         super.init()
@@ -1174,12 +1175,21 @@ class ServiceManager: NSObject, ObservableObject {
         loadNextServiceFromQueue()
     }
     
-    private func loadNextServiceFromQueue() {
+    private func loadNextServiceFromQueue(forceReload: Bool = false) {
         // Check if we're already loading or if queue is empty
         guard currentlyLoadingService == nil, !serviceLoadingQueue.isEmpty else {
             print("⏭️ Skipping loadNextServiceFromQueue - already loading: \(currentlyLoadingService ?? "none"), queue count: \(serviceLoadingQueue.count)")
+            
+            // If queue is empty and we were force reloading, clear the flag
+            if serviceLoadingQueue.isEmpty && isForceReloading {
+                isForceReloading = false
+                print("✅ Force reload completed for all services")
+            }
             return
         }
+        
+        // Use isForceReloading flag if no explicit forceReload parameter provided
+        let shouldForceReload = forceReload || isForceReloading
         
         // Get the next service to load
         let service = serviceLoadingQueue.removeFirst()
@@ -1198,20 +1208,28 @@ class ServiceManager: NSObject, ObservableObject {
         print("🔄 Loading service from queue: \(service.name)")
         
         // Load the service
-        loadDefaultPage(for: service, webView: webView)
+        loadDefaultPage(for: service, webView: webView, forceReload: shouldForceReload)
     }
     
-    private func loadDefaultPage(for service: AIService, webView: WKWebView) {
-        // Check if WebView is already loading or has a URL with query params
-        if webView.isLoading {
-            print("⏭️ \(service.name): Skipping default page load - already loading")
-            return
-        }
-        
-        if let currentURL = webView.url?.absoluteString,
-           currentURL.contains("?q=") {
-            print("⏭️ \(service.name): Skipping default page load - already has query params")
-            return
+    private func loadDefaultPage(for service: AIService, webView: WKWebView, forceReload: Bool = false) {
+        // Check if WebView is already loading or has a URL with query params (unless forcing reload)
+        if !forceReload {
+            if webView.isLoading {
+                print("⏭️ \(service.name): Skipping default page load - already loading")
+                return
+            }
+            
+            if let currentURL = webView.url?.absoluteString,
+               currentURL.contains("?q=") {
+                print("⏭️ \(service.name): Skipping default page load - already has query params")
+                return
+            }
+        } else {
+            print("🔄 \(service.name): Force reloading to home URL")
+            // Stop any current loading if force reloading
+            if webView.isLoading {
+                webView.stopLoading()
+            }
         }
         
         let defaultURL: String
@@ -1237,8 +1255,8 @@ class ServiceManager: NSObject, ObservableObject {
             
             // Add minimal delay to prevent race conditions
             DispatchQueue.main.asyncAfter(deadline: .now() + 0.01) {
-                // Double-check before loading in case state changed
-                if !webView.isLoading && webView.url?.absoluteString.contains("?q=") != true {
+                // Double-check before loading in case state changed (unless force reloading)
+                if forceReload || (!webView.isLoading && webView.url?.absoluteString.contains("?q=") != true) {
                     webView.load(request)
                     
                     // For Perplexity, set up timeout monitoring
@@ -1410,8 +1428,11 @@ class ServiceManager: NSObject, ObservableObject {
         isFirstSubmit = true
         replyToAll = true  // Reset UI to default state
         
-        // Start loading the first service
-        loadNextServiceFromQueue()
+        // Set force reload mode
+        isForceReloading = true
+        
+        // Start loading the first service with force reload
+        loadNextServiceFromQueue(forceReload: true)
     }
     
     private func createWebView(for service: AIService) -> WKWebView {
