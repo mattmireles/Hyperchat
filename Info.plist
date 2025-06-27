@@ -30,5 +30,7 @@
 	<true/>
 	<key>SUScheduledCheckInterval</key>
 	<integer>86400</integer>
+	<key>SUPublicEDKey</key>
+	<string>YOUR_SPARKLE_PUBLIC_KEY_HERE=</string>
 </dict>
 </plist> 
