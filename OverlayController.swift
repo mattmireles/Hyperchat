@@ -468,7 +468,7 @@ struct UnifiedInputBar: View {
                         .mask(
                             Image(systemName: "plus")
                                 .font(.system(size: 24, weight: .semibold))
-                                .symbolEffect(.pulse, isActive: isLoading)
+                                .symbolEffect(.pulse.wholeSymbol, isActive: isLoading)
                         )
                     }
                     .frame(width: 62, height: 62)
