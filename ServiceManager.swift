@@ -1117,6 +1117,7 @@ class ServiceManager: NSObject, ObservableObject {
     private let processPool = WKProcessPool.shared  // Critical optimization
     private let perplexityProcessPool = WKProcessPool()  // Dedicated pool for Perplexity
     
+    
     // Share prompt execution state across all ServiceManager instances
     private static var globalIsFirstSubmit: Bool = true
     private var isFirstSubmit: Bool {
@@ -1128,6 +1129,8 @@ class ServiceManager: NSObject, ObservableObject {
     private var serviceLoadingQueue: [AIService] = []  // Queue for sequential loading
     private var currentlyLoadingService: String? = nil  // Track which service is currently being loaded
     private var isForceReloading: Bool = false  // Track if we're in force reload mode
+    private var loadedServicesCount: Int = 0  // Track how many services have finished loading
+    private var hasNotifiedAllServicesLoaded: Bool = false  // Prevent duplicate notifications
     
     override init() {
         super.init()
@@ -1229,6 +1232,9 @@ class ServiceManager: NSObject, ObservableObject {
                 webView.stopLoading()
             }
         }
+        
+        // Update loading state
+        loadingStates[service.id] = true
         
         let defaultURL: String
         
@@ -1342,6 +1348,10 @@ class ServiceManager: NSObject, ObservableObject {
         // Reset to first submit mode after reload
         isFirstSubmit = true
         replyToAll = true  // Reset UI to default state
+        
+        // Reset loading tracking for the loading overlay
+        loadedServicesCount = 0
+        hasNotifiedAllServicesLoaded = false
         
         // Set force reload mode
         isForceReloading = true
@@ -1565,13 +1575,28 @@ extension ServiceManager: WKNavigationDelegate {
         print("ERROR WebView navigation failed: \(nsError.code) - \(nsError.localizedDescription)")
         
         // Forward to BrowserView's delegate method for UI updates
-        for (_, webService) in webServices {
+        for (serviceId, webService) in webServices {
             if webService.browserView.webView == webView {
                 webService.browserView.webView(webView, didFail: navigation, withError: error)
+                
+                // Mark as not loading
+                loadingStates[serviceId] = false
+                
+                // Count this as a finished service (even though it failed)
+                if !hasNotifiedAllServicesLoaded {
+                    loadedServicesCount += 1
+                    print("📊 Service failed but counted as finished: \(serviceId) (\(loadedServicesCount)/\(activeServices.count))")
+                    
+                    // Check if all services have finished (loaded or failed)
+                    if loadedServicesCount >= activeServices.count && serviceLoadingQueue.isEmpty && currentlyLoadingService == nil {
+                        hasNotifiedAllServicesLoaded = true
+                        print("🎉 All services have finished (some may have failed)!")
+                        NotificationCenter.default.post(name: .allServicesDidLoad, object: self)
+                    }
+                }
                 break
             }
         }
-        
     }
     
     func webView(_ webView: WKWebView, didFailProvisionalNavigation navigation: WKNavigation!, withError error: Error) {
@@ -1579,23 +1604,36 @@ extension ServiceManager: WKNavigationDelegate {
         print("ERROR WebView provisional navigation failed: \(nsError.code) - \(nsError.localizedDescription)")
         
         // Forward to BrowserView's delegate method for UI updates
-        for (_, webService) in webServices {
+        for (serviceId, webService) in webServices {
             if webService.browserView.webView == webView {
                 webService.browserView.webView(webView, didFailProvisionalNavigation: navigation, withError: error)
+                
+                // Mark as not loading
+                loadingStates[serviceId] = false
+                
+                // Don't count as finished if this was a query parameter URL that failed (likely due to cancellation)
+                if nsError.code == NSURLErrorCancelled,
+                   let failedURL = lastAttemptedURLs[webView],
+                   failedURL.absoluteString.contains("?q=") {
+                    print("⚠️ Ignoring cancelled navigation for query URL: \(failedURL.absoluteString)")
+                    return
+                }
+                
+                // Count this as a finished service (even though it failed)
+                if !hasNotifiedAllServicesLoaded {
+                    loadedServicesCount += 1
+                    print("📊 Service failed but counted as finished: \(serviceId) (\(loadedServicesCount)/\(activeServices.count))")
+                    
+                    // Check if all services have finished (loaded or failed)
+                    if loadedServicesCount >= activeServices.count && serviceLoadingQueue.isEmpty && currentlyLoadingService == nil {
+                        hasNotifiedAllServicesLoaded = true
+                        print("🎉 All services have finished (some may have failed)!")
+                        NotificationCenter.default.post(name: .allServicesDidLoad, object: self)
+                    }
+                }
                 break
             }
         }
-        
-        // Don't retry if this was a query parameter URL that failed (likely due to cancellation)
-        if nsError.code == NSURLErrorCancelled,
-           let failedURL = lastAttemptedURLs[webView],
-           failedURL.absoluteString.contains("?q=") {
-            if LoggingSettings.shared.debugPerplexity && failedURL.absoluteString.contains("perplexity") {
-                WebViewLogger.shared.log("⚠️ Perplexity: Ignoring cancelled navigation for query URL: \(failedURL.absoluteString)", for: "perplexity", type: .info)
-            }
-            return
-        }
-        
     }
     
     func webView(_ webView: WKWebView, didCommit navigation: WKNavigation!) {
@@ -1613,9 +1651,25 @@ extension ServiceManager: WKNavigationDelegate {
         print("SUCCESS WebView loaded successfully: \(urlString)")
         
         // Forward to BrowserView's delegate method for UI updates
-        for (_, webService) in webServices {
+        for (serviceId, webService) in webServices {
             if webService.browserView.webView == webView {
                 webService.browserView.webView(webView, didFinish: navigation)
+                
+                // Update loading state
+                loadingStates[serviceId] = false
+                
+                // Track service as loaded if this is initial load (not a query URL)
+                if !urlString.contains("?q=") && !hasNotifiedAllServicesLoaded {
+                    loadedServicesCount += 1
+                    print("📊 Service loaded: \(serviceId) (\(loadedServicesCount)/\(activeServices.count))")
+                    
+                    // Check if all services have loaded
+                    if loadedServicesCount >= activeServices.count && serviceLoadingQueue.isEmpty && currentlyLoadingService == nil {
+                        hasNotifiedAllServicesLoaded = true
+                        print("🎉 All services have finished loading!")
+                        NotificationCenter.default.post(name: .allServicesDidLoad, object: self)
+                    }
+                }
                 break
             }
         }

@@ -1,6 +1,29 @@
 import Cocoa
 import SwiftUI
 
+// MARK: - Loading Overlay View
+
+struct LoadingOverlayView: View {
+    @Binding var opacity: Double
+    
+    var body: some View {
+        ZStack {
+            // Black background that fills entire window
+            Color.black
+                .ignoresSafeArea()
+            
+            // Hyperchat logo centered, sized to window height
+            // Using separate image set to avoid cache pollution from 62x62 icon
+            Image("HyperchatLoadingIcon")
+                .resizable()
+                .aspectRatio(contentMode: .fit)
+                .frame(maxHeight: .infinity)
+        }
+        .opacity(opacity)
+        .allowsHitTesting(false) // Allow clicks to pass through during fade
+    }
+}
+
 class OverlayWindow: NSWindow {
     weak var overlayController: OverlayController?
 
@@ -42,6 +65,12 @@ class OverlayController {
     private var windowSnapshots: [NSWindow: NSImageView] = [:]
     private var hibernatedWindows: Set<NSWindow> = []
     
+    // Loading overlay support
+    private var loadingOverlayViews: [NSWindow: NSHostingView<LoadingOverlayView>] = [:]
+    private var loadingOverlayOpacities: [NSWindow: Double] = [:]
+    private var loadingTimers: [NSWindow: Timer] = [:]
+    private var isFirstWindowLoad = true
+    
     private var stackViewConstraints: [NSLayoutConstraint] = []
     private var inputBarHostingView: NSHostingView<UnifiedInputBar>?
 
@@ -62,6 +91,14 @@ class OverlayController {
             self,
             selector: #selector(windowDidResignKey(_:)),
             name: NSWindow.didResignKeyNotification,
+            object: nil
+        )
+        
+        // Listen for all services loaded notification
+        NotificationCenter.default.addObserver(
+            self,
+            selector: #selector(allServicesDidLoad(_:)),
+            name: .allServicesDidLoad,
             object: nil
         )
     }
@@ -142,6 +179,9 @@ class OverlayController {
         containerView.addSubview(backgroundEffectView)
 
         setupBrowserViews(in: containerView, using: windowServiceManager, for: window)
+        
+        // Add loading overlay
+        setupLoadingOverlay(for: window, in: containerView)
         
         // Register for appearance change notifications
         DistributedNotificationCenter.default.addObserver(
@@ -224,6 +264,12 @@ class OverlayController {
         // Clean up hibernation data
         windowSnapshots.removeValue(forKey: window)
         hibernatedWindows.remove(window)
+        // Clean up loading overlay data
+        loadingTimers[window]?.invalidate()
+        loadingTimers.removeValue(forKey: window)
+        loadingOverlayViews[window]?.removeFromSuperview()
+        loadingOverlayViews.removeValue(forKey: window)
+        loadingOverlayOpacities.removeValue(forKey: window)
     }
     
     private func updateBackgroundColorForAppearance() {
@@ -306,11 +352,87 @@ class OverlayController {
         
         print("⏰ Restored window with \(serviceManager.activeServices.count) services")
     }
+    
+    // MARK: - Loading Overlay Management
+    
+    private func setupLoadingOverlay(for window: NSWindow, in containerView: NSView) {
+        // Create SwiftUI wrapper for binding
+        loadingOverlayOpacities[window] = 1.0
+        
+        let loadingView = LoadingOverlayView(
+            opacity: Binding(
+                get: { [weak self] in self?.loadingOverlayOpacities[window] ?? 0 },
+                set: { [weak self] in self?.loadingOverlayOpacities[window] = $0 }
+            )
+        )
+        
+        let hostingView = NSHostingView(rootView: loadingView)
+        hostingView.translatesAutoresizingMaskIntoConstraints = false
+        containerView.addSubview(hostingView)
+        
+        // Constrain to fill entire window
+        NSLayoutConstraint.activate([
+            hostingView.topAnchor.constraint(equalTo: containerView.topAnchor),
+            hostingView.leadingAnchor.constraint(equalTo: containerView.leadingAnchor),
+            hostingView.trailingAnchor.constraint(equalTo: containerView.trailingAnchor),
+            hostingView.bottomAnchor.constraint(equalTo: containerView.bottomAnchor)
+        ])
+        
+        loadingOverlayViews[window] = hostingView
+        
+        // Set up timer and behavior based on whether this is first window or subsequent
+        if isFirstWindowLoad {
+            isFirstWindowLoad = false
+            
+            // For first window: 7-second maximum timer
+            let timer = Timer.scheduledTimer(withTimeInterval: 7.0, repeats: false) { [weak self] _ in
+                self?.hideLoadingOverlay(for: window)
+            }
+            loadingTimers[window] = timer
+        } else {
+            // For subsequent windows: 1-second display
+            DispatchQueue.main.asyncAfter(deadline: .now() + 1.0) { [weak self] in
+                self?.hideLoadingOverlay(for: window)
+            }
+        }
+    }
+    
+    private func hideLoadingOverlay(for window: NSWindow) {
+        // Cancel any existing timer
+        loadingTimers[window]?.invalidate()
+        loadingTimers.removeValue(forKey: window)
+        
+        // Animate opacity to 0 over 2 seconds
+        withAnimation(.easeOut(duration: 2.0)) {
+            loadingOverlayOpacities[window] = 0.0
+        }
+        
+        // Remove the view after animation completes
+        DispatchQueue.main.asyncAfter(deadline: .now() + 2.1) { [weak self] in
+            self?.loadingOverlayViews[window]?.removeFromSuperview()
+            self?.loadingOverlayViews.removeValue(forKey: window)
+            self?.loadingOverlayOpacities.removeValue(forKey: window)
+        }
+    }
+    
+    @objc private func allServicesDidLoad(_ notification: Notification) {
+        // Find which window's ServiceManager sent this notification
+        guard let serviceManager = notification.object as? ServiceManager else { return }
+        
+        for (window, windowServiceManager) in windowServiceManagers {
+            if windowServiceManager === serviceManager {
+                // Hide loading overlay for this window
+                hideLoadingOverlay(for: window)
+                break
+            }
+        }
+    }
 }
 
 extension Notification.Name {
     static let overlayDidHide = Notification.Name("overlayDidHide")
     static let focusUnifiedInput = Notification.Name("focusUnifiedInput")
+    static let allServicesDidLoad = Notification.Name("allServicesDidLoad")
 }
 
 struct UnifiedInputBar: View {
