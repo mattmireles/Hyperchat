@@ -58,14 +58,24 @@ class DraggableButton: NSButton {
     }
     
     override func mouseUp(with event: NSEvent) {
-        if let initialLocation = initialLocation, initialLocation == event.locationInWindow {
-            // This was a click, not a drag.
-            if let action = self.action {
-                _ = self.target?.perform(action, with: self)
+        if let initialLocation = initialLocation {
+            let currentLocation = event.locationInWindow
+            let dx = currentLocation.x - initialLocation.x
+            let dy = currentLocation.y - initialLocation.y
+            let distance = sqrt(dx * dx + dy * dy)
+            
+            // Consider it a click if the mouse moved less than 5 pixels
+            let clickThreshold: CGFloat = 5.0
+            
+            if distance < clickThreshold {
+                // This was a click, not a drag.
+                if let action = self.action {
+                    _ = self.target?.perform(action, with: self)
+                }
+            } else {
+                // This was a drag.
+                dragCallback()
             }
-        } else {
-            // This was a drag.
-            dragCallback()
         }
         self.initialLocation = nil
     }
