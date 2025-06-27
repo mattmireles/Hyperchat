@@ -6,13 +6,11 @@ class AppDelegate: NSObject, NSApplicationDelegate, SPUUpdaterDelegate {
     var floatingButtonManager: FloatingButtonManager
     var overlayController: OverlayController
     var promptWindowController: PromptWindowController
-    var serviceManager: ServiceManager
     var updaterController: SPUStandardUpdaterController!
 
     override init() {
-        self.serviceManager = ServiceManager()
         self.floatingButtonManager = FloatingButtonManager()
-        self.overlayController = OverlayController(serviceManager: self.serviceManager)
+        self.overlayController = OverlayController()
         self.promptWindowController = PromptWindowController()
         super.init()
         self.updaterController = SPUStandardUpdaterController(startingUpdater: false, updaterDelegate: self, userDriverDelegate: nil)
