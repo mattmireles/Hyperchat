@@ -401,46 +401,6 @@ struct UnifiedInputBar: View {
                             .transition(.scale.combined(with: .opacity))
                         }
                         
-                        // Refresh button
-                        Button(action: {
-                            // Trigger rotation animation
-                            withAnimation(.easeInOut(duration: 0.6)) {
-                                rotationAngle += 360
-                            }
-                            serviceManager.reloadAllServices()
-                        }) {
-                            ZStack {
-                                if isRefreshHovering {
-                                    LinearGradient(
-                                        gradient: Gradient(colors: [
-                                            Color(red: 0.0, green: 0.6, blue: 1.0),  // Blue
-                                            Color(red: 1.0, green: 0.0, blue: 0.8)   // Pink/Magenta
-                                        ]),
-                                        startPoint: .bottomLeading,
-                                        endPoint: .topTrailing
-                                    )
-                                    .mask(
-                                        Image(systemName: "arrow.clockwise")
-                                            .font(.system(size: 18, weight: .semibold))
-                                    )
-                                    .rotationEffect(.degrees(rotationAngle))
-                                } else {
-                                    Image(systemName: "arrow.clockwise")
-                                        .font(.system(size: 18, weight: .semibold))
-                                        .foregroundColor(.secondary.opacity(0.4))
-                                        .rotationEffect(.degrees(rotationAngle))
-                                }
-                            }
-                            .frame(width: 24, height: 24)
-                        }
-                        .buttonStyle(.plain)
-                        .help("Reload all AI services")
-                        .onHover { hovering in
-                            withAnimation(.easeInOut(duration: 0.2)) {
-                                isRefreshHovering = hovering
-                            }
-                        }
-                        
                         Button(action: {
                             submitWithAnimation()
                         }) {
@@ -486,6 +446,55 @@ struct UnifiedInputBar: View {
                         .stroke(Color(NSColor.separatorColor).opacity(0.3), lineWidth: 1)
                 )
                 .frame(maxWidth: .infinity)
+                
+                // Refresh button - mirrors the Hyperchat logo
+                Button(action: {
+                    // Trigger rotation animation
+                    withAnimation(.easeInOut(duration: 0.6)) {
+                        rotationAngle += 360
+                    }
+                    serviceManager.reloadAllServices()
+                }) {
+                    ZStack {
+                        // Background matching the logo style
+                        Color(NSColor.controlBackgroundColor)
+                            .cornerRadius(13)
+                            .overlay(
+                                RoundedRectangle(cornerRadius: 13)
+                                    .stroke(Color(NSColor.separatorColor).opacity(0.3), lineWidth: 1)
+                            )
+                        
+                        if isRefreshHovering {
+                            LinearGradient(
+                                gradient: Gradient(colors: [
+                                    Color(red: 0.0, green: 0.6, blue: 1.0),  // Blue
+                                    Color(red: 1.0, green: 0.0, blue: 0.8)   // Pink/Magenta
+                                ]),
+                                startPoint: .bottomLeading,
+                                endPoint: .topTrailing
+                            )
+                            .mask(
+                                Image(systemName: "arrow.clockwise")
+                                    .font(.system(size: 24, weight: .semibold))
+                            )
+                            .rotationEffect(.degrees(rotationAngle))
+                        } else {
+                            Image(systemName: "arrow.clockwise")
+                                .font(.system(size: 24, weight: .semibold))
+                                .foregroundColor(.secondary.opacity(0.4))
+                                .rotationEffect(.degrees(rotationAngle))
+                        }
+                    }
+                    .frame(width: 62, height: 62)
+                    .shadow(color: Color.black.opacity(0.1), radius: 2, x: 0, y: 1)
+                }
+                .buttonStyle(.plain)
+                .help("Reload all AI services")
+                .onHover { hovering in
+                    withAnimation(.easeInOut(duration: 0.2)) {
+                        isRefreshHovering = hovering
+                    }
+                }
             }
             .padding(.horizontal, 20)
             .padding(.vertical, 12)
