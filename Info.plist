@@ -30,5 +30,7 @@
 	<true/>
 	<key>SUScheduledCheckInterval</key>
 	<integer>86400</integer>
+	<key>SUPublicEDKey</key>
+	<string>***REMOVED-SPARKLE-KEY***=</string>
 </dict>
 </plist> 
