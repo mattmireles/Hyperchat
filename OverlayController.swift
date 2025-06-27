@@ -318,8 +318,11 @@ struct UnifiedInputBar: View {
     @FocusState private var isInputFocused: Bool
     @State private var isRefreshHovering = false
     @State private var isSubmitHovering = false
-    @State private var rotationAngle: Double = 0
     @State private var showFlameIcon = false
+    
+    private var isLoading: Bool {
+        serviceManager.loadingStates.values.contains(true)
+    }
     
     private func submitWithAnimation() {
         // Trigger flame animation
@@ -350,19 +353,6 @@ struct UnifiedInputBar: View {
                     .frame(width: 62, height: 62)
                     .cornerRadius(13)
                     .shadow(color: Color.black.opacity(0.1), radius: 2, x: 0, y: 1)
-                
-                // Show loading indicator when services are loading
-                if serviceManager.loadingStates.values.contains(true) {
-                    HStack(spacing: 6) {
-                        ProgressView()
-                            .controlSize(.small)
-                            .scaleEffect(0.8)
-                        Text("Loading...")
-                            .font(.system(size: 12))
-                            .foregroundColor(.secondary)
-                    }
-                    .transition(.opacity)
-                }
                 
                 // Input field section - fills remaining space
                 HStack(spacing: 0) {
@@ -449,41 +439,37 @@ struct UnifiedInputBar: View {
                 
                 // Refresh button - mirrors the Hyperchat logo
                 Button(action: {
-                    // Trigger rotation animation
-                    withAnimation(.easeInOut(duration: 0.6)) {
-                        rotationAngle += 360
-                    }
                     serviceManager.reloadAllServices()
                 }) {
                     ZStack {
-                        // Background matching the logo style
-                        Color(NSColor.controlBackgroundColor)
-                            .cornerRadius(13)
-                            .overlay(
-                                RoundedRectangle(cornerRadius: 13)
-                                    .stroke(Color(NSColor.separatorColor).opacity(0.3), lineWidth: 1)
-                            )
-                        
+                        // Background - black on hover, matching logo style
                         if isRefreshHovering {
-                            LinearGradient(
-                                gradient: Gradient(colors: [
-                                    Color(red: 0.0, green: 0.6, blue: 1.0),  // Blue
-                                    Color(red: 1.0, green: 0.0, blue: 0.8)   // Pink/Magenta
-                                ]),
-                                startPoint: .bottomLeading,
-                                endPoint: .topTrailing
-                            )
-                            .mask(
-                                Image(systemName: "arrow.clockwise")
-                                    .font(.system(size: 24, weight: .semibold))
-                            )
-                            .rotationEffect(.degrees(rotationAngle))
+                            Color.black
+                                .cornerRadius(13)
                         } else {
-                            Image(systemName: "arrow.clockwise")
-                                .font(.system(size: 24, weight: .semibold))
-                                .foregroundColor(.secondary.opacity(0.4))
-                                .rotationEffect(.degrees(rotationAngle))
+                            Color(NSColor.controlBackgroundColor)
+                                .cornerRadius(13)
+                                .overlay(
+                                    RoundedRectangle(cornerRadius: 13)
+                                        .stroke(Color(NSColor.separatorColor).opacity(0.3), lineWidth: 1)
+                                )
                         }
+                        
+                        // Plus icon with gradient
+                        LinearGradient(
+                            gradient: Gradient(colors: [
+                                Color(red: 0.0, green: 0.6, blue: 1.0),  // Blue
+                                Color(red: 1.0, green: 0.0, blue: 0.8)   // Pink/Magenta
+                            ]),
+                            startPoint: .bottomLeading,
+                            endPoint: .topTrailing
+                        )
+                        .opacity(1.0)  // 100% opacity
+                        .mask(
+                            Image(systemName: "plus")
+                                .font(.system(size: 24, weight: .semibold))
+                                .symbolEffect(.pulse, isActive: isLoading)
+                        )
                     }
                     .frame(width: 62, height: 62)
                     .shadow(color: Color.black.opacity(0.1), radius: 2, x: 0, y: 1)
