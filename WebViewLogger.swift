@@ -14,7 +14,6 @@ class LoggingSettings: ObservableObject {
     @AppStorage("logging.navigation") var navigation = true
     @AppStorage("logging.debugPrompts") var debugPrompts = true
     @AppStorage("logging.analyticsFilter") var analyticsFilter = true
-    @AppStorage("logging.debugPerplexity") var debugPerplexity = false
     
     // Convenience methods for preset configurations
     func setMinimalLogging() {
@@ -25,7 +24,6 @@ class LoggingSettings: ObservableObject {
         navigation = true
         debugPrompts = false
         analyticsFilter = true
-        debugPerplexity = false
         objectWillChange.send()
     }
     
@@ -37,7 +35,6 @@ class LoggingSettings: ObservableObject {
         navigation = true
         debugPrompts = true
         analyticsFilter = true
-        debugPerplexity = false
         objectWillChange.send()
     }
     
@@ -49,7 +46,6 @@ class LoggingSettings: ObservableObject {
         navigation = true
         debugPrompts = true
         analyticsFilter = false
-        debugPerplexity = true
         objectWillChange.send()
     }
 }

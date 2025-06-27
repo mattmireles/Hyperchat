@@ -1115,7 +1115,6 @@ class ServiceManager: NSObject, ObservableObject {
     @Published var loadingStates: [String: Bool] = [:]  // Track loading state per service (for UI only)
     var webServices: [String: WebService] = [:]
     private let processPool = WKProcessPool.shared  // Critical optimization
-    private let perplexityProcessPool = WKProcessPool()  // Dedicated pool for Perplexity
     
     
     // Share prompt execution state across all ServiceManager instances
@@ -1213,23 +1212,37 @@ class ServiceManager: NSObject, ObservableObject {
     }
     
     private func loadDefaultPage(for service: AIService, webView: WKWebView, forceReload: Bool = false) {
-        // Check if WebView is already loading or has a URL with query params (unless forcing reload)
+        // Get the expected home URL for this service
+        let expectedHomeURL: String
+        if let config = ServiceConfigurations.config(for: service.id) {
+            expectedHomeURL = config.homeURL
+        } else if service.id == "claude" {
+            expectedHomeURL = "https://claude.ai"
+        } else {
+            return
+        }
+        
+        // Check if WebView is already at the home URL or loading it
         if !forceReload {
             if webView.isLoading {
                 print("⏭️ \(service.name): Skipping default page load - already loading")
                 return
             }
             
-            if let currentURL = webView.url?.absoluteString,
-               currentURL.contains("?q=") {
-                print("⏭️ \(service.name): Skipping default page load - already has query params")
-                return
+            if let currentURL = webView.url?.absoluteString {
+                // Check if already at home URL or has query params
+                if currentURL.hasPrefix(expectedHomeURL) || currentURL.contains("?q=") {
+                    print("⏭️ \(service.name): Skipping default page load - already at correct URL")
+                    return
+                }
             }
         } else {
             print("🔄 \(service.name): Force reloading to home URL")
-            // Stop any current loading if force reloading
-            if webView.isLoading {
-                webView.stopLoading()
+            // Only reload if we're not already at the home URL
+            if let currentURL = webView.url?.absoluteString,
+               currentURL.hasPrefix(expectedHomeURL) && !currentURL.contains("?q=") {
+                print("⏭️ \(service.name): Already at home URL, skipping reload")
+                return
             }
         }
         
@@ -1263,8 +1276,8 @@ class ServiceManager: NSObject, ObservableObject {
                 if forceReload || (!webView.isLoading && webView.url?.absoluteString.contains("?q=") != true) {
                     webView.load(request)
                     
-                    // Log Perplexity loads for debugging
-                    if service.id == "perplexity" && LoggingSettings.shared.debugPerplexity {
+                    // Log service loads for debugging
+                    if service.id == "perplexity" {
                         WebViewLogger.shared.log("🔵 Perplexity: Starting default page load - \(defaultURL)", for: "perplexity", type: .info)
                     }
                 }
@@ -1367,12 +1380,8 @@ class ServiceManager: NSObject, ObservableObject {
             configuration.defaultWebpagePreferences.allowsContentJavaScript = true
         }
         
-        // Use dedicated process pool for Perplexity to isolate crashes
-        if service.id == "perplexity" {
-            configuration.processPool = perplexityProcessPool
-        } else {
-            configuration.processPool = processPool
-        }
+        // Use shared process pool for all services
+        configuration.processPool = processPool
         
         // Prevent loading cancellations
         configuration.suppressesIncrementalRendering = false
@@ -1601,6 +1610,28 @@ extension ServiceManager: WKNavigationDelegate {
     
     func webView(_ webView: WKWebView, didFailProvisionalNavigation navigation: WKNavigation!, withError error: Error) {
         let nsError = error as NSError
+        
+        // Special handling for -999 errors (NSURLErrorCancelled)
+        if nsError.code == NSURLErrorCancelled {
+            print("⚠️ Navigation cancelled (error -999) - this is usually harmless")
+            
+            // Find the service for better logging
+            var serviceName = "Unknown"
+            for (serviceId, webService) in webServices {
+                if webService.browserView.webView == webView {
+                    if let service = activeServices.first(where: { $0.id == serviceId }) {
+                        serviceName = service.name
+                    }
+                    break
+                }
+            }
+            
+            print("📍 \(serviceName): Navigation was cancelled, likely due to a new navigation request")
+            
+            // Don't treat cancellations as failures - just return
+            return
+        }
+        
         print("ERROR WebView provisional navigation failed: \(nsError.code) - \(nsError.localizedDescription)")
         
         // Forward to BrowserView's delegate method for UI updates
@@ -1676,16 +1707,12 @@ extension ServiceManager: WKNavigationDelegate {
         
         // Handle Perplexity successful load
         if urlString.contains("perplexity.ai") {
-            if LoggingSettings.shared.debugPerplexity {
-                WebViewLogger.shared.log("✅ Perplexity: Page loaded successfully - \(urlString)", for: "perplexity", type: .info)
-            }
+            WebViewLogger.shared.log("✅ Perplexity: Page loaded successfully - \(urlString)", for: "perplexity", type: .info)
             
             // Mark Perplexity as ready to accept queries
             if !urlString.contains("?q=") {
                 perplexityInitialLoadComplete = true
-                if LoggingSettings.shared.debugPerplexity {
-                    WebViewLogger.shared.log("✅ Perplexity: Initial load complete, ready for queries", for: "perplexity", type: .info)
-                }
+                WebViewLogger.shared.log("✅ Perplexity: Initial load complete, ready for queries", for: "perplexity", type: .info)
                 
                 // Return focus to main prompt bar after Perplexity loads
                 // Wait 2 seconds to ensure Perplexity's JavaScript has executed
@@ -1787,9 +1814,7 @@ extension ServiceManager: WKNavigationDelegate {
         if urlString.contains("perplexity.ai"),
            let service = activeServices.first(where: { $0.id == "perplexity" }) {
             loadingStates[service.id] = true
-            if LoggingSettings.shared.debugPerplexity {
-                WebViewLogger.shared.log("🔄 Perplexity: Started loading - \(urlString)", for: "perplexity", type: .info)
-            }
+            WebViewLogger.shared.log("🔄 Perplexity: Started loading - \(urlString)", for: "perplexity", type: .info)
         }
         
         // Check if this is the service we're expecting to load

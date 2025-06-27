@@ -66,10 +66,6 @@ struct HyperchatApp: App {
                     .onChange(of: loggingSettings.debugPrompts) { newValue in
                         WebViewLogger.shared.log("Prompt debugging: \(newValue ? "enabled" : "disabled")", for: "system", type: .info)
                     }
-                Toggle("Debug Perplexity Loading", isOn: $loggingSettings.debugPerplexity)
-                    .onChange(of: loggingSettings.debugPerplexity) { newValue in
-                        WebViewLogger.shared.log("Perplexity debug logging: \(newValue ? "enabled" : "disabled")", for: "system", type: .info)
-                    }
                 Toggle("Filter Analytics", isOn: $loggingSettings.analyticsFilter)
                     .onChange(of: loggingSettings.analyticsFilter) { newValue in
                         WebViewLogger.shared.log("Analytics filtering: \(newValue ? "enabled" : "disabled")", for: "system", type: .info)
