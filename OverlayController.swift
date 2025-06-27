@@ -388,8 +388,8 @@ class OverlayController {
             }
             loadingTimers[window] = timer
         } else {
-            // For subsequent windows: 1-second display
-            DispatchQueue.main.asyncAfter(deadline: .now() + 1.0) { [weak self] in
+            // For subsequent windows: show briefly then start fading
+            DispatchQueue.main.asyncAfter(deadline: .now() + 0.1) { [weak self] in
                 self?.hideLoadingOverlay(for: window)
             }
         }
@@ -400,17 +400,50 @@ class OverlayController {
         loadingTimers[window]?.invalidate()
         loadingTimers.removeValue(forKey: window)
         
-        // Animate opacity to 0 over 2 seconds
-        withAnimation(.easeOut(duration: 2.0)) {
-            loadingOverlayOpacities[window] = 0.0
+        // Animate opacity using Timer for smooth easeOut curve
+        let animationDuration: TimeInterval = 2.0
+        let frameRate: TimeInterval = 60.0 // 60 FPS
+        let totalFrames = Int(animationDuration * frameRate)
+        var currentFrame = 0
+        
+        let animationTimer = Timer.scheduledTimer(withTimeInterval: 1.0 / frameRate, repeats: true) { [weak self] timer in
+            guard let self = self else {
+                timer.invalidate()
+                return
+            }
+            
+            currentFrame += 1
+            let progress = Double(currentFrame) / Double(totalFrames)
+            
+            // Apply easeOut curve: 1 - (1 - t)^2
+            let easeOutProgress = 1.0 - pow(1.0 - progress, 2.0)
+            
+            // Update opacity
+            self.loadingOverlayOpacities[window] = 1.0 - easeOutProgress
+            
+            // Force SwiftUI to update
+            if let hostingView = self.loadingOverlayViews[window] {
+                hostingView.rootView = LoadingOverlayView(
+                    opacity: Binding(
+                        get: { [weak self] in self?.loadingOverlayOpacities[window] ?? 0 },
+                        set: { [weak self] in self?.loadingOverlayOpacities[window] = $0 }
+                    )
+                )
+            }
+            
+            if currentFrame >= totalFrames {
+                timer.invalidate()
+                // Remove the view after animation completes
+                DispatchQueue.main.async { [weak self] in
+                    self?.loadingOverlayViews[window]?.removeFromSuperview()
+                    self?.loadingOverlayViews.removeValue(forKey: window)
+                    self?.loadingOverlayOpacities.removeValue(forKey: window)
+                }
+            }
         }
         
-        // Remove the view after animation completes
-        DispatchQueue.main.asyncAfter(deadline: .now() + 2.1) { [weak self] in
-            self?.loadingOverlayViews[window]?.removeFromSuperview()
-            self?.loadingOverlayViews.removeValue(forKey: window)
-            self?.loadingOverlayOpacities.removeValue(forKey: window)
-        }
+        // Store the animation timer so it can be cancelled if needed
+        loadingTimers[window] = animationTimer
     }
     
     @objc private func allServicesDidLoad(_ notification: Notification) {
