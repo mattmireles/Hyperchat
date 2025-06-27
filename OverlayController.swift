@@ -55,7 +55,6 @@ class OverlayWindow: NSWindow {
 
 class OverlayController {
     private var windows: [OverlayWindow] = []
-    var serviceManager: ServiceManager  // Keep for backward compatibility
     private var isHiding = false
     
     // Per-window ServiceManager instances
@@ -74,8 +73,7 @@ class OverlayController {
     private var stackViewConstraints: [NSLayoutConstraint] = []
     private var inputBarHostingView: NSHostingView<UnifiedInputBar>?
 
-    init(serviceManager: ServiceManager) {
-        self.serviceManager = serviceManager
+    init() {
         setupWindowNotifications()
     }
     

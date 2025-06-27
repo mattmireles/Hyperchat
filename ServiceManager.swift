@@ -1591,6 +1591,17 @@ extension ServiceManager: WKNavigationDelegate {
                 // Mark as not loading
                 loadingStates[serviceId] = false
                 
+                // Check if this was the service we were waiting for
+                if serviceId == currentlyLoadingService {
+                    print("❌ Service \(serviceId) failed during navigation - proceeding to next service")
+                    currentlyLoadingService = nil
+                    
+                    // Continue with the next service after a small delay
+                    DispatchQueue.main.asyncAfter(deadline: .now() + 0.5) { [weak self] in
+                        self?.loadNextServiceFromQueue()
+                    }
+                }
+                
                 // Count this as a finished service (even though it failed)
                 if !hasNotifiedAllServicesLoaded {
                     loadedServicesCount += 1
@@ -1642,6 +1653,17 @@ extension ServiceManager: WKNavigationDelegate {
                 // Mark as not loading
                 loadingStates[serviceId] = false
                 
+                // Check if this was the service we were waiting for
+                if serviceId == currentlyLoadingService {
+                    print("❌ Service \(serviceId) failed to load - proceeding to next service anyway")
+                    currentlyLoadingService = nil
+                    
+                    // Continue with the next service after a small delay
+                    DispatchQueue.main.asyncAfter(deadline: .now() + 0.5) { [weak self] in
+                        self?.loadNextServiceFromQueue()
+                    }
+                }
+                
                 // Don't count as finished if this was a query parameter URL that failed (likely due to cancellation)
                 if nsError.code == NSURLErrorCancelled,
                    let failedURL = lastAttemptedURLs[webView],
@@ -1688,6 +1710,17 @@ extension ServiceManager: WKNavigationDelegate {
                 
                 // Update loading state
                 loadingStates[serviceId] = false
+                
+                // Check if this was the service we were waiting for
+                if serviceId == currentlyLoadingService {
+                    print("✅ Service \(serviceId) finished loading - proceeding to next service")
+                    currentlyLoadingService = nil
+                    
+                    // Load the next service after a small delay
+                    DispatchQueue.main.asyncAfter(deadline: .now() + 0.5) { [weak self] in
+                        self?.loadNextServiceFromQueue()
+                    }
+                }
                 
                 // Track service as loaded if this is initial load (not a query URL)
                 if !urlString.contains("?q=") && !hasNotifiedAllServicesLoaded {
@@ -1828,15 +1861,11 @@ extension ServiceManager: WKNavigationDelegate {
                 }
             }
             
-            // Only proceed with next service if this is the one we were loading
+            // Just log that loading started - don't process queue yet
             if let service = foundService, service.id == loadingServiceId {
                 print("✅ Service \(service.name) started loading successfully")
-                currentlyLoadingService = nil
-                
-                // Load the next service after a small delay to ensure smooth loading
-                DispatchQueue.main.asyncAfter(deadline: .now() + 0.5) { [weak self] in
-                    self?.loadNextServiceFromQueue()
-                }
+                // Don't clear currentlyLoadingService or call loadNextServiceFromQueue here
+                // Wait for didFinish to ensure the service fully loads before starting the next one
             }
         }
     }

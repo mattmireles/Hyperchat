@@ -43,31 +43,31 @@ struct HyperchatApp: App {
                 
                 // Individual toggles
                 Toggle("Network Requests", isOn: $loggingSettings.networkRequests)
-                    .onChange(of: loggingSettings.networkRequests) { newValue in
+                    .onChange(of: loggingSettings.networkRequests) { _, newValue in
                         WebViewLogger.shared.log("Network logging: \(newValue ? "enabled" : "disabled")", for: "system", type: .info)
                     }
                 Toggle("User Interactions", isOn: $loggingSettings.userInteractions)
-                    .onChange(of: loggingSettings.userInteractions) { newValue in
+                    .onChange(of: loggingSettings.userInteractions) { _, newValue in
                         WebViewLogger.shared.log("User interaction logging: \(newValue ? "enabled" : "disabled")", for: "system", type: .info)
                     }
                 Toggle("Console Messages", isOn: $loggingSettings.consoleMessages)
-                    .onChange(of: loggingSettings.consoleMessages) { newValue in
+                    .onChange(of: loggingSettings.consoleMessages) { _, newValue in
                         WebViewLogger.shared.log("Console message logging: \(newValue ? "enabled" : "disabled")", for: "system", type: .info)
                     }
                 Toggle("DOM Changes", isOn: $loggingSettings.domChanges)
-                    .onChange(of: loggingSettings.domChanges) { newValue in
+                    .onChange(of: loggingSettings.domChanges) { _, newValue in
                         WebViewLogger.shared.log("DOM changes logging: \(newValue ? "enabled" : "disabled")", for: "system", type: .info)
                     }
                 Toggle("Navigation Events", isOn: $loggingSettings.navigation)
-                    .onChange(of: loggingSettings.navigation) { newValue in
+                    .onChange(of: loggingSettings.navigation) { _, newValue in
                         WebViewLogger.shared.log("Navigation logging: \(newValue ? "enabled" : "disabled")", for: "system", type: .info)
                     }
                 Toggle("Prompt Debugging", isOn: $loggingSettings.debugPrompts)
-                    .onChange(of: loggingSettings.debugPrompts) { newValue in
+                    .onChange(of: loggingSettings.debugPrompts) { _, newValue in
                         WebViewLogger.shared.log("Prompt debugging: \(newValue ? "enabled" : "disabled")", for: "system", type: .info)
                     }
                 Toggle("Filter Analytics", isOn: $loggingSettings.analyticsFilter)
-                    .onChange(of: loggingSettings.analyticsFilter) { newValue in
+                    .onChange(of: loggingSettings.analyticsFilter) { _, newValue in
                         WebViewLogger.shared.log("Analytics filtering: \(newValue ? "enabled" : "disabled")", for: "system", type: .info)
                     }
             }
