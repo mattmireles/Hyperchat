@@ -3,10 +3,10 @@
 # HyperChat Code Signing and Notarization Script
 
 # Configuration
-APP_NAME="HyperChat"
+APP_NAME="Hyperchat"
 BUNDLE_ID="com.transcendence.hyperchat"
-TEAM_ID="K39XS6L5PP"
-IDENTITY="Developer ID Application: YOUR_NAME (K39XS6L5PP)"  # Update with your actual certificate name
+TEAM_ID="$(APPLE_TEAM_ID)"
+IDENTITY="Developer ID Application: Matt Mireles ($(APPLE_TEAM_ID))"
 
 # Colors for output
 RED='\033[0;31m'
@@ -26,7 +26,7 @@ fi
 
 # Build the app
 echo -e "${YELLOW}Building Release version...${NC}"
-xcodebuild -scheme HyperChat -configuration Release archive -archivePath build/HyperChat.xcarchive
+xcodebuild -scheme Hyperchat -configuration Release archive -archivePath build/Hyperchat.xcarchive
 
 # Export the app
 echo -e "${YELLOW}Exporting app...${NC}"
@@ -49,7 +49,7 @@ cat > build/ExportOptions.plist << EOF
 </plist>
 EOF
 
-xcodebuild -exportArchive -archivePath build/HyperChat.xcarchive -exportPath build -exportOptionsPlist build/ExportOptions.plist
+xcodebuild -exportArchive -archivePath build/Hyperchat.xcarchive -exportPath build -exportOptionsPlist build/ExportOptions.plist
 
 # Verify the signature
 echo -e "${YELLOW}Verifying signature...${NC}"
