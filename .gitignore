@@ -1,2 +1,6 @@
 Export/
 Hyperchat.xcarchive/
+DerivedData/
+build/
+*.xcuserstate
+.DS_Store
