@@ -1,6 +1,9 @@
 Export/
 Hyperchat.xcarchive/
+Hyperchat*.xcarchive/
 DerivedData/
 build/
 *.xcuserstate
 .DS_Store
+*.backup
+*.backup-*
