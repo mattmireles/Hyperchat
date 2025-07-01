@@ -578,7 +578,7 @@ struct UnifiedInputBar: View {
                         }
                         .buttonStyle(.plain)
                         .disabled(serviceManager.sharedPrompt.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty)
-                        .help("Send prompt to all AI services")
+                        .help("Send Message to All")
                         .animation(.easeInOut(duration: 0.2), value: serviceManager.sharedPrompt.isEmpty)
                         .animation(.easeInOut(duration: 0.2), value: isSubmitHovering)
                         .onHover { hovering in
@@ -633,7 +633,7 @@ struct UnifiedInputBar: View {
                     .shadow(color: Color.black.opacity(0.1), radius: 2, x: 0, y: 1)
                 }
                 .buttonStyle(.plain)
-                .help("Reload all AI services")
+                .help("Create New Chat Thread & Refresh All")
                 .onHover { hovering in
                     withAnimation(.easeInOut(duration: 0.2)) {
                         isRefreshHovering = hovering

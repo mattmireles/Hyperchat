@@ -36,13 +36,13 @@ struct GradientToolbarButton: View {
     private var tooltipText: String {
         switch systemName {
         case "chevron.backward":
-            return "Go back to previous page"
+            return "Back"
         case "chevron.forward":
-            return "Go forward to next page"
+            return "Forward"
         case "arrow.clockwise":
-            return "Reload current page"
+            return "Refresh"
         case "clipboard":
-            return "Copy current URL to clipboard"
+            return "Copy URL to Clipboard"
         default:
             return ""
         }
