@@ -25,6 +25,8 @@ struct GradientToolbarButton: View {
     @State private var bounceOffset: CGFloat = 0
     @State private var wigglePhase: Double = 0
     @State private var showReplaceIcon = false
+    @State private var showCopiedTooltip = false
+    @State private var showCopiedPopover = false
     
     init(systemName: String, state: ButtonState, fontSize: CGFloat = 14, action: @escaping () -> Void) {
         self.systemName = systemName
@@ -74,6 +76,12 @@ struct GradientToolbarButton: View {
                     withAnimation(.easeInOut(duration: 0.3).delay(0.6)) {
                         showReplaceIcon = false
                     }
+                    // Show copied popover
+                    showCopiedPopover = true
+                    // Hide popover after 2 seconds
+                    DispatchQueue.main.asyncAfter(deadline: .now() + 2.0) {
+                        showCopiedPopover = false
+                    }
                 default:
                     break
                 }
@@ -114,6 +122,18 @@ struct GradientToolbarButton: View {
                 }
             }
             .help(tooltipText)
+            .popover(isPresented: $showCopiedPopover, arrowEdge: .bottom) {
+                VStack(spacing: 8) {
+                    Image(systemName: "checkmark.circle.fill")
+                        .font(.system(size: 24))
+                        .foregroundColor(.green)
+                    Text("Copied Current URL to Clipboard")
+                        .font(.system(size: 13, weight: .medium))
+                        .foregroundColor(.primary)
+                }
+                .padding()
+                .frame(width: 240)
+            }
         }
         .frame(width: 20, height: 20, alignment: .center)  // Explicit alignment
     }
