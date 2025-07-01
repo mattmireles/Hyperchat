@@ -1238,12 +1238,8 @@ class ServiceManager: NSObject, ObservableObject {
             }
         } else {
             print("🔄 \(service.name): Force reloading to home URL")
-            // Only reload if we're not already at the home URL
-            if let currentURL = webView.url?.absoluteString,
-               currentURL.hasPrefix(expectedHomeURL) && !currentURL.contains("?q=") {
-                print("⏭️ \(service.name): Already at home URL, skipping reload")
-                return
-            }
+            // When force reload is requested, always reload regardless of current URL
+            // This ensures "new chat" button always creates a fresh session
         }
         
         // Update loading state
