@@ -12,14 +12,19 @@ struct LoadingOverlayView: View {
             Color.black
                 .ignoresSafeArea()
             
-            // Hyperchat logo centered, sized to window height
-            // Using separate image set to avoid cache pollution from 62x62 icon
-            Image("HyperchatLoadingIcon")
-                .resizable()
-                .aspectRatio(contentMode: .fit)
-                .frame(maxHeight: .infinity)
+            // Hyperchat logo with black background removed via blend mode
+            // This extracts only the non-black pixels (the swoosh and effects)
+            GeometryReader { geometry in
+                Image("HyperchatLoadingIcon")
+                    .resizable()
+                    .aspectRatio(contentMode: .fit)
+                    .frame(maxHeight: geometry.size.height)
+                    .frame(maxWidth: geometry.size.width)
+                    .frame(maxWidth: .infinity, maxHeight: .infinity)
+                    .blendMode(.screen) // Screen blend mode: black becomes transparent, colors remain
+            }
         }
-        .opacity(opacity)
+        .opacity(opacity) // Single opacity applied to entire stack
         .allowsHitTesting(false) // Allow clicks to pass through during fade
     }
 }
