@@ -70,14 +70,14 @@ class PromptWindowController: NSWindowController {
 
     convenience init() {
         let window = PromptWindow(
-            contentRect: NSRect(x: 0, y: 0, width: 500, height: 124), // Set initial size
+            contentRect: NSRect(x: 0, y: 0, width: 840, height: 164), // Increased by 40px for padding
             styleMask: [.borderless],
             backing: .buffered,
             defer: false
         )
         window.isOpaque = false
         window.backgroundColor = .clear
-        window.hasShadow = true
+        window.hasShadow = false
         window.level = .floating
 
         self.init(window: window)
@@ -160,6 +160,81 @@ class PromptWindowController: NSWindowController {
 
 // MARK: - SwiftUI View and Helpers
 
+// Animated gradient border view for Siri-like glow effect
+struct AnimatedGradientBorder: View {
+    @State private var phase: CGFloat = 0
+    let cornerRadius: CGFloat
+    let lineWidth: CGFloat
+    
+    var body: some View {
+        ZStack {
+            // Outermost glow layer - softly blurred
+            RoundedRectangle(cornerRadius: cornerRadius)
+                .stroke(
+                    AngularGradient(
+                        gradient: Gradient(colors: [
+                            Color(red: 0.0, green: 0.6, blue: 1.0),      // Blue
+                            Color(red: 1.0, green: 0.0, blue: 0.8),      // Pink/Magenta
+                            Color(red: 0.0, green: 0.6, blue: 1.0),      // Blue (repeat for seamless loop)
+                            Color(red: 1.0, green: 0.0, blue: 0.8),      // Pink/Magenta (repeat)
+                            Color(red: 0.0, green: 0.6, blue: 1.0)       // Blue (final)
+                        ]),
+                        center: .center,
+                        startAngle: .degrees(phase),
+                        endAngle: .degrees(phase + 360)
+                    ),
+                    lineWidth: lineWidth * 1.2
+                )
+                .blur(radius: 6)
+                .opacity(0.4)
+            
+            // Middle glow layer - subtle blur
+            RoundedRectangle(cornerRadius: cornerRadius)
+                .stroke(
+                    AngularGradient(
+                        gradient: Gradient(colors: [
+                            Color(red: 0.0, green: 0.6, blue: 1.0),
+                            Color(red: 1.0, green: 0.0, blue: 0.8),
+                            Color(red: 0.0, green: 0.6, blue: 1.0),
+                            Color(red: 1.0, green: 0.0, blue: 0.8),
+                            Color(red: 0.0, green: 0.6, blue: 1.0)
+                        ]),
+                        center: .center,
+                        startAngle: .degrees(phase),
+                        endAngle: .degrees(phase + 360)
+                    ),
+                    lineWidth: lineWidth * 0.8
+                )
+                .blur(radius: 3)
+                .opacity(0.6)
+            
+            // Inner sharp layer - minimal blur for definition
+            RoundedRectangle(cornerRadius: cornerRadius)
+                .stroke(
+                    AngularGradient(
+                        gradient: Gradient(colors: [
+                            Color(red: 0.0, green: 0.6, blue: 1.0).opacity(0.9),
+                            Color(red: 1.0, green: 0.0, blue: 0.8).opacity(0.9),
+                            Color(red: 0.0, green: 0.6, blue: 1.0).opacity(0.9),
+                            Color(red: 1.0, green: 0.0, blue: 0.8).opacity(0.9),
+                            Color(red: 0.0, green: 0.6, blue: 1.0).opacity(0.9)
+                        ]),
+                        center: .center,
+                        startAngle: .degrees(phase),
+                        endAngle: .degrees(phase + 360)
+                    ),
+                    lineWidth: lineWidth * 0.3
+                )
+                .blur(radius: 0.5)
+        }
+        .onAppear {
+            withAnimation(.linear(duration: 3).repeatForever(autoreverses: false)) {
+                phase = 360
+            }
+        }
+    }
+}
+
 // Notification name for showing the main overlay.
 extension Notification.Name {
     static let showOverlay = Notification.Name("showOverlay")
@@ -185,6 +260,7 @@ struct PromptView: View {
     @State private var showFlameIcon = false
 
     var body: some View {
+        // Outer transparent padding container
         VStack(spacing: 0) {
             HStack(spacing: 16) {
                 // Hyperchat logo
@@ -279,13 +355,15 @@ struct PromptView: View {
             .padding(.horizontal, 20)
             .padding(.vertical, 12)
             .frame(height: 72)
-            .background(
-                VisualEffectBackground()
-            )
         }
         .frame(width: 800)
-        .cornerRadius(12)
-        .shadow(radius: 20)
+        .background(
+            VisualEffectBackground()
+                .clipShape(RoundedRectangle(cornerRadius: 12))
+        )
+        .overlay(
+            AnimatedGradientBorder(cornerRadius: 12, lineWidth: 4)
+        )
         .overlay(
             GeometryReader { geometry in
                 Color.clear.preference(key: HeightPreferenceKey.self, value: geometry.size.height)
@@ -293,9 +371,11 @@ struct PromptView: View {
         )
         .onPreferenceChange(HeightPreferenceKey.self) { newTotalHeight in
             if newTotalHeight > 0 {
-                onHeightChange(newTotalHeight)
+                // Add padding to the reported height
+                onHeightChange(newTotalHeight + 40)
             }
         }
+        .padding(20) // Add transparent padding around everything
         .onAppear { isInputFocused = true }
     }
     
