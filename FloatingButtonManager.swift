@@ -2,6 +2,86 @@ import Cocoa
 import SwiftUI
 import os.log
 
+// SwiftUI view for animated gradient glow
+struct FloatingButtonGlow: View {
+    @State private var phase: CGFloat = 0
+    let isVisible: Bool
+    
+    var body: some View {
+        ZStack {
+            // Outer glow layer
+            RoundedRectangle(cornerRadius: 20)
+                .inset(by: 10)  // Account for 8px padding + icon internal padding
+                .stroke(
+                    AngularGradient(
+                        gradient: Gradient(colors: [
+                            Color(red: 1.0, green: 0.0, blue: 0.8),
+                            Color(red: 0.0, green: 0.6, blue: 1.0),
+                            Color(red: 1.0, green: 0.0, blue: 0.8),
+                            Color(red: 0.0, green: 0.6, blue: 1.0),
+                            Color(red: 1.0, green: 0.0, blue: 0.8)
+                        ]),
+                        center: .center,
+                        startAngle: .degrees(phase),
+                        endAngle: .degrees(phase + 360)
+                    ),
+                    lineWidth: 4.8
+                )
+                .blur(radius: 6)
+                .opacity(0.4)
+            
+            // Middle glow layer
+            RoundedRectangle(cornerRadius: 20)
+                .inset(by: 11)  // Account for 8px padding + icon internal padding
+                .stroke(
+                    AngularGradient(
+                        gradient: Gradient(colors: [
+                            Color(red: 1.0, green: 0.0, blue: 0.8),
+                            Color(red: 0.0, green: 0.6, blue: 1.0),
+                            Color(red: 1.0, green: 0.0, blue: 0.8),
+                            Color(red: 0.0, green: 0.6, blue: 1.0),
+                            Color(red: 1.0, green: 0.0, blue: 0.8)
+                        ]),
+                        center: .center,
+                        startAngle: .degrees(phase),
+                        endAngle: .degrees(phase + 360)
+                    ),
+                    lineWidth: 3.2
+                )
+                .blur(radius: 3)
+                .opacity(0.6)
+            
+            // Inner sharp layer
+            RoundedRectangle(cornerRadius: 20)
+                .inset(by: 12)  // Account for 8px padding + icon internal padding
+                .stroke(
+                    AngularGradient(
+                        gradient: Gradient(colors: [
+                            Color(red: 1.0, green: 0.0, blue: 0.8),
+                            Color(red: 0.0, green: 0.6, blue: 1.0),
+                            Color(red: 1.0, green: 0.0, blue: 0.8),
+                            Color(red: 0.0, green: 0.6, blue: 1.0),
+                            Color(red: 1.0, green: 0.0, blue: 0.8)
+                        ]),
+                        center: .center,
+                        startAngle: .degrees(phase),
+                        endAngle: .degrees(phase + 360)
+                    ),
+                    lineWidth: 1.2
+                )
+                .blur(radius: 0.5)
+        }
+        .opacity(isVisible ? 1 : 0)
+        .animation(.easeInOut(duration: 0.2), value: isVisible)
+        .allowsHitTesting(false)  // Allow mouse events to pass through to button
+        .onAppear {
+            withAnimation(.linear(duration: 3).repeatForever(autoreverses: false)) {
+                phase = 360
+            }
+        }
+    }
+}
+
 // Custom panel that can receive clicks but won't become key
 class FloatingPanel: NSPanel {
     override var canBecomeKey: Bool { false }
@@ -18,14 +98,22 @@ class FloatingPanel: NSPanel {
     }
 }
 
-// Custom button that can be dragged
-class DraggableButton: NSButton {
+// Custom view that can be dragged and clicked
+class DraggableView: NSView {
     private var initialLocation: NSPoint?
     private let dragCallback: () -> Void
+    private let clickCallback: () -> Void
+    private var trackingArea: NSTrackingArea?
+    private var glowHostingView: NSHostingView<FloatingButtonGlow>?
+    private var iconView: NSImageView?
+    private var isHovering = false
     
-    init(frame: NSRect, dragCallback: @escaping () -> Void) {
+    init(frame: NSRect, dragCallback: @escaping () -> Void, clickCallback: @escaping () -> Void) {
         self.dragCallback = dragCallback
+        self.clickCallback = clickCallback
         super.init(frame: frame)
+        setupView()
+        setupTrackingArea()
     }
     
     override func acceptsFirstMouse(for event: NSEvent?) -> Bool {
@@ -34,6 +122,43 @@ class DraggableButton: NSButton {
     
     required init?(coder: NSCoder) {
         fatalError("init(coder:) has not been implemented")
+    }
+    
+    private func setupView() {
+        wantsLayer = true
+        layer?.backgroundColor = NSColor.clear.cgColor
+        
+        // Add icon as a child view
+        let iconSize: CGFloat = 48
+        let padding: CGFloat = 8
+        iconView = NSImageView(frame: NSRect(x: padding, y: padding, width: iconSize, height: iconSize))
+        if let appIcon = NSImage(named: "AppIcon") {
+            appIcon.size = NSSize(width: iconSize, height: iconSize)
+            iconView?.image = appIcon
+        }
+        iconView?.imageScaling = .scaleProportionallyUpOrDown
+        iconView?.wantsLayer = true
+        iconView?.layer?.cornerRadius = 10
+        iconView?.layer?.masksToBounds = true
+        
+        addSubview(iconView!)
+        
+        // Setup glow view on top
+        setupGlowView()
+    }
+    
+    private func setupTrackingArea() {
+        let options: NSTrackingArea.Options = [.mouseEnteredAndExited, .activeAlways]
+        trackingArea = NSTrackingArea(rect: bounds, options: options, owner: self, userInfo: nil)
+        addTrackingArea(trackingArea!)
+    }
+    
+    override func updateTrackingAreas() {
+        super.updateTrackingAreas()
+        if let trackingArea = trackingArea {
+            removeTrackingArea(trackingArea)
+        }
+        setupTrackingArea()
     }
     
     override func mouseDown(with event: NSEvent) {
@@ -55,6 +180,9 @@ class DraggableButton: NSButton {
         )
         
         window.setFrameOrigin(newOrigin)
+        
+        // Save position after moving the window
+        dragCallback()
     }
     
     override func mouseUp(with event: NSEvent) {
@@ -69,15 +197,52 @@ class DraggableButton: NSButton {
             
             if distance < clickThreshold {
                 // This was a click, not a drag.
-                if let action = self.action {
-                    _ = self.target?.perform(action, with: self)
-                }
-            } else {
-                // This was a drag.
-                dragCallback()
+                clickCallback()
             }
+            // Note: dragCallback is now called in mouseDragged to save position during drag
         }
         self.initialLocation = nil
+    }
+    
+    override func mouseEntered(with event: NSEvent) {
+        guard !isHovering else { return }
+        isHovering = true
+        updateGlowVisibility()
+    }
+    
+    override func mouseExited(with event: NSEvent) {
+        guard isHovering else { return }
+        isHovering = false
+        updateGlowVisibility()
+    }
+    
+    private func updateGlowVisibility() {
+        // Update the SwiftUI view's visibility state
+        if let hostingView = glowHostingView {
+            hostingView.rootView = FloatingButtonGlow(isVisible: isHovering)
+        }
+    }
+    
+    private func setupGlowView() {
+        // Create the SwiftUI glow view
+        let glowView = FloatingButtonGlow(isVisible: false)
+        let hostingView = NSHostingView(rootView: glowView)
+        hostingView.translatesAutoresizingMaskIntoConstraints = false
+        hostingView.wantsLayer = true
+        hostingView.layer?.backgroundColor = NSColor.clear.cgColor
+        
+        // Add glow on top of everything
+        addSubview(hostingView)
+        
+        // Make glow fill the entire view
+        NSLayoutConstraint.activate([
+            hostingView.leadingAnchor.constraint(equalTo: self.leadingAnchor),
+            hostingView.trailingAnchor.constraint(equalTo: self.trailingAnchor),
+            hostingView.topAnchor.constraint(equalTo: self.topAnchor),
+            hostingView.bottomAnchor.constraint(equalTo: self.bottomAnchor)
+        ])
+        
+        glowHostingView = hostingView
     }
 }
 
@@ -100,7 +265,9 @@ class FloatingButtonManager {
         logger.log("👇 showFloatingButton called.")
         
         let buttonSize: CGFloat = 48
-        let buttonFrame = NSRect(x: 0, y: 0, width: buttonSize, height: buttonSize)
+        let padding: CGFloat = 8  // Extra padding for glow effect
+        let windowSize: CGFloat = 64  // Fixed window size
+        let buttonFrame = NSRect(x: 0, y: 0, width: windowSize, height: windowSize)
 
         let window = FloatingPanel(
             contentRect: buttonFrame,
@@ -118,25 +285,15 @@ class FloatingButtonManager {
         window.hidesOnDeactivate = false // Important: don't hide when app loses focus
         self.buttonWindow = window
 
-        let button = DraggableButton(frame: NSRect(origin: .zero, size: CGSize(width: buttonSize, height: buttonSize))) { [weak self] in
-            self?.saveCurrentPosition()
-        }
-        if let appIcon = NSImage(named: "AppIcon") {
-            appIcon.size = NSSize(width: buttonSize, height: buttonSize)
-            button.image = appIcon
-        }
-        button.imageScaling = .scaleProportionallyUpOrDown
-        button.imagePosition = .imageOnly
-        button.isBordered = false
-        button.wantsLayer = true
-        button.layer?.backgroundColor = NSColor.clear.cgColor
-        button.layer?.cornerRadius = 10  // Match the app icon's natural corner radius
-        button.layer?.masksToBounds = true
-        
-        button.target = self
-        button.action = #selector(floatingButtonClicked)
+        let contentView = DraggableView(frame: NSRect(x: 0, y: 0, width: windowSize, height: windowSize), 
+                                        dragCallback: { [weak self] in
+                                            self?.saveCurrentPosition()
+                                        },
+                                        clickCallback: { [weak self] in
+                                            self?.floatingButtonClicked()
+                                        })
 
-        window.contentView = button
+        window.contentView = contentView
         
         updateButtonPosition()
         
@@ -167,7 +324,7 @@ class FloatingButtonManager {
         buttonWindow?.orderFront(nil)
     }
 
-    @objc private func floatingButtonClicked() {
+    private func floatingButtonClicked() {
         // Don't hide overlay if it's visible - just show prompt window
         // This prevents the hanging issue
         
