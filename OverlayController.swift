@@ -136,12 +136,18 @@ class OverlayWindow: NSWindow {
     }
     
     override func close() {
-        super.close()
-        // Remove this window from the controller's list
-        if let controller = overlayController {
-            controller.removeWindow(self)
-        }
+        // Capture controller reference before any deallocation
+        let controller = overlayController
+        overlayController = nil // Clear reference immediately to prevent double cleanup
+        
+        // First, inform the controller that this window is going away **before** the window begins
+        // its teardown inside super.close(). Doing it afterwards can lead to accessing objects
+        // that have already started deallocating, which causes crashes in objc_release.
+        controller?.removeWindow(self)
         NotificationCenter.default.post(name: .overlayDidHide, object: nil)
+
+        // Now let AppKit perform the actual close and deallocation work.
+        super.close()
     }
 }
 
@@ -167,6 +173,18 @@ class OverlayController {
 
     init() {
         setupWindowNotifications()
+    }
+    
+    deinit {
+        // Clean up all timers
+        for timer in loadingTimers.values {
+            timer.invalidate()
+        }
+        loadingTimers.removeAll()
+        
+        // Remove all notification observers
+        NotificationCenter.default.removeObserver(self)
+        DistributedNotificationCenter.default.removeObserver(self)
     }
     
     private func setupWindowNotifications() {
@@ -351,12 +369,42 @@ class OverlayController {
     }
     
     func removeWindow(_ window: OverlayWindow) {
+        // Guard against multiple cleanup calls
+        guard windows.contains(where: { $0 == window }) else { return }
+        
         windows.removeAll { $0 == window }
+        
         // Clean up the window-specific ServiceManager
-        windowServiceManagers.removeValue(forKey: window)
+        if let serviceManager = windowServiceManagers.removeValue(forKey: window) {
+            // Fully tear-down every WKWebView to prevent async callbacks to deallocated objects
+            for (_, webService) in serviceManager.webServices {
+                let browserView = webService.browserView
+                let webView = browserView.webView
+
+                // Stop any ongoing loads
+                webView.stopLoading()
+
+                // Remove all JavaScript message handlers
+                webView.configuration.userContentController.removeAllUserScripts()
+                if let handlers = webView.configuration.userContentController.value(forKey: "scriptMessageHandlers") as? [String: Any] {
+                    for handlerName in handlers.keys {
+                        webView.configuration.userContentController.removeScriptMessageHandler(forName: handlerName)
+                    }
+                }
+                
+                // Clear delegates to break retain cycles and prevent late callbacks
+                webView.navigationDelegate = nil
+                webView.uiDelegate = nil
+                
+                // Remove from superview
+                webView.removeFromSuperview()
+            }
+        }
+        
         // Clean up hibernation data
         windowSnapshots.removeValue(forKey: window)
         hibernatedWindows.remove(window)
+        
         // Clean up loading overlay data
         loadingTimers[window]?.invalidate()
         loadingTimers.removeValue(forKey: window)
@@ -404,29 +452,31 @@ class OverlayController {
         guard let serviceManager = windowServiceManagers[window],
               !hibernatedWindows.contains(window) else { return }
         
-        // Capture screenshot of current content
-        if let contentView = window.contentView,
-           let imageRep = contentView.bitmapImageRepForCachingDisplay(in: contentView.bounds) {
-            contentView.cacheDisplay(in: contentView.bounds, to: imageRep)
-            let snapshot = NSImage(size: contentView.bounds.size)
-            snapshot.addRepresentation(imageRep)
+        autoreleasepool {
+            // Capture screenshot of current content
+            if let contentView = window.contentView,
+               let imageRep = contentView.bitmapImageRepForCachingDisplay(in: contentView.bounds) {
+                contentView.cacheDisplay(in: contentView.bounds, to: imageRep)
+                let snapshot = NSImage(size: contentView.bounds.size)
+                snapshot.addRepresentation(imageRep)
+                
+                // Create and add snapshot view
+                let snapshotView = NSImageView(frame: contentView.bounds)
+                snapshotView.image = snapshot
+                snapshotView.imageScaling = .scaleAxesIndependently
+                snapshotView.autoresizingMask = [.width, .height]
+                snapshotView.wantsLayer = true
+                contentView.addSubview(snapshotView)
+                
+                windowSnapshots[window] = snapshotView
+            }
             
-            // Create and add snapshot view
-            let snapshotView = NSImageView(frame: contentView.bounds)
-            snapshotView.image = snapshot
-            snapshotView.imageScaling = .scaleAxesIndependently
-            snapshotView.autoresizingMask = [.width, .height]
-            snapshotView.wantsLayer = true
-            contentView.addSubview(snapshotView)
+            // Pause all WebViews to free resources
+            serviceManager.pauseAllWebViews()
+            hibernatedWindows.insert(window)
             
-            windowSnapshots[window] = snapshotView
+            print("🛌 Hibernated window with \(serviceManager.activeServices.count) services")
         }
-        
-        // Pause all WebViews to free resources
-        serviceManager.pauseAllWebViews()
-        hibernatedWindows.insert(window)
-        
-        print("🛌 Hibernated window with \(serviceManager.activeServices.count) services")
     }
     
     private func restoreWindow(_ window: NSWindow) {
@@ -479,14 +529,16 @@ class OverlayController {
             isFirstWindowLoad = false
             
             // For first window: 7-second maximum timer
-            let timer = Timer.scheduledTimer(withTimeInterval: 7.0, repeats: false) { [weak self] _ in
-                self?.hideLoadingOverlay(for: window)
+            let timer = Timer.scheduledTimer(withTimeInterval: 7.0, repeats: false) { [weak self, weak window] _ in
+                guard let self = self, let window = window else { return }
+                self.hideLoadingOverlay(for: window)
             }
             loadingTimers[window] = timer
         } else {
             // For subsequent windows: show briefly then start fading
-            DispatchQueue.main.asyncAfter(deadline: .now() + 0.1) { [weak self] in
-                self?.hideLoadingOverlay(for: window)
+            DispatchQueue.main.asyncAfter(deadline: .now() + 0.1) { [weak self, weak window] in
+                guard let self = self, let window = window else { return }
+                self.hideLoadingOverlay(for: window)
             }
         }
     }
@@ -502,8 +554,8 @@ class OverlayController {
         let totalFrames = Int(animationDuration * frameRate)
         var currentFrame = 0
         
-        let animationTimer = Timer.scheduledTimer(withTimeInterval: 1.0 / frameRate, repeats: true) { [weak self] timer in
-            guard let self = self else {
+        let animationTimer = Timer.scheduledTimer(withTimeInterval: 1.0 / frameRate, repeats: true) { [weak self, weak window] timer in
+            guard let self = self, let window = window else {
                 timer.invalidate()
                 return
             }
@@ -531,10 +583,11 @@ class OverlayController {
             if currentFrame >= totalFrames {
                 timer.invalidate()
                 // Remove the view after animation completes
-                DispatchQueue.main.async { [weak self] in
-                    self?.loadingOverlayViews[window]?.removeFromSuperview()
-                    self?.loadingOverlayViews.removeValue(forKey: window)
-                    self?.loadingOverlayOpacities.removeValue(forKey: window)
+                DispatchQueue.main.async { [weak self, weak window] in
+                    guard let self = self, let window = window else { return }
+                    self.loadingOverlayViews[window]?.removeFromSuperview()
+                    self.loadingOverlayViews.removeValue(forKey: window)
+                    self.loadingOverlayOpacities.removeValue(forKey: window)
                 }
             }
         }
