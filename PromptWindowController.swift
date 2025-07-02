@@ -266,7 +266,7 @@ struct PromptView: View {
                             isSubmitHovering = hovering
                         }
                     }
-                    .padding(.trailing, 8)
+                    .padding(.trailing, 20)
                 }
                 .background(Color(NSColor.controlBackgroundColor))
                 .cornerRadius(10)
