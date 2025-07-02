@@ -26,10 +26,7 @@ struct TypewriterText: View {
                 LinearGradient(
                     gradient: Gradient(stops: [
                         .init(color: Color(red: 1.0, green: 0.0, blue: 0.6), location: 0.0),      // Pink
-                        .init(color: Color(red: 0.5, green: 0.3, blue: 0.9), location: 0.46),     // Purple
-                        .init(color: Color(red: 0.0, green: 0.6, blue: 1.0), location: 0.5),      // Blue
-                        .init(color: Color(red: 0.5, green: 0.3, blue: 0.9), location: 0.54),     // Purple
-                        .init(color: Color(red: 1.0, green: 0.0, blue: 0.6), location: 1.0)       // Pink
+                        .init(color: Color(red: 0.6, green: 0.2, blue: 0.8), location: 1)     // Purple
                     ]),
                     startPoint: .leading,
                     endPoint: .trailing
@@ -103,11 +100,8 @@ struct LoadingOverlayView: View {
                     .foregroundStyle(
                         LinearGradient(
                             gradient: Gradient(stops: [
-                                .init(color: Color(red: 1.0, green: 0.0, blue: 0.6), location: 0.0),      // Pink
-                                .init(color: Color(red: 0.5, green: 0.3, blue: 0.9), location: 0.46),     // Purple
-                                .init(color: Color(red: 0.0, green: 0.6, blue: 1.0), location: 0.5),      // Blue
-                                .init(color: Color(red: 0.5, green: 0.3, blue: 0.9), location: 0.54),     // Purple
-                                .init(color: Color(red: 1.0, green: 0.0, blue: 0.6), location: 1.0)       // Pink
+                        .init(color: Color(red: 1.0, green: 0.0, blue: 0.6), location: 0.0),      // Pink
+                        .init(color: Color(red: 0.6, green: 0.2, blue: 0.8), location: 1)     // Purple
                             ]),
                             startPoint: .leading,
                             endPoint: .trailing
@@ -227,7 +221,10 @@ class OverlayController {
             WebViewLogger.shared.log("🪟 New window created with dedicated ServiceManager", for: "system", type: .info)
         }
         
-        let screen = NSScreen.screenWithMouse() ?? NSScreen.main!
+        guard let screen = NSScreen.screenWithMouse() ?? NSScreen.main ?? NSScreen.screens.first else {
+            print("OverlayController: No screens available")
+            return
+        }
         
         let windowWidth: CGFloat = 1200
         let windowHeight: CGFloat = 800
