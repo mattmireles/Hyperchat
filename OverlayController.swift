@@ -10,6 +10,92 @@ extension Font {
     }
 }
 
+struct TypewriterText: View {
+    let text: String
+    let font: Font
+    let tracking: CGFloat
+    @State private var revealedCharacters = 0
+    @State private var shimmerOffset: CGFloat = -0.3
+    
+    private let characterDelay: TimeInterval = 0.1
+    
+    var body: some View {
+        HStack(spacing: 0) {
+            // Show full text with animated gradient
+            Text(text)
+                .font(font)
+                .tracking(tracking)
+                .foregroundStyle(
+                    LinearGradient(
+                        gradient: Gradient(stops: [
+                            .init(color: Color(red: 1.0, green: 0.0, blue: 0.6), location: 0.0),      // Pink (bright)
+                            .init(color: Color(red: 0.5, green: 0.3, blue: 0.9), location: 0.2),      // Purple
+                            .init(color: Color(red: 0.0, green: 0.6, blue: 1.0), location: 0.5),      // Blue
+                            .init(color: Color(red: 0.5, green: 0.3, blue: 0.9), location: 0.8),      // Purple
+                            .init(color: Color(red: 1.0, green: 0.0, blue: 0.6), location: 1.0),      // Pink (bright)
+                            // Shimmer highlight overlay
+                            .init(color: Color(red: 1.0, green: 0.0, blue: 0.8).opacity(0.8), location: max(0.0, min(1.0, shimmerOffset - 0.1))),   // Pink highlight
+                            .init(color: Color(red: 0.8, green: 0.4, blue: 1.0).opacity(0.8), location: max(0.0, min(1.0, shimmerOffset))),         // Purple highlight
+                            .init(color: Color(red: 0.2, green: 0.8, blue: 1.0).opacity(0.8), location: max(0.0, min(1.0, shimmerOffset + 0.1)))   // Blue highlight
+                        ]),
+                        startPoint: .leading,
+                        endPoint: .trailing
+                    )
+                )
+                .mask(
+                    // Mask for typewriter effect - use GeometryReader to match text layout
+                    GeometryReader { geometry in
+                        HStack(spacing: 0) {
+                            ForEach(0..<text.count, id: \.self) { index in
+                                Rectangle()
+                                    .frame(width: geometry.size.width / CGFloat(text.count))
+                                    .opacity(index < revealedCharacters ? 1 : 0)
+                            }
+                        }
+                    }
+                )
+                .overlay(
+                    // Glow effect
+                    Text(text)
+                        .font(font)
+                        .tracking(tracking)
+                        .foregroundStyle(
+                            LinearGradient(
+                                gradient: Gradient(stops: [
+                                    .init(color: Color.clear, location: 0.0),
+                                    .init(color: Color(red: 1.0, green: 0.0, blue: 0.6).opacity(0.6), location: max(0.0, min(1.0, shimmerOffset + 0.05))),
+                                    .init(color: Color(red: 0.0, green: 0.6, blue: 1.0).opacity(0.6), location: max(0.0, min(1.0, shimmerOffset + 0.15))),
+                                    .init(color: Color(red: 1.0, green: 0.0, blue: 0.6).opacity(0.6), location: max(0.0, min(1.0, shimmerOffset + 0.25))),
+                                    .init(color: Color.clear, location: 1.0)
+                                ]),
+                                startPoint: .leading,
+                                endPoint: .trailing
+                            )
+                        )
+                        .blur(radius: 8)
+                        .opacity(0.8)
+                )
+        }
+        .onAppear {
+            // Start shimmer animation immediately
+            withAnimation(.linear(duration: 4.0).repeatForever(autoreverses: false)) {
+                shimmerOffset = 1.0
+            }
+            
+            // Start typewriter effect after a short delay
+            DispatchQueue.main.asyncAfter(deadline: .now() + 0.5) {
+                Timer.scheduledTimer(withTimeInterval: characterDelay, repeats: true) { timer in
+                    if revealedCharacters < text.count {
+                        revealedCharacters += 1
+                    } else {
+                        timer.invalidate()
+                    }
+                }
+            }
+        }
+    }
+}
+
 struct LoadingOverlayView: View {
     @Binding var opacity: Double
     
@@ -32,13 +118,14 @@ struct LoadingOverlayView: View {
             }
         }
         .overlay(alignment: .bottomTrailing) {
-            // Hyperchat text in lower right corner
-            Text("Hyperchat")
-                .font(.orbitronBold(size: 48))
-                .tracking(10) // Add 3 points of space between characters
-                .foregroundColor(.white)
-                .padding(.bottom, 75)
-                .padding(.trailing, 90)
+            // Hyperchat text with typewriter effect
+            TypewriterText(
+                text: "Hyperchat",
+                font: .orbitronBold(size: 48),
+                tracking: 10
+            )
+            .padding(.bottom, 75)
+            .padding(.trailing, 90)
         }
         .opacity(opacity) // Single opacity applied to entire stack
         .allowsHitTesting(false) // Allow clicks to pass through during fade
