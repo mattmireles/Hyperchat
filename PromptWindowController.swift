@@ -199,7 +199,7 @@ struct PromptView: View {
                 HStack(spacing: 0) {
                     ZStack(alignment: .topLeading) {
                         if promptText.isEmpty {
-                            Text("Ask your AIs anything")
+                            Text("Ask your AIs anything. `Esc` to dismiss.")
                                 .foregroundColor(.secondary.opacity(0.4))
                                 .font(.system(size: 14))
                                 .padding(.leading, 17)  // Adjusted to align with cursor
