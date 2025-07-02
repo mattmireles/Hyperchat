@@ -1137,14 +1137,21 @@ class ServiceManager: NSObject, ObservableObject {
     private let processPool = WKProcessPool.shared  // Critical optimization
     
     
-    // Share prompt execution state across all ServiceManager instances
-    private static var globalIsFirstSubmit: Bool = true
+    // Thread-safe shared prompt execution state across all ServiceManager instances
+    private static let globalStateQueue = DispatchQueue(label: "com.hyperchat.servicemanager.globalstate")
+    private static var _globalIsFirstSubmit: Bool = true
     private var isFirstSubmit: Bool {
-        get { ServiceManager.globalIsFirstSubmit }
-        set { ServiceManager.globalIsFirstSubmit = newValue }
+        get { 
+            ServiceManager.globalStateQueue.sync { ServiceManager._globalIsFirstSubmit }
+        }
+        set { 
+            ServiceManager.globalStateQueue.sync { ServiceManager._globalIsFirstSubmit = newValue }
+        }
     }
     private var perplexityInitialLoadComplete: Bool = false  // Track if Perplexity has completed initial load
     private var lastAttemptedURLs: [WKWebView: URL] = [:]  // Track last attempted URL per WebView
+    // Thread-safe state management
+    private let stateQueue = DispatchQueue(label: "com.hyperchat.servicemanager.state", qos: .userInitiated)
     private var serviceLoadingQueue: [AIService] = []  // Queue for sequential loading
     private var currentlyLoadingService: String? = nil  // Track which service is currently being loaded
     private var isForceReloading: Bool = false  // Track if we're in force reload mode
@@ -1159,7 +1166,7 @@ class ServiceManager: NSObject, ObservableObject {
         
         // Log ServiceManager creation for debugging
         if LoggingSettings.shared.debugPrompts {
-            WebViewLogger.shared.log("🚀 ServiceManager created - globalIsFirstSubmit: \(ServiceManager.globalIsFirstSubmit)", for: "system", type: .info)
+            WebViewLogger.shared.log("🚀 ServiceManager created - globalIsFirstSubmit: \(isFirstSubmit)", for: "system", type: .info)
         }
         
         setupServices()
@@ -1595,6 +1602,21 @@ extension ServiceManager {
     private func getAllServiceManagers() -> [ServiceManager] {
         ServiceManager.allManagers.compactMap { $0.manager }
     }
+    
+    private func findServiceId(for webView: WKWebView) -> String? {
+        for (serviceId, webService) in webServices {
+            if webService.browserView.webView == webView {
+                return serviceId
+            }
+        }
+        return nil
+    }
+    
+    private func updateLoadingState(for serviceId: String, isLoading: Bool) {
+        DispatchQueue.main.async { [weak self] in
+            self?.loadingStates[serviceId] = isLoading
+        }
+    }
 }
 
 // MARK: - WKNavigationDelegate for ServiceManager
@@ -1885,8 +1907,29 @@ extension ServiceManager: WKNavigationDelegate {
             // Just log that loading started - don't process queue yet
             if let service = foundService, service.id == loadingServiceId {
                 print("✅ Service \(service.name) started loading successfully")
-                // Don't clear currentlyLoadingService or call loadNextServiceFromQueue here
+                // Don't clear currentlyloadingService or call loadNextServiceFromQueue here
                 // Wait for didFinish to ensure the service fully loads before starting the next one
+            }
+        }
+    }
+    
+    // Handle WebView process crashes
+    func webViewWebContentProcessDidTerminate(_ webView: WKWebView) {
+        guard let serviceId = findServiceId(for: webView) else { return }
+        
+        print("⚠️ WebView process crashed for service: \(serviceId)")
+        WebViewLogger.shared.log("⚠️ WebView process crashed, attempting recovery", for: serviceId, type: .error)
+        
+        // Mark service as not loading to prevent hanging (thread-safe)
+        updateLoadingState(for: serviceId, isLoading: false)
+        
+        // Reload the service with a small delay to allow process cleanup
+        DispatchQueue.main.asyncAfter(deadline: .now() + 1.0) { [weak self] in
+            guard let self = self else { return }
+            if let service = self.activeServices.first(where: { $0.id == serviceId }),
+               let webService = self.webServices[serviceId] {
+                self.loadDefaultPage(for: service, webView: webService.browserView.webView, forceReload: true)
+                WebViewLogger.shared.log("🔄 WebView recovered from crash", for: serviceId, type: .info)
             }
         }
     }

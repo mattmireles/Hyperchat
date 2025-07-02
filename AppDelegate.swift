@@ -6,7 +6,7 @@ class AppDelegate: NSObject, NSApplicationDelegate, SPUUpdaterDelegate {
     var floatingButtonManager: FloatingButtonManager
     var overlayController: OverlayController
     var promptWindowController: PromptWindowController
-    var updaterController: SPUStandardUpdaterController!
+    var updaterController: SPUStandardUpdaterController?
 
     override init() {
         self.floatingButtonManager = FloatingButtonManager()
@@ -78,6 +78,10 @@ class AppDelegate: NSObject, NSApplicationDelegate, SPUUpdaterDelegate {
     }
     
     @objc func checkForUpdates(_ sender: Any?) {
+        guard let updaterController = updaterController else {
+            print("Sparkle: Updater controller not initialized")
+            return
+        }
         // Ensure updater is started before checking for updates
         if !updaterController.updater.sessionInProgress {
             do {
@@ -91,6 +95,10 @@ class AppDelegate: NSObject, NSApplicationDelegate, SPUUpdaterDelegate {
     }
     
     private func startUpdater() {
+        guard let updaterController = updaterController else {
+            print("Sparkle: Updater controller not initialized")
+            return
+        }
         do {
             try updaterController.updater.start()
             print("Sparkle: Updater started successfully")

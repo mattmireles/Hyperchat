@@ -367,22 +367,23 @@ class FloatingButtonManager {
             screen = activeScreen
             lastKnownScreen = activeScreen
         } else {
-            screen = NSScreen.main ?? NSScreen.screens.first!
+            guard let fallbackScreen = NSScreen.main ?? NSScreen.screens.first else {
+                print("FloatingButtonManager: No screens available")
+                return
+            }
+            screen = fallbackScreen
         }
 
-        // Try to load saved position for this screen
-        if let savedPosition = loadPosition(for: screen) {
-            logger.log("Loading saved position for screen: x=\(savedPosition.x), y=\(savedPosition.y)")
-            window.setFrameOrigin(savedPosition)
+        // Try to load saved position for this screen with validation
+        if let savedPosition = loadPosition(for: screen),
+           let validatedPosition = validatePosition(savedPosition, for: screen, windowSize: window.frame.size) {
+            logger.log("Loading validated saved position for screen: x=\(validatedPosition.x), y=\(validatedPosition.y)")
+            window.setFrameOrigin(validatedPosition)
         } else {
-            // Default position if no saved position exists
-            let padding: CGFloat = 20
-            let xPos = screen.visibleFrame.minX + padding
-            let yPos = screen.visibleFrame.minY + padding
-            
-            logger.log("Using default position: x=\(xPos), y=\(yPos)")
-            
-            window.setFrameOrigin(NSPoint(x: xPos, y: yPos))
+            // Default position if no saved position exists or saved position is invalid
+            let defaultPosition = getDefaultPosition(for: screen)
+            logger.log("Using default position: x=\(defaultPosition.x), y=\(defaultPosition.y)")
+            window.setFrameOrigin(defaultPosition)
         }
     }
     
@@ -417,5 +418,45 @@ class FloatingButtonManager {
             return nil
         }
         return NSPoint(x: x, y: y)
+    }
+    
+    private func validatePosition(_ position: NSPoint, for screen: NSScreen, windowSize: NSSize) -> NSPoint? {
+        let visibleFrame = screen.visibleFrame
+        let padding: CGFloat = 20
+        
+        // Check if position is within screen bounds with padding
+        let minX = visibleFrame.minX + padding
+        let maxX = visibleFrame.maxX - windowSize.width - padding
+        let minY = visibleFrame.minY + padding  
+        let maxY = visibleFrame.maxY - windowSize.height - padding
+        
+        // If position is completely out of bounds, return nil
+        if position.x < visibleFrame.minX - windowSize.width || 
+           position.x > visibleFrame.maxX ||
+           position.y < visibleFrame.minY - windowSize.height ||
+           position.y > visibleFrame.maxY {
+            logger.log("⚠️ Saved position is completely outside screen bounds, using default")
+            return nil
+        }
+        
+        // Adjust position to be within safe bounds
+        let adjustedX = max(minX, min(maxX, position.x))
+        let adjustedY = max(minY, min(maxY, position.y))
+        
+        let adjustedPosition = NSPoint(x: adjustedX, y: adjustedY)
+        
+        // Log if position was adjusted
+        if adjustedPosition != position {
+            logger.log("📍 Adjusted position from (\(position.x), \(position.y)) to (\(adjustedX), \(adjustedY))")
+        }
+        
+        return adjustedPosition
+    }
+    
+    private func getDefaultPosition(for screen: NSScreen) -> NSPoint {
+        let padding: CGFloat = 20
+        let xPos = screen.visibleFrame.minX + padding
+        let yPos = screen.visibleFrame.minY + padding
+        return NSPoint(x: xPos, y: yPos)
     }
 } 
