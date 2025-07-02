@@ -3,6 +3,13 @@ import SwiftUI
 
 // MARK: - Loading Overlay View
 
+extension Font {
+    static func orbitronBold(size: CGFloat) -> Font {
+        // Try custom font first, fallback to system font
+        return Font.custom("Orbitron-Bold", size: size)
+    }
+}
+
 struct LoadingOverlayView: View {
     @Binding var opacity: Double
     
@@ -23,6 +30,15 @@ struct LoadingOverlayView: View {
                     .frame(maxWidth: .infinity, maxHeight: .infinity)
                     .blendMode(.screen) // Screen blend mode: black becomes transparent, colors remain
             }
+        }
+        .overlay(alignment: .bottomTrailing) {
+            // Hyperchat text in lower right corner
+            Text("Hyperchat")
+                .font(.orbitronBold(size: 48))
+                .tracking(10) // Add 3 points of space between characters
+                .foregroundColor(.white)
+                .padding(.bottom, 75)
+                .padding(.trailing, 90)
         }
         .opacity(opacity) // Single opacity applied to entire stack
         .allowsHitTesting(false) // Allow clicks to pass through during fade

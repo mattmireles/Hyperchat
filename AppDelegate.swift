@@ -17,6 +17,9 @@ class AppDelegate: NSObject, NSApplicationDelegate, SPUUpdaterDelegate {
     }
 
     func applicationDidFinishLaunching(_ aNotification: Notification) {
+        // Register custom fonts
+        registerCustomFonts()
+        
         floatingButtonManager.promptWindowController = promptWindowController
         floatingButtonManager.overlayController = self.overlayController
         floatingButtonManager.showFloatingButton()
@@ -47,6 +50,31 @@ class AppDelegate: NSObject, NSApplicationDelegate, SPUUpdaterDelegate {
     
     func applicationWillTerminate(_ aNotification: Notification) {
         // Insert code here to tear down your application
+    }
+    
+    private func registerCustomFonts() {
+        if let fontURL = Bundle.main.url(forResource: "Orbitron-Bold", withExtension: "ttf") {
+            print("Found font file at: \(fontURL.path)")
+            
+            var error: Unmanaged<CFError>?
+            if CTFontManagerRegisterFontsForURL(fontURL as CFURL, .process, &error) {
+                print("✅ Orbitron font registered successfully")
+                
+                // Try different font name variations
+                let variations = ["Orbitron-Bold", "Orbitron Bold", "OrbitronBold", "Orbitron"]
+                for name in variations {
+                    if let _ = NSFont(name: name, size: 12) {
+                        print("✅ Font available as: '\(name)'")
+                    }
+                }
+            } else {
+                if let error = error {
+                    print("❌ Failed to register font: \(error.takeRetainedValue())")
+                }
+            }
+        } else {
+            print("❌ Failed to find Orbitron font file in bundle")
+        }
     }
     
     @objc func checkForUpdates(_ sender: Any?) {

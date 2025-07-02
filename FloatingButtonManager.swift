@@ -5,6 +5,7 @@ import os.log
 // SwiftUI view for animated gradient glow
 struct FloatingButtonGlow: View {
     @State private var phase: CGFloat = 0
+    @State private var animationTask: Task<Void, Never>?
     let isVisible: Bool
     
     var body: some View {
@@ -72,11 +73,25 @@ struct FloatingButtonGlow: View {
                 .blur(radius: 0.5)
         }
         .opacity(isVisible ? 1 : 0)
+        .background(Color.clear)
         .animation(.easeInOut(duration: 0.2), value: isVisible)
         .allowsHitTesting(false)  // Allow mouse events to pass through to button
-        .onAppear {
-            withAnimation(.linear(duration: 3).repeatForever(autoreverses: false)) {
-                phase = 360
+        .onChange(of: isVisible) { oldValue, newValue in
+            if newValue {
+                // Start animation when becoming visible
+                animationTask = Task {
+                    withAnimation(.linear(duration: 3).repeatForever(autoreverses: false)) {
+                        phase = 360
+                    }
+                }
+            } else {
+                // Stop animation when becoming invisible
+                animationTask?.cancel()
+                animationTask = nil
+                // Reset phase without animation
+                withAnimation(nil) {
+                    phase = 0
+                }
             }
         }
     }
@@ -264,8 +279,6 @@ class FloatingButtonManager {
     func showFloatingButton() {
         logger.log("👇 showFloatingButton called.")
         
-        let buttonSize: CGFloat = 48
-        let padding: CGFloat = 8  // Extra padding for glow effect
         let windowSize: CGFloat = 64  // Fixed window size
         let buttonFrame = NSRect(x: 0, y: 0, width: windowSize, height: windowSize)
 
