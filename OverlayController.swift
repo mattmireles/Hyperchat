@@ -15,81 +15,39 @@ struct TypewriterText: View {
     let font: Font
     let tracking: CGFloat
     @State private var revealedCharacters = 0
-    @State private var reflectionPosition: CGFloat = -0.1
     
     private let characterDelay: TimeInterval = 0.1
     
     var body: some View {
-        ZStack {
-            // Base gradient text with typewriter
-            Text(text)
-                .font(font)
-                .tracking(tracking)
-                .foregroundStyle(
-                    LinearGradient(
-                        gradient: Gradient(stops: [
-                            .init(color: Color(red: 1.0, green: 0.0, blue: 0.6), location: 0.0),      // Pink
-                            .init(color: Color(red: 0.5, green: 0.3, blue: 0.9), location: 0.46),     // Purple
-                            .init(color: Color(red: 0.0, green: 0.6, blue: 1.0), location: 0.5),      // Blue
-                            .init(color: Color(red: 0.5, green: 0.3, blue: 0.9), location: 0.54),     // Purple
-                            .init(color: Color(red: 1.0, green: 0.0, blue: 0.6), location: 1.0)       // Pink
-                        ]),
-                        startPoint: .leading,
-                        endPoint: .trailing
-                    )
+        Text(text)
+            .font(font)
+            .tracking(tracking)
+            .foregroundStyle(
+                LinearGradient(
+                    gradient: Gradient(stops: [
+                        .init(color: Color(red: 1.0, green: 0.0, blue: 0.6), location: 0.0),      // Pink
+                        .init(color: Color(red: 0.5, green: 0.3, blue: 0.9), location: 0.46),     // Purple
+                        .init(color: Color(red: 0.0, green: 0.6, blue: 1.0), location: 0.5),      // Blue
+                        .init(color: Color(red: 0.5, green: 0.3, blue: 0.9), location: 0.54),     // Purple
+                        .init(color: Color(red: 1.0, green: 0.0, blue: 0.6), location: 1.0)       // Pink
+                    ]),
+                    startPoint: .leading,
+                    endPoint: .trailing
                 )
-                .mask(
-                    // Mask for typewriter effect
-                    GeometryReader { geometry in
-                        HStack(spacing: 0) {
-                            ForEach(0..<text.count, id: \.self) { index in
-                                Rectangle()
-                                    .frame(width: geometry.size.width / CGFloat(text.count))
-                                    .opacity(index < revealedCharacters ? 1 : 0)
-                            }
+            )
+            .mask(
+                // Mask for typewriter effect
+                GeometryReader { geometry in
+                    HStack(spacing: 0) {
+                        ForEach(0..<text.count, id: \.self) { index in
+                            Rectangle()
+                                .frame(width: geometry.size.width / CGFloat(text.count))
+                                .opacity(index < revealedCharacters ? 1 : 0)
                         }
                     }
-                )
-            
-            // Glass reflection overlay - thin white edge
-            Text(text)
-                .font(font)
-                .tracking(tracking)
-                .foregroundStyle(
-                    LinearGradient(
-                        gradient: Gradient(stops: [
-                            .init(color: Color.clear, location: 0.0),
-                            .init(color: Color.clear, location: min(1.0, max(0.0, reflectionPosition - 0.04))),
-                            .init(color: Color.white.opacity(0.9), location: min(1.0, max(0.0, reflectionPosition - 0.02))),
-                            .init(color: Color.white.opacity(1.0), location: min(1.0, max(0.0, reflectionPosition))),
-                            .init(color: Color.white.opacity(1.0), location: min(1.0, max(0.0, reflectionPosition + 0.02))),
-                            .init(color: Color.white.opacity(0.9), location: min(1.0, max(0.0, reflectionPosition + 0.04))),
-                            .init(color: Color.clear, location: min(1.0, max(0.0, reflectionPosition + 0.08))),
-                            .init(color: Color.clear, location: 1.0)
-                        ]),
-                        startPoint: .leading,
-                        endPoint: .trailing
-                    )
-                )
-                .mask(
-                    // Same typewriter mask for consistency
-                    GeometryReader { geometry in
-                        HStack(spacing: 0) {
-                            ForEach(0..<text.count, id: \.self) { index in
-                                Rectangle()
-                                    .frame(width: geometry.size.width / CGFloat(text.count))
-                                    .opacity(index < revealedCharacters ? 1 : 0)
-                            }
-                        }
-                    }
-                )
-                .blendMode(.plusLighter)
-        }
+                }
+            )
         .onAppear {
-            // Start reflection sweep animation
-            withAnimation(.linear(duration: 3.0).repeatForever(autoreverses: false)) {
-                reflectionPosition = 1.1
-            }
             
             // Start typewriter effect after a short delay
             DispatchQueue.main.asyncAfter(deadline: .now() + 0.5) {
@@ -107,6 +65,7 @@ struct TypewriterText: View {
 
 struct LoadingOverlayView: View {
     @Binding var opacity: Double
+    let isFirstWindow: Bool
     
     var body: some View {
         ZStack {
@@ -127,14 +86,36 @@ struct LoadingOverlayView: View {
             }
         }
         .overlay(alignment: .bottomTrailing) {
-            // Hyperchat text with typewriter effect
-            TypewriterText(
-                text: "Hyperchat",
-                font: .orbitronBold(size: 48),
-                tracking: 10
-            )
-            .padding(.bottom, 75)
-            .padding(.trailing, 90)
+            if isFirstWindow {
+                // Animated text for first window only
+                TypewriterText(
+                    text: "Hyperchat",
+                    font: .orbitronBold(size: 48),
+                    tracking: 10
+                )
+                .padding(.bottom, 75)
+                .padding(.trailing, 90)
+            } else {
+                // Static text for subsequent windows
+                Text("Hyperchat")
+                    .font(.orbitronBold(size: 48))
+                    .tracking(10)
+                    .foregroundStyle(
+                        LinearGradient(
+                            gradient: Gradient(stops: [
+                                .init(color: Color(red: 1.0, green: 0.0, blue: 0.6), location: 0.0),      // Pink
+                                .init(color: Color(red: 0.5, green: 0.3, blue: 0.9), location: 0.46),     // Purple
+                                .init(color: Color(red: 0.0, green: 0.6, blue: 1.0), location: 0.5),      // Blue
+                                .init(color: Color(red: 0.5, green: 0.3, blue: 0.9), location: 0.54),     // Purple
+                                .init(color: Color(red: 1.0, green: 0.0, blue: 0.6), location: 1.0)       // Pink
+                            ]),
+                            startPoint: .leading,
+                            endPoint: .trailing
+                        )
+                    )
+                    .padding(.bottom, 75)
+                    .padding(.trailing, 90)
+            }
         }
         .opacity(opacity) // Single opacity applied to entire stack
         .allowsHitTesting(false) // Allow clicks to pass through during fade
@@ -478,7 +459,8 @@ class OverlayController {
             opacity: Binding(
                 get: { [weak self] in self?.loadingOverlayOpacities[window] ?? 0 },
                 set: { [weak self] in self?.loadingOverlayOpacities[window] = $0 }
-            )
+            ),
+            isFirstWindow: isFirstWindowLoad
         )
         
         let hostingView = NSHostingView(rootView: loadingView)
@@ -544,7 +526,8 @@ class OverlayController {
                     opacity: Binding(
                         get: { [weak self] in self?.loadingOverlayOpacities[window] ?? 0 },
                         set: { [weak self] in self?.loadingOverlayOpacities[window] = $0 }
-                    )
+                    ),
+                    isFirstWindow: false  // Animation already started, this is just updating opacity
                 )
             }
             
