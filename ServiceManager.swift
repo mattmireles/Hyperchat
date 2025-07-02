@@ -1173,6 +1173,35 @@ class ServiceManager: NSObject, ObservableObject {
         registerManager()
     }
     
+    deinit {
+        // Clean up all WebViews
+        for (_, webService) in webServices {
+            let webView = webService.browserView.webView
+            
+            // Stop any ongoing loads
+            webView.stopLoading()
+            
+            // Remove all JavaScript message handlers
+            webView.configuration.userContentController.removeAllUserScripts()
+            
+            // Clear delegates
+            webView.navigationDelegate = nil
+            webView.uiDelegate = nil
+            
+            // Remove from superview
+            webView.removeFromSuperview()
+        }
+        
+        // Clear all references
+        webServices.removeAll()
+        activeServices.removeAll()
+        loadingStates.removeAll()
+        serviceLoadingQueue.removeAll()
+        
+        // Remove from global managers list by clearing weak references
+        ServiceManager.allManagers = ServiceManager.allManagers.filter { $0.manager != nil && $0.manager !== self }
+    }
+    
     private func setupServices() {
         // Sort services by their order property to ensure correct loading sequence
         let sortedServices = defaultServices.filter { $0.enabled }.sorted { $0.order < $1.order }

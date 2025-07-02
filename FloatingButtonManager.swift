@@ -279,6 +279,13 @@ class FloatingButtonManager {
     func showFloatingButton() {
         logger.log("👇 showFloatingButton called.")
         
+        // Prevent creating duplicate buttons
+        if buttonWindow != nil {
+            logger.log("⚠️ Floating button already exists, bringing to front")
+            buttonWindow?.orderFront(nil)
+            return
+        }
+        
         let windowSize: CGFloat = 64  // Fixed window size
         let buttonFrame = NSRect(x: 0, y: 0, width: windowSize, height: windowSize)
 
@@ -312,6 +319,10 @@ class FloatingButtonManager {
         
         window.makeKeyAndOrderFront(nil)
         
+        // Invalidate any existing timers before creating new ones
+        screenUpdateTimer?.invalidate()
+        visibilityTimer?.invalidate()
+        
         // Start timer to follow mouse across screens
         screenUpdateTimer = Timer.scheduledTimer(withTimeInterval: 0.5, repeats: true) { [weak self] _ in
             self?.checkAndUpdateScreenIfNeeded()
@@ -319,7 +330,8 @@ class FloatingButtonManager {
 
         // Start timer to ensure button stays visible
         visibilityTimer = Timer.scheduledTimer(withTimeInterval: 1.0, repeats: true) { [weak self] _ in
-            if let window = self?.buttonWindow, !window.isVisible {
+            guard let self = self else { return }
+            if let window = self.buttonWindow, !window.isVisible {
                 window.orderFront(nil)
             }
         }
@@ -336,6 +348,18 @@ class FloatingButtonManager {
     func ensureFloatingButtonVisible() {
         buttonWindow?.orderFront(nil)
     }
+    
+    func hideFloatingButton() {
+        // Clean up timers
+        screenUpdateTimer?.invalidate()
+        screenUpdateTimer = nil
+        visibilityTimer?.invalidate()
+        visibilityTimer = nil
+        
+        // Close and remove button window
+        buttonWindow?.close()
+        buttonWindow = nil
+    }
 
     private func floatingButtonClicked() {
         // Don't hide overlay if it's visible - just show prompt window
@@ -345,8 +369,16 @@ class FloatingButtonManager {
         // DO NOT re-create it here.
         
         // Use the screen the button is on, or the one with the mouse, or fallback to main.
-        let screen = buttonWindow?.screen ?? NSScreen.screenWithMouse() ?? NSScreen.main!
-        promptWindowController?.showWindow(on: screen)
+        guard let controller = promptWindowController else { return }
+
+        if let window = controller.window, window.isVisible {
+            // If the window is already visible, just bring it to the front.
+            window.orderFront(nil)
+        } else {
+            // Otherwise, show it on the correct screen.
+            let screen = buttonWindow?.screen ?? NSScreen.screenWithMouse() ?? NSScreen.main!
+            controller.showWindow(on: screen)
+        }
     }
     
     private func checkAndUpdateScreenIfNeeded() {
@@ -389,7 +421,7 @@ class FloatingButtonManager {
     
     private func saveCurrentPosition() {
         guard let window = buttonWindow,
-              let screen = lastKnownScreen else { return }
+              let screen = window.screen ?? lastKnownScreen else { return }
         
         let position = window.frame.origin
         savePosition(position, for: screen)
