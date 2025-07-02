@@ -386,11 +386,6 @@ class OverlayController {
 
                 // Remove all JavaScript message handlers
                 webView.configuration.userContentController.removeAllUserScripts()
-                if let handlers = webView.configuration.userContentController.value(forKey: "scriptMessageHandlers") as? [String: Any] {
-                    for handlerName in handlers.keys {
-                        webView.configuration.userContentController.removeScriptMessageHandler(forName: handlerName)
-                    }
-                }
                 
                 // Clear delegates to break retain cycles and prevent late callbacks
                 webView.navigationDelegate = nil
