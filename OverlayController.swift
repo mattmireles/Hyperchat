@@ -15,35 +15,31 @@ struct TypewriterText: View {
     let font: Font
     let tracking: CGFloat
     @State private var revealedCharacters = 0
-    @State private var shimmerOffset: CGFloat = -0.3
+    @State private var reflectionPosition: CGFloat = -0.1
     
     private let characterDelay: TimeInterval = 0.1
     
     var body: some View {
-        HStack(spacing: 0) {
-            // Show full text with animated gradient
+        ZStack {
+            // Base gradient text with typewriter
             Text(text)
                 .font(font)
                 .tracking(tracking)
                 .foregroundStyle(
                     LinearGradient(
                         gradient: Gradient(stops: [
-                            .init(color: Color(red: 1.0, green: 0.0, blue: 0.6), location: 0.0),      // Pink (bright)
-                            .init(color: Color(red: 0.5, green: 0.3, blue: 0.9), location: 0.2),      // Purple
+                            .init(color: Color(red: 1.0, green: 0.0, blue: 0.6), location: 0.0),      // Pink
+                            .init(color: Color(red: 0.5, green: 0.3, blue: 0.9), location: 0.46),     // Purple
                             .init(color: Color(red: 0.0, green: 0.6, blue: 1.0), location: 0.5),      // Blue
-                            .init(color: Color(red: 0.5, green: 0.3, blue: 0.9), location: 0.8),      // Purple
-                            .init(color: Color(red: 1.0, green: 0.0, blue: 0.6), location: 1.0),      // Pink (bright)
-                            // Shimmer highlight overlay
-                            .init(color: Color(red: 1.0, green: 0.0, blue: 0.8).opacity(0.8), location: max(0.0, min(1.0, shimmerOffset - 0.1))),   // Pink highlight
-                            .init(color: Color(red: 0.8, green: 0.4, blue: 1.0).opacity(0.8), location: max(0.0, min(1.0, shimmerOffset))),         // Purple highlight
-                            .init(color: Color(red: 0.2, green: 0.8, blue: 1.0).opacity(0.8), location: max(0.0, min(1.0, shimmerOffset + 0.1)))   // Blue highlight
+                            .init(color: Color(red: 0.5, green: 0.3, blue: 0.9), location: 0.54),     // Purple
+                            .init(color: Color(red: 1.0, green: 0.0, blue: 0.6), location: 1.0)       // Pink
                         ]),
                         startPoint: .leading,
                         endPoint: .trailing
                     )
                 )
                 .mask(
-                    // Mask for typewriter effect - use GeometryReader to match text layout
+                    // Mask for typewriter effect
                     GeometryReader { geometry in
                         HStack(spacing: 0) {
                             ForEach(0..<text.count, id: \.self) { index in
@@ -54,32 +50,45 @@ struct TypewriterText: View {
                         }
                     }
                 )
-                .overlay(
-                    // Glow effect
-                    Text(text)
-                        .font(font)
-                        .tracking(tracking)
-                        .foregroundStyle(
-                            LinearGradient(
-                                gradient: Gradient(stops: [
-                                    .init(color: Color.clear, location: 0.0),
-                                    .init(color: Color(red: 1.0, green: 0.0, blue: 0.6).opacity(0.6), location: max(0.0, min(1.0, shimmerOffset + 0.05))),
-                                    .init(color: Color(red: 0.0, green: 0.6, blue: 1.0).opacity(0.6), location: max(0.0, min(1.0, shimmerOffset + 0.15))),
-                                    .init(color: Color(red: 1.0, green: 0.0, blue: 0.6).opacity(0.6), location: max(0.0, min(1.0, shimmerOffset + 0.25))),
-                                    .init(color: Color.clear, location: 1.0)
-                                ]),
-                                startPoint: .leading,
-                                endPoint: .trailing
-                            )
-                        )
-                        .blur(radius: 8)
-                        .opacity(0.8)
+            
+            // Glass reflection overlay - thin white edge
+            Text(text)
+                .font(font)
+                .tracking(tracking)
+                .foregroundStyle(
+                    LinearGradient(
+                        gradient: Gradient(stops: [
+                            .init(color: Color.clear, location: 0.0),
+                            .init(color: Color.clear, location: min(1.0, max(0.0, reflectionPosition - 0.04))),
+                            .init(color: Color.white.opacity(0.9), location: min(1.0, max(0.0, reflectionPosition - 0.02))),
+                            .init(color: Color.white.opacity(1.0), location: min(1.0, max(0.0, reflectionPosition))),
+                            .init(color: Color.white.opacity(1.0), location: min(1.0, max(0.0, reflectionPosition + 0.02))),
+                            .init(color: Color.white.opacity(0.9), location: min(1.0, max(0.0, reflectionPosition + 0.04))),
+                            .init(color: Color.clear, location: min(1.0, max(0.0, reflectionPosition + 0.08))),
+                            .init(color: Color.clear, location: 1.0)
+                        ]),
+                        startPoint: .leading,
+                        endPoint: .trailing
+                    )
                 )
+                .mask(
+                    // Same typewriter mask for consistency
+                    GeometryReader { geometry in
+                        HStack(spacing: 0) {
+                            ForEach(0..<text.count, id: \.self) { index in
+                                Rectangle()
+                                    .frame(width: geometry.size.width / CGFloat(text.count))
+                                    .opacity(index < revealedCharacters ? 1 : 0)
+                            }
+                        }
+                    }
+                )
+                .blendMode(.plusLighter)
         }
         .onAppear {
-            // Start shimmer animation immediately
-            withAnimation(.linear(duration: 4.0).repeatForever(autoreverses: false)) {
-                shimmerOffset = 1.0
+            // Start reflection sweep animation
+            withAnimation(.linear(duration: 3.0).repeatForever(autoreverses: false)) {
+                reflectionPosition = 1.1
             }
             
             // Start typewriter effect after a short delay
