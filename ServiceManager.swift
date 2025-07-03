@@ -1138,6 +1138,15 @@ class ClaudeService: WebService {
 // MARK: - ServiceManager
 
 class ServiceManager: NSObject, ObservableObject {
+    // MARK: - Script Message Handler Names
+    static let scriptMessageHandlerNames = [
+        "consoleLog",
+        "networkRequest",
+        "networkResponse",
+        "userInteraction"
+        // Add new handler names here to ensure both installation and removal
+    ]
+    
     @Published var activeServices: [AIService] = []
     @Published var sharedPrompt: String = ""
     @Published var replyToAll: Bool = true
@@ -1218,12 +1227,8 @@ class ServiceManager: NSObject, ObservableObject {
                 // Remove all JavaScript message handlers
                 webView.configuration.userContentController.removeAllUserScripts()
                 
-                // Don't remove script message handlers - let them be deallocated naturally
-                // with the configuration to avoid timing issues with WebKit
-                // webView.configuration.userContentController.removeScriptMessageHandler(forName: "consoleLog")
-                // webView.configuration.userContentController.removeScriptMessageHandler(forName: "networkRequest")
-                // webView.configuration.userContentController.removeScriptMessageHandler(forName: "networkResponse")
-                // webView.configuration.userContentController.removeScriptMessageHandler(forName: "userInteraction")
+                // Note: Script message handlers are now removed in windowWillClose
+                // to ensure they're cleaned up before deallocation begins
                 
                 // Clear delegates
                 webView.navigationDelegate = nil
@@ -1567,12 +1572,12 @@ class ServiceManager: NSObject, ObservableObject {
             "userInteraction": userInteractionHandler
         ]
         
-        // Add message handlers with individual instances
-        userContentController.add(consoleHandler, name: "consoleLog")
-        userContentController.add(networkRequestHandler, name: "networkRequest")
-        userContentController.add(networkResponseHandler, name: "networkResponse")
-        // userContentController.add(domChangeHandler, name: "domChange") // Disabled
-        userContentController.add(userInteractionHandler, name: "userInteraction")
+        // Add message handlers using centralized names
+        for handlerName in ServiceManager.scriptMessageHandlerNames {
+            if let handler = messageHandlers[service.id]?[handlerName] {
+                userContentController.add(handler, name: handlerName)
+            }
+        }
         
         print("✅ [\(Date().timeIntervalSince1970)] Added \(messageHandlers[service.id]?.count ?? 0) message handlers for \(service.name)")
         
@@ -1714,6 +1719,12 @@ extension ServiceManager {
 
 extension ServiceManager: WKNavigationDelegate {
     func webView(_ webView: WKWebView, didFail navigation: WKNavigation!, withError error: Error) {
+        // Defensive check: Ensure we're not cleaning up
+        guard !isCleaningUp else {
+            print("⚠️ [\(Date().timeIntervalSince1970)] Ignoring didFail - ServiceManager is cleaning up")
+            return
+        }
+        
         let nsError = error as NSError
         print("ERROR WebView navigation failed: \(nsError.code) - \(nsError.localizedDescription)")
         
@@ -1754,6 +1765,12 @@ extension ServiceManager: WKNavigationDelegate {
     }
     
     func webView(_ webView: WKWebView, didFailProvisionalNavigation navigation: WKNavigation!, withError error: Error) {
+        // Defensive check: Ensure we're not cleaning up
+        guard !isCleaningUp else {
+            print("⚠️ [\(Date().timeIntervalSince1970)] Ignoring didFailProvisionalNavigation - ServiceManager is cleaning up")
+            return
+        }
+        
         let nsError = error as NSError
         
         // Special handling for -999 errors (NSURLErrorCancelled)
@@ -1903,6 +1920,13 @@ extension ServiceManager: WKNavigationDelegate {
     }
     
     func webView(_ webView: WKWebView, decidePolicyFor navigationAction: WKNavigationAction, decisionHandler: @escaping (WKNavigationActionPolicy) -> Void) {
+        // Defensive check: Ensure we're not cleaning up
+        guard !isCleaningUp else {
+            print("⚠️ [\(Date().timeIntervalSince1970)] Ignoring decidePolicyFor - ServiceManager is cleaning up")
+            decisionHandler(.cancel)
+            return
+        }
+        
         guard let url = navigationAction.request.url else {
             decisionHandler(.cancel)
             return
@@ -1967,6 +1991,12 @@ extension ServiceManager: WKNavigationDelegate {
     }
     
     func webView(_ webView: WKWebView, didStartProvisionalNavigation navigation: WKNavigation!) {
+        // Defensive check: Ensure we're not cleaning up
+        guard !isCleaningUp else {
+            print("⚠️ [\(Date().timeIntervalSince1970)] Ignoring didStartProvisionalNavigation - ServiceManager is cleaning up")
+            return
+        }
+        
         let urlString = webView.url?.absoluteString ?? "unknown"
         print("🔄 WebView started loading: \(urlString)")
         
@@ -2037,6 +2067,12 @@ extension ServiceManager: WKNavigationDelegate {
 extension ServiceManager: WKUIDelegate {
     // Handle JavaScript alerts
     func webView(_ webView: WKWebView, runJavaScriptAlertPanelWithMessage message: String, initiatedByFrame frame: WKFrameInfo, completionHandler: @escaping () -> Void) {
-        completionHandler()
+        // Defensive check: Always call completion handler even during cleanup
+        defer { completionHandler() }
+        
+        guard !isCleaningUp else {
+            print("⚠️ [\(Date().timeIntervalSince1970)] Ignoring JavaScript alert - ServiceManager is cleaning up")
+            return
+        }
     }
 } 
