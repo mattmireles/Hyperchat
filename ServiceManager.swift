@@ -158,6 +158,7 @@ class BrowserView: NSView {
     private var bottomToolbar: NSStackView!
     private let isFirstService: Bool
     private var allowFocusCapture = false
+    private let instanceId = UUID().uuidString.prefix(8)
     
     // SwiftUI button views
     private var backButtonView: NSHostingView<GradientToolbarButton>!
@@ -173,6 +174,8 @@ class BrowserView: NSView {
         self.webView = webView
         self.service = service
         self.isFirstService = isFirstService
+        let wvAddress = Unmanaged.passUnretained(webView).toOpaque()
+        let retainCount = CFGetRetainCount(webView)
         
         // Create controls
         self.backButton = NSButton()
@@ -182,6 +185,8 @@ class BrowserView: NSView {
         self.urlField = NSTextField()
         
         super.init(frame: .zero)
+        
+        print("🟢 [\(Date().timeIntervalSince1970)] BrowserView INIT \(instanceId) for \(service.name), WebView at \(wvAddress), retain count: \(retainCount)")
         
         // Add visual styling
         self.wantsLayer = true
@@ -219,6 +224,10 @@ class BrowserView: NSView {
     
     required init?(coder: NSCoder) {
         fatalError("init(coder:) has not been implemented")
+    }
+    
+    deinit {
+        print("🔴 [\(Date().timeIntervalSince1970)] BrowserView DEINIT \(instanceId) for \(service.name)")
     }
     
     private func setupControls() {
@@ -1158,8 +1167,15 @@ class ServiceManager: NSObject, ObservableObject {
     private var loadedServicesCount: Int = 0  // Track how many services have finished loading
     private var hasNotifiedAllServicesLoaded: Bool = false  // Prevent duplicate notifications
     
+    // Cleanup state tracking
+    private var isCleaningUp = false
+    private let instanceId = UUID().uuidString.prefix(8)
+    
     override init() {
         super.init()
+        
+        let address = Unmanaged.passUnretained(self).toOpaque()
+        print("🟢 [\(Date().timeIntervalSince1970)] ServiceManager INIT \(instanceId) at \(address)")
         
         // Initialize logging configuration for minimal output
         LoggingSettings.shared.setMinimalLogging()
@@ -1174,32 +1190,60 @@ class ServiceManager: NSObject, ObservableObject {
     }
     
     deinit {
-        // Clean up all WebViews
-        for (_, webService) in webServices {
-            let webView = webService.browserView.webView
+        print("🔴 [\(Date().timeIntervalSince1970)] ServiceManager DEINIT \(instanceId) starting cleanup")
+        
+        // Wrap all cleanup in autoreleasepool to ensure WebKit's autoreleased objects
+        // are released immediately, preventing over-release crashes
+        autoreleasepool {
+            isCleaningUp = true
+            // Clean up message handlers first
+            print("🧹 [\(Date().timeIntervalSince1970)] Cleaning up message handlers for \(messageHandlers.count) services")
+            for (serviceId, handlers) in messageHandlers {
+                print("🧹 [\(Date().timeIntervalSince1970)] Marking \(handlers.count) handlers as cleaned up for service \(serviceId)")
+                for (messageType, handler) in handlers {
+                    handler.markCleanedUp()
+                }
+            }
+            messageHandlers.removeAll()
             
-            // Stop any ongoing loads
-            webView.stopLoading()
+            // Clean up all WebViews
+            print("🧹 [\(Date().timeIntervalSince1970)] Cleaning up \(webServices.count) WebViews")
+            for (serviceId, webService) in webServices {
+                print("🧹 [\(Date().timeIntervalSince1970)] Cleaning up WebView for \(serviceId)")
+                let webView = webService.browserView.webView
+                
+                // Stop any ongoing loads
+                webView.stopLoading()
+                
+                // Remove all JavaScript message handlers
+                webView.configuration.userContentController.removeAllUserScripts()
+                
+                // Don't remove script message handlers - let them be deallocated naturally
+                // with the configuration to avoid timing issues with WebKit
+                // webView.configuration.userContentController.removeScriptMessageHandler(forName: "consoleLog")
+                // webView.configuration.userContentController.removeScriptMessageHandler(forName: "networkRequest")
+                // webView.configuration.userContentController.removeScriptMessageHandler(forName: "networkResponse")
+                // webView.configuration.userContentController.removeScriptMessageHandler(forName: "userInteraction")
+                
+                // Clear delegates
+                webView.navigationDelegate = nil
+                webView.uiDelegate = nil
+                
+                // Remove from superview
+                webView.removeFromSuperview()
+            }
             
-            // Remove all JavaScript message handlers
-            webView.configuration.userContentController.removeAllUserScripts()
+            // Clear all references
+            webServices.removeAll()
+            activeServices.removeAll()
+            loadingStates.removeAll()
+            serviceLoadingQueue.removeAll()
             
-            // Clear delegates
-            webView.navigationDelegate = nil
-            webView.uiDelegate = nil
+            // Remove from global managers list by clearing weak references
+            ServiceManager.allManagers = ServiceManager.allManagers.filter { $0.manager != nil && $0.manager !== self }
             
-            // Remove from superview
-            webView.removeFromSuperview()
+            print("✅ [\(Date().timeIntervalSince1970)] ServiceManager DEINIT \(instanceId) cleanup complete")
         }
-        
-        // Clear all references
-        webServices.removeAll()
-        activeServices.removeAll()
-        loadingStates.removeAll()
-        serviceLoadingQueue.removeAll()
-        
-        // Remove from global managers list by clearing weak references
-        ServiceManager.allManagers = ServiceManager.allManagers.filter { $0.manager != nil && $0.manager !== self }
     }
     
     private func setupServices() {
@@ -1501,18 +1545,36 @@ class ServiceManager: NSObject, ObservableObject {
         // Only stop if absolutely necessary
     }
     
+    // Track message handlers for cleanup
+    private var messageHandlers: [String: [String: ConsoleMessageHandler]] = [:] // [serviceId: [messageType: handler]]
+    
     private func setupLoggingScripts(for configuration: WKWebViewConfiguration, service: AIService) {
         let userContentController = configuration.userContentController
         
-        // Create message handler for this service
-        let messageHandler = ConsoleMessageHandler(service: service.name)
+        print("📋 [\(Date().timeIntervalSince1970)] Setting up logging scripts for \(service.name)")
         
-        // Add message handlers
-        userContentController.add(messageHandler, name: "consoleLog")
-        userContentController.add(messageHandler, name: "networkRequest")
-        userContentController.add(messageHandler, name: "networkResponse")
-        // userContentController.add(messageHandler, name: "domChange") // Disabled
-        userContentController.add(messageHandler, name: "userInteraction")
+        // Create separate message handlers for each type
+        let consoleHandler = ConsoleMessageHandler(service: service.name, messageType: "consoleLog")
+        let networkRequestHandler = ConsoleMessageHandler(service: service.name, messageType: "networkRequest")
+        let networkResponseHandler = ConsoleMessageHandler(service: service.name, messageType: "networkResponse")
+        let userInteractionHandler = ConsoleMessageHandler(service: service.name, messageType: "userInteraction")
+        
+        // Store handlers for cleanup
+        messageHandlers[service.id] = [
+            "consoleLog": consoleHandler,
+            "networkRequest": networkRequestHandler,
+            "networkResponse": networkResponseHandler,
+            "userInteraction": userInteractionHandler
+        ]
+        
+        // Add message handlers with individual instances
+        userContentController.add(consoleHandler, name: "consoleLog")
+        userContentController.add(networkRequestHandler, name: "networkRequest")
+        userContentController.add(networkResponseHandler, name: "networkResponse")
+        // userContentController.add(domChangeHandler, name: "domChange") // Disabled
+        userContentController.add(userInteractionHandler, name: "userInteraction")
+        
+        print("✅ [\(Date().timeIntervalSince1970)] Added \(messageHandlers[service.id]?.count ?? 0) message handlers for \(service.name)")
         
         // Inject console logging script
         let consoleScript = WKUserScript(
@@ -1772,6 +1834,12 @@ extension ServiceManager: WKNavigationDelegate {
     }
     
     func webView(_ webView: WKWebView, didFinish navigation: WKNavigation!) {
+        // Check if we're cleaning up
+        if isCleaningUp {
+            print("⚠️ [\(Date().timeIntervalSince1970)] Navigation delegate called during cleanup - didFinish")
+            return
+        }
+        
         let urlString = webView.url?.absoluteString ?? "unknown"
         print("SUCCESS WebView loaded successfully: \(urlString)")
         
