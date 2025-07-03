@@ -192,6 +192,7 @@ class OverlayController: NSObject, NSWindowDelegate {
     private var loadingOverlayOpacities: [NSWindow: Double] = [:]
     private var loadingTimers: [NSWindow: Timer] = [:]
     private var isFirstWindowLoad = true
+    private var hidingOverlays: Set<NSWindow> = []
     
     private var stackViewConstraints: [NSLayoutConstraint] = []
     private var inputBarHostingView: NSHostingView<UnifiedInputBar>?
@@ -436,6 +437,7 @@ class OverlayController: NSObject, NSWindowDelegate {
         loadingOverlayViews[window]?.removeFromSuperview()
         loadingOverlayViews.removeValue(forKey: window)
         loadingOverlayOpacities.removeValue(forKey: window)
+        hidingOverlays.remove(window)
         
         print("✅ [\(Date().timeIntervalSince1970)] removeWindow complete")
     }
@@ -571,6 +573,15 @@ class OverlayController: NSObject, NSWindowDelegate {
     }
     
     private func hideLoadingOverlay(for window: NSWindow) {
+        // Check if already hiding this overlay
+        guard !hidingOverlays.contains(window) else {
+            print("🎬 Loading overlay already hiding for window, skipping duplicate animation")
+            return
+        }
+        
+        // Mark as hiding
+        hidingOverlays.insert(window)
+        
         // Cancel any existing timer
         loadingTimers[window]?.invalidate()
         loadingTimers.removeValue(forKey: window)
@@ -615,6 +626,8 @@ class OverlayController: NSObject, NSWindowDelegate {
                     self.loadingOverlayViews[window]?.removeFromSuperview()
                     self.loadingOverlayViews.removeValue(forKey: window)
                     self.loadingOverlayOpacities.removeValue(forKey: window)
+                    // Remove from hiding set
+                    self.hidingOverlays.remove(window)
                 }
             }
         }
@@ -685,6 +698,7 @@ class OverlayController: NSObject, NSWindowDelegate {
             // Clean up loading overlay references
             loadingOverlayViews.removeValue(forKey: window)
             loadingOverlayOpacities.removeValue(forKey: window)
+            hidingOverlays.remove(window)
             
             // Clean up hibernation references
             windowSnapshots.removeValue(forKey: window)

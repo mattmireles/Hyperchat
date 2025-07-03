@@ -280,9 +280,12 @@ class FloatingButtonManager {
         logger.log("👇 showFloatingButton called.")
         
         // Prevent creating duplicate buttons
-        if buttonWindow != nil {
+        if let existingWindow = buttonWindow {
             logger.log("⚠️ Floating button already exists, bringing to front")
-            buttonWindow?.orderFront(nil)
+            existingWindow.orderFront(nil)
+            
+            // Update position in case screen geometry changed
+            updateButtonPosition()
             return
         }
         
