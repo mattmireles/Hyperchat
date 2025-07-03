@@ -706,28 +706,58 @@ extension WebViewLogger {
 // MARK: - Script Message Handler
 class ConsoleMessageHandler: NSObject, WKScriptMessageHandler {
     let service: String
+    let messageType: String
+    private let instanceId = UUID().uuidString.prefix(8)
+    private weak var parentController: WKUserContentController?
+    private var isCleanedUp = false
     
-    init(service: String) {
+    init(service: String, messageType: String) {
         self.service = service
+        self.messageType = messageType
         super.init()
+        let address = Unmanaged.passUnretained(self).toOpaque()
+        let retainCount = CFGetRetainCount(self)
+        print("🟢 [\(Date().timeIntervalSince1970)] ConsoleMessageHandler INIT \(instanceId) for \(service)/\(messageType) at \(address), retain count: \(retainCount)")
+    }
+    
+    deinit {
+        print("🔴 [\(Date().timeIntervalSince1970)] ConsoleMessageHandler DEINIT \(instanceId) for \(service)/\(messageType) - was cleaned up: \(isCleanedUp)")
+    }
+    
+    func markCleanedUp() {
+        isCleanedUp = true
+        print("🧹 [\(Date().timeIntervalSince1970)] ConsoleMessageHandler \(instanceId) marked as cleaned up")
     }
     
     func userContentController(_ userContentController: WKUserContentController, didReceive message: WKScriptMessage) {
+        guard !isCleanedUp else {
+            print("⚠️ [\(Date().timeIntervalSince1970)] ConsoleMessageHandler \(instanceId) received message after cleanup: \(message.name)")
+            return
+        }
+        
+        let address = Unmanaged.passUnretained(self).toOpaque()
+        let retainCount = CFGetRetainCount(self)
+        print("📨 [\(Date().timeIntervalSince1970)] ConsoleMessageHandler \(instanceId) (\(address)) received message: \(message.name), retain count: \(retainCount)")
         guard let body = message.body as? [String: Any] else { return }
         
-        switch message.name {
-        case "consoleLog":
-            WebViewLogger.shared.handleConsoleMessage(body, service: service)
-        case "networkRequest":
-            WebViewLogger.shared.handleNetworkRequest(body, service: service)
-        case "networkResponse":
-            WebViewLogger.shared.handleNetworkResponse(body, service: service)
-        case "domChange":
-            WebViewLogger.shared.handleDOMChange(body, service: service)
-        case "userInteraction":
-            WebViewLogger.shared.handleUserInteraction(body, service: service)
-        default:
-            break
+        // Only handle the specific message type this handler was created for
+        if message.name == messageType {
+            switch messageType {
+            case "consoleLog":
+                WebViewLogger.shared.handleConsoleMessage(body, service: service)
+            case "networkRequest":
+                WebViewLogger.shared.handleNetworkRequest(body, service: service)
+            case "networkResponse":
+                WebViewLogger.shared.handleNetworkResponse(body, service: service)
+            case "domChange":
+                WebViewLogger.shared.handleDOMChange(body, service: service)
+            case "userInteraction":
+                WebViewLogger.shared.handleUserInteraction(body, service: service)
+            default:
+                print("⚠️ Unknown message type: \(messageType)")
+            }
+        } else {
+            print("⚠️ Handler for \(messageType) received wrong message type: \(message.name)")
         }
     }
 }

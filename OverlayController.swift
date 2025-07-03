@@ -1,5 +1,6 @@
 import Cocoa
 import SwiftUI
+import WebKit
 
 // MARK: - Loading Overlay View
 
@@ -118,8 +119,19 @@ struct LoadingOverlayView: View {
 
 class OverlayWindow: NSWindow {
     weak var overlayController: OverlayController?
+    private let instanceId = UUID().uuidString.prefix(8)
 
     override var canBecomeKey: Bool { true }
+    
+    override init(contentRect: NSRect, styleMask style: NSWindow.StyleMask, backing backingStoreType: NSWindow.BackingStoreType, defer flag: Bool) {
+        super.init(contentRect: contentRect, styleMask: style, backing: backingStoreType, defer: flag)
+        let address = Unmanaged.passUnretained(self).toOpaque()
+        print("🧻 [\(Date().timeIntervalSince1970)] OverlayWindow INIT \(instanceId) at \(address)")
+    }
+    
+    deinit {
+        print("🔴 [\(Date().timeIntervalSince1970)] OverlayWindow DEINIT \(instanceId)")
+    }
     
     // Allow window to be moved by dragging anywhere
     override var isMovableByWindowBackground: Bool {
@@ -136,24 +148,37 @@ class OverlayWindow: NSWindow {
     }
     
     override func close() {
-        // Capture controller reference before any deallocation
-        let controller = overlayController
-        overlayController = nil // Clear reference immediately to prevent double cleanup
+        print("🛎 [\(Date().timeIntervalSince1970)] OverlayWindow.close() called for \(instanceId)")
         
-        // First, inform the controller that this window is going away **before** the window begins
-        // its teardown inside super.close(). Doing it afterwards can lead to accessing objects
-        // that have already started deallocating, which causes crashes in objc_release.
-        controller?.removeWindow(self)
-        NotificationCenter.default.post(name: .overlayDidHide, object: nil)
+        // Wrap cleanup in autoreleasepool to ensure WebKit's autoreleased objects
+        // are released immediately, preventing crashes during run loop drain
+        autoreleasepool {
+            // Capture controller reference before any deallocation
+            let controller = overlayController
+            overlayController = nil // Clear reference immediately to prevent double cleanup
+            
+            print("🛑 [\(Date().timeIntervalSince1970)] OverlayWindow \(instanceId) calling removeWindow")
+            
+            // First, inform the controller that this window is going away **before** the window begins
+            // its teardown inside super.close(). Doing it afterwards can lead to accessing objects
+            // that have already started deallocating, which causes crashes in objc_release.
+            controller?.removeWindow(self)
+            NotificationCenter.default.post(name: .overlayDidHide, object: nil)
 
-        // Now let AppKit perform the actual close and deallocation work.
-        super.close()
+            print("🏁 [\(Date().timeIntervalSince1970)] OverlayWindow \(instanceId) calling super.close()")
+            
+            // Now let AppKit perform the actual close and deallocation work.
+            super.close()
+            
+            print("✅ [\(Date().timeIntervalSince1970)] OverlayWindow \(instanceId) close() complete")
+        }
     }
 }
 
-class OverlayController {
+class OverlayController: NSObject, NSWindowDelegate {
     private var windows: [OverlayWindow] = []
     private var isHiding = false
+    private let instanceId = UUID().uuidString.prefix(8)
     
     // Per-window ServiceManager instances
     private var windowServiceManagers: [NSWindow: ServiceManager] = [:]
@@ -171,20 +196,29 @@ class OverlayController {
     private var stackViewConstraints: [NSLayoutConstraint] = []
     private var inputBarHostingView: NSHostingView<UnifiedInputBar>?
 
-    init() {
+    override init() {
+        super.init()
+        let address = Unmanaged.passUnretained(self).toOpaque()
+        print("🟢 [\(Date().timeIntervalSince1970)] OverlayController INIT \(instanceId) at \(address)")
         setupWindowNotifications()
     }
     
     deinit {
+        print("🔴 [\(Date().timeIntervalSince1970)] OverlayController DEINIT \(instanceId) starting")
+        
         // Clean up all timers
+        print("🧹 [\(Date().timeIntervalSince1970)] Invalidating \(loadingTimers.count) timers")
         for timer in loadingTimers.values {
             timer.invalidate()
         }
         loadingTimers.removeAll()
         
         // Remove all notification observers
+        print("🧹 [\(Date().timeIntervalSince1970)] Removing notification observers")
         NotificationCenter.default.removeObserver(self)
         DistributedNotificationCenter.default.removeObserver(self)
+        
+        print("✅ [\(Date().timeIntervalSince1970)] OverlayController DEINIT \(instanceId) complete")
     }
     
     private func setupWindowNotifications() {
@@ -259,11 +293,19 @@ class OverlayController {
             backing: .buffered,
             defer: false
         )
+        
+        // CRITICAL: Prevent the window from deallocating itself on close
+        // This aligns window behavior with ARC and prevents EXC_BAD_ACCESS crashes
+        window.isReleasedWhenClosed = false
+        
         window.overlayController = self
         windows.append(window)
         
         // Store the window-specific ServiceManager
         windowServiceManagers[window] = windowServiceManager
+        
+        // Set window delegate to handle cleanup before close
+        window.delegate = self
 
         // Configure window for full-size content view with visible buttons
         window.titleVisibility = .hidden
@@ -369,32 +411,20 @@ class OverlayController {
     }
     
     func removeWindow(_ window: OverlayWindow) {
+        print("🗑 [\(Date().timeIntervalSince1970)] OverlayController.removeWindow called for window")
+        
         // Guard against multiple cleanup calls
-        guard windows.contains(where: { $0 == window }) else { return }
-        
-        windows.removeAll { $0 == window }
-        
-        // Clean up the window-specific ServiceManager
-        if let serviceManager = windowServiceManagers.removeValue(forKey: window) {
-            // Fully tear-down every WKWebView to prevent async callbacks to deallocated objects
-            for (_, webService) in serviceManager.webServices {
-                let browserView = webService.browserView
-                let webView = browserView.webView
-
-                // Stop any ongoing loads
-                webView.stopLoading()
-
-                // Remove all JavaScript message handlers
-                webView.configuration.userContentController.removeAllUserScripts()
-                
-                // Clear delegates to break retain cycles and prevent late callbacks
-                webView.navigationDelegate = nil
-                webView.uiDelegate = nil
-                
-                // Remove from superview
-                webView.removeFromSuperview()
-            }
+        guard windows.contains(where: { $0 == window }) else {
+            print("⚠️ [\(Date().timeIntervalSince1970)] Window already removed, skipping cleanup")
+            return
         }
+        
+        // Remove window from array
+        windows.removeAll { $0 == window }
+        print("📊 [\(Date().timeIntervalSince1970)] Remaining windows: \(windows.count)")
+        
+        // Note: WebView cleanup is now handled in windowWillClose delegate method
+        // This ensures script message handlers are removed before deallocation
         
         // Clean up hibernation data
         windowSnapshots.removeValue(forKey: window)
@@ -406,6 +436,8 @@ class OverlayController {
         loadingOverlayViews[window]?.removeFromSuperview()
         loadingOverlayViews.removeValue(forKey: window)
         loadingOverlayOpacities.removeValue(forKey: window)
+        
+        print("✅ [\(Date().timeIntervalSince1970)] removeWindow complete")
     }
     
     private func updateBackgroundColorForAppearance() {
@@ -418,7 +450,7 @@ class OverlayController {
     
     // MARK: - Window Hibernation
     
-    @objc private func windowDidBecomeKey(_ notification: Notification) {
+    @objc func windowDidBecomeKey(_ notification: Notification) {
         // Only handle OverlayWindow instances, not PromptWindow
         guard let window = notification.object as? OverlayWindow,
               windows.contains(where: { $0 == window }) else { return }
@@ -437,7 +469,7 @@ class OverlayController {
         }
     }
     
-    @objc private func windowDidResignKey(_ notification: Notification) {
+    @objc func windowDidResignKey(_ notification: Notification) {
         // Don't automatically hibernate when window loses focus
         // Hibernation now only happens when another OverlayWindow gains focus
         // This prevents hibernation when the prompt window appears or when switching to other apps
@@ -601,6 +633,67 @@ class OverlayController {
                 hideLoadingOverlay(for: window)
                 break
             }
+        }
+    }
+    
+    // MARK: - NSWindowDelegate
+    
+    func windowWillClose(_ notification: Notification) {
+        guard let window = notification.object as? NSWindow,
+              let serviceManager = windowServiceManagers[window] else { return }
+        
+        print("🚨 [\(Date().timeIntervalSince1970)] windowWillClose - Starting comprehensive WebView cleanup BEFORE window closes")
+        
+        // Wrap cleanup in autoreleasepool to ensure WebKit's autoreleased objects
+        // are released immediately, preventing crashes during run loop drain
+        autoreleasepool {
+            // Critical: Remove script message handlers BEFORE anything else deallocates
+            for (serviceId, webService) in serviceManager.webServices {
+                let webView = webService.browserView.webView
+                let controller = webView.configuration.userContentController
+                
+                print("🧨 [\(Date().timeIntervalSince1970)] Beginning cleanup for \(serviceId)")
+                
+                // 1. Stop all activity immediately
+                webView.stopLoading()
+                
+                // 2. Terminate JavaScript environment by loading blank page
+                // This unloads the previous page's entire execution context
+                webView.loadHTMLString("<html><body></body></html>", baseURL: nil)
+                
+                // 3. Remove ALL message handlers using centralized names - this prevents the crash
+                for handlerName in ServiceManager.scriptMessageHandlerNames {
+                    controller.removeScriptMessageHandler(forName: handlerName)
+                }
+                
+                // 4. Sever delegate connections to prevent callbacks
+                webView.navigationDelegate = nil
+                webView.uiDelegate = nil
+                
+                // 5. Remove from view hierarchy
+                webView.removeFromSuperview()
+                
+                print("✅ [\(Date().timeIntervalSince1970)] Cleaned up WebView for \(serviceId)")
+            }
+            
+            // Clean up loading timers for this window
+            if let timer = loadingTimers[window] {
+                timer.invalidate()
+                loadingTimers.removeValue(forKey: window)
+            }
+            
+            // Clean up loading overlay references
+            loadingOverlayViews.removeValue(forKey: window)
+            loadingOverlayOpacities.removeValue(forKey: window)
+            
+            // Clean up hibernation references
+            windowSnapshots.removeValue(forKey: window)
+            hibernatedWindows.remove(window)
+            
+            // Clean up ServiceManager reference
+            windowServiceManagers.removeValue(forKey: window)
+            
+            print("✅ [\(Date().timeIntervalSince1970)] windowWillClose cleanup complete")
         }
     }
 }
