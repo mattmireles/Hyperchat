@@ -271,7 +271,7 @@ cd "${MACOS_DIR}/Export"
 
 # Step 8: Create DMG
 echo -e "${YELLOW}💿 Creating DMG...${NC}"
-DMG_NAME="Hyperchat-v${VERSION}.dmg"
+DMG_NAME="Hyperchat-b${NEW_BUILD}.dmg"
 DMG_DIR="/tmp/Hyperchat-DMG"
 rm -rf "${DMG_DIR}"
 mkdir -p "${DMG_DIR}"
@@ -366,7 +366,17 @@ fi
 
 # Step 13: Deploy to website
 echo -e "${YELLOW}🚀 Deploying to website...${NC}"
-cp "${DMG_NAME}" "${WEB_DIR}/public/"
+
+# Create archive directory if it doesn't exist
+mkdir -p "${WEB_DIR}/public/archive"
+
+# Copy versioned DMG to archive folder
+echo -e "${BLUE}  Archiving versioned build...${NC}"
+cp "${DMG_NAME}" "${WEB_DIR}/public/archive/"
+
+# Create/update the latest symlink or copy
+echo -e "${BLUE}  Creating latest version link...${NC}"
+cp "${DMG_NAME}" "${WEB_DIR}/public/Hyperchat-latest.dmg"
 
 # Step 14: Update appcast.xml
 echo -e "${YELLOW}📋 Updating appcast.xml...${NC}"
@@ -391,7 +401,7 @@ cat > appcast.xml << EOF
           <p>Bug fixes and performance improvements.</p>
         ]]>
       </description>
-      <enclosure url="https://hyperchat.app/${DMG_NAME}"
+      <enclosure url="https://hyperchat.app/archive/${DMG_NAME}"
                  length="${DMG_SIZE}"
                  type="application/octet-stream"
                  sparkle:edSignature="" />
