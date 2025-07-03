@@ -1209,7 +1209,7 @@ class ServiceManager: NSObject, ObservableObject {
             print("🧹 [\(Date().timeIntervalSince1970)] Cleaning up message handlers for \(messageHandlers.count) services")
             for (serviceId, handlers) in messageHandlers {
                 print("🧹 [\(Date().timeIntervalSince1970)] Marking \(handlers.count) handlers as cleaned up for service \(serviceId)")
-                for (messageType, handler) in handlers {
+                for (_, handler) in handlers {
                     handler.markCleanedUp()
                 }
             }
