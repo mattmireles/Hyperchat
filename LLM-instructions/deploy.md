@@ -9,8 +9,26 @@
 6. [Distribution Methods & App Translocation](#distribution)
 7. [Sparkle Auto-Update Integration](#sparkle)
 8. [Troubleshooting Guide](#troubleshooting)
+   - [Diagnostic Script](#diagnostic-script)
+   - [Common Issues and Solutions](#common-issues-and-solutions)
+   - [The errSecInternalComponent Error](#the-errsecInternalComponent-error)
+   - [JAR Files and Unsigned Binaries](#jar-files-and-unsigned-binaries)
+   - [Framework-Specific Issues](#framework-specific-issues)
+   - [Virtual Machine Testing Protocol](#virtual-machine-testing-protocol)
+   - [Advanced Notarization Log Analysis](#advanced-notarization-log-analysis)
+   - [Detailed Gatekeeper Assessment](#detailed-gatekeeper-assessment)
+   - [App Translocation Deep Dive](#app-translocation-deep-dive)
+   - [CI/CD Specific Issues](#cicd-specific-issues)
+   - [Entitlement Conflicts and Edge Cases](#entitlement-conflicts-and-edge-cases)
+   - [Debugging Notarization Hangs](#debugging-notarization-hangs)
+   - [Complete Diagnostic Checklist](#complete-diagnostic-checklist)
+   - [The "Death by a Thousand Cuts" Issues](#the-death-by-a-thousand-cuts-issues)
+   - [Security-Scoped Bookmarks](#security-scoped-bookmarks-sandboxed-apps)
+   - [Testing Strategies That Prevent Disasters](#testing-strategies-that-prevent-disasters)
 9. [Recent macOS Changes](#recent-changes)
 10. [Quick Reference](#quick-reference)
+11. [Hyperchat-Specific Deployment](#hyperchat)
+12. [Conclusion](#conclusion)
 
 ## Overview: Understanding the Distribution Process {#overview}
 
@@ -426,6 +444,404 @@ security create-keychain -p "temp123" $KEYCHAIN_PATH
 security import certificate.p12 -k $KEYCHAIN_PATH -P "p12password" -T /usr/bin/codesign
 security set-keychain-settings -lut 21600 $KEYCHAIN_PATH
 security default-keychain -s $KEYCHAIN_PATH
+
+# Fix 3: Nuclear option - In Keychain Access
+# Manually set private key to "Allow all applications to access"
+```
+
+### JAR Files and Unsigned Binaries
+
+Notarization now rejects unsigned native code inside JAR files:
+
+```bash
+# Find problematic JARs
+find YourApp.app -name "*.jar" -exec sh -c 'jar -tf "$1" | grep -E "\.(dylib|so|jnilib)$" && echo "Found in: $1"' _ {} \;
+
+# Extract, sign, and repackage JARs
+jar -xf problematic.jar
+find . -name "*.dylib" -o -name "*.jnilib" | while read lib; do
+    codesign --force --timestamp --options runtime --sign "Developer ID" "$lib"
+done
+jar -cfm problematic.jar META-INF/MANIFEST.MF .
+```
+
+### Framework-Specific Issues
+
+**Qt Framework:**
+```bash
+# Remove problematic files
+find YourApp.app -name "*.prl" -delete
+find YourApp.app -name "*.la" -delete
+
+# Fix symlinks
+cd YourApp.app/Contents/Frameworks/QtCore.framework
+ln -sf Versions/Current/QtCore QtCore
+```
+
+**Electron Apps:**
+```bash
+# Sign Electron Framework first
+codesign --force --timestamp --options runtime \
+  --sign "Developer ID" \
+  "YourApp.app/Contents/Frameworks/Electron Framework.framework/Versions/A/Electron Framework"
+
+# Then Libraries
+codesign --force --timestamp --options runtime \
+  --sign "Developer ID" \
+  "YourApp.app/Contents/Frameworks/Electron Framework.framework/Libraries/libffmpeg.dylib"
+```
+
+### Virtual Machine Testing Protocol
+
+**The Clean Room Testing Imperative**
+
+Your development machine is contaminated with:
+- Developer certificates that bypass security checks
+- Cached Gatekeeper decisions
+- Disabled security settings
+- Previously approved apps
+
+**Complete VM Testing Workflow:**
+
+```bash
+# 1. Setup clean VM (UTM/Parallels/VMware)
+# 2. Take snapshot immediately after OS install
+# 3. For each test:
+
+# Restore to clean snapshot
+# Download DMG via Safari (applies quarantine)
+# Verify quarantine is present
+xattr -l ~/Downloads/YourApp.dmg | grep quarantine
+
+# Test offline (disconnect network)
+# Mount DMG and install
+# Should open without warnings if properly stapled
+
+# Test online
+# Verify auto-update works
+# Check Console.app for errors
+```
+
+### Advanced Notarization Log Analysis
+
+**Interpreting `developer_log.json`:**
+
+```json
+{
+  "issues": [
+    {
+      "severity": "error",
+      "code": null,
+      "message": "The binary uses an SDK older than the 10.9 SDK.",
+      "path": "YourApp.app/Contents/Frameworks/SomeFramework.framework/Versions/A/SomeFramework",
+      "architecture": "x86_64"
+    }
+  ]
+}
+```
+
+**Complete Error Reference:**
+
+| Error Message | Root Cause | Detailed Fix |
+|--------------|------------|--------------|
+| "The signature of the binary is invalid" | Modified after signing OR unsigned nested component OR wrong certificate type | 1. Find specific file: `codesign -vvv --deep YourApp.app 2>&1 | grep "invalid"` <br> 2. Re-sign that specific component <br> 3. Re-sign parent bundle |
+| "The binary is not signed with a valid Developer ID certificate" | Wrong cert type or expired cert | Check cert: `codesign -dvv YourApp.app | grep "Authority"` <br> Must show "Developer ID Application" |
+| "The signature does not include a secure timestamp" | Missing `--timestamp` flag | Re-sign ALL components with `--timestamp` |
+| "The executable requests the com.apple.security.get-task-allow entitlement" | Debug entitlement in release build | Remove from entitlements file or use separate Release.entitlements |
+| "The binary uses SDK in a disallowed manner" | Using private APIs | Use `nm -u` to find undefined symbols, check against private API list |
+| "The executable has entitlement com.apple.security.cs.debugger" | Another debug entitlement | Remove all debug entitlements for distribution |
+
+### Detailed Gatekeeper Assessment
+
+```bash
+# Complete assessment with context
+spctl --assess --type execute --verbose=4 YourApp.app 2>&1
+
+# Check specific components
+find YourApp.app -type f -perm +111 | while read f; do
+    echo "Checking: $f"
+    spctl --assess --type execute "$f" 2>&1
+done
+
+# Verify online notarization check
+# This simulates what happens on user's machine
+log stream --predicate 'subsystem == "com.apple.Security"' | grep -i "YourApp"
+# In another terminal, launch your app
+```
+
+### App Translocation Deep Dive
+
+**Detecting Translocation:**
+```bash
+# In your app, check at runtime
+if [[ "$0" == *"/AppTranslocation/"* ]]; then
+    echo "App is translocated!"
+fi
+
+# From outside
+ps aux | grep YourApp | grep AppTranslocation
+```
+
+**All Translocation Triggers:**
+1. Downloaded via browser (quarantine attribute)
+2. Extracted from ZIP in place
+3. Copied via command line without proper attributes
+4. AirDropped and not moved
+5. Downloaded via curl/wget without removing quarantine
+
+**Preventing Translocation:**
+```bash
+# Option 1: Remove quarantine (NOT recommended for distribution)
+xattr -dr com.apple.quarantine YourApp.app
+
+# Option 2: Move with Finder (recommended)
+# Must be actual Finder drag, not Terminal mv
+
+# Option 3: Distribute as DMG with visual instructions
+```
+
+### CI/CD Specific Issues
+
+**GitHub Actions:**
+```yaml
+- name: Import Certificate
+  env:
+    CERTIFICATE_BASE64: ${{ secrets.CERTIFICATE_BASE64 }}
+    CERTIFICATE_PASSWORD: ${{ secrets.CERTIFICATE_PASSWORD }}
+  run: |
+    # Create temporary keychain
+    KEYCHAIN_PATH=$RUNNER_TEMP/app-signing.keychain-db
+    KEYCHAIN_PASSWORD=mysecretpassword
+    
+    security create-keychain -p "$KEYCHAIN_PASSWORD" "$KEYCHAIN_PATH"
+    security set-keychain-settings -lut 21600 "$KEYCHAIN_PATH"
+    security unlock-keychain -p "$KEYCHAIN_PASSWORD" "$KEYCHAIN_PATH"
+    
+    # Import certificate
+    echo "$CERTIFICATE_BASE64" | base64 --decode > certificate.p12
+    security import certificate.p12 -k "$KEYCHAIN_PATH" \
+      -P "$CERTIFICATE_PASSWORD" \
+      -T /usr/bin/codesign \
+      -T /usr/bin/security
+    
+    security list-keychains -d user -s "$KEYCHAIN_PATH"
+    security default-keychain -s "$KEYCHAIN_PATH"
+    
+    # Grant access
+    security set-key-partition-list -S apple-tool:,apple:,codesign: \
+      -s -k "$KEYCHAIN_PASSWORD" "$KEYCHAIN_PATH"
+```
+
+**Jenkins/Other CI:**
+```bash
+# Common issue: No GUI session
+# Solution: Use ssh with -Y flag or run via launchd user agent
+```
+
+### Entitlement Conflicts and Edge Cases
+
+**Conflicting Entitlements:**
+```xml
+<!-- NEVER combine these -->
+<key>com.apple.security.app-sandbox</key>
+<true/>
+<key>com.apple.security.inherit</key>
+<true/>
+
+<!-- These require careful consideration -->
+<key>com.apple.security.cs.disable-library-validation</key>
+<true/>
+<!-- Breaks with: -->
+<key>com.apple.security.cs.runtime-exceptions</key>
+```
+
+**Entitlement Inheritance Issues:**
+```bash
+# Helper app entitlements must be subset of main app
+# Check with:
+codesign -d --entitlements :- YourApp.app
+codesign -d --entitlements :- YourApp.app/Contents/Helpers/Helper.app
+```
+
+### Debugging Notarization Hangs
+
+```bash
+# Check Apple System Status
+curl -s https://www.apple.com/support/systemstatus/data/system_status_en_US.js
+
+# Cancel stuck submission
+xcrun notarytool submission list --keychain-profile "profile"
+xcrun notarytool submission cancel SUBMISSION_ID --keychain-profile "profile"
+
+# Retry with verbose logging
+xcrun notarytool submit YourApp.zip \
+  --keychain-profile "profile" \
+  --verbose \
+  --wait 2>&1 | tee notarization.log
+```
+
+### Complete Diagnostic Checklist
+
+When nothing else works, run this comprehensive diagnostic:
+
+```bash
+#!/bin/bash
+# ultimate-diagnostic.sh
+
+APP="$1"
+echo "=== macOS Signing Diagnostic Tool ==="
+echo "App: $APP"
+echo "Date: $(date)"
+echo "macOS: $(sw_vers -productVersion)"
+
+echo -e "\n=== 1. Certificate Validation ==="
+security find-identity -v -p codesigning
+
+echo -e "\n=== 2. Basic Signature Info ==="
+codesign -dvv "$APP" 2>&1
+
+echo -e "\n=== 3. Signature Verification ==="
+codesign --verify --deep --strict --verbose=4 "$APP" 2>&1
+
+echo -e "\n=== 4. Entitlements ==="
+codesign -d --entitlements :- "$APP" 2>&1
+
+echo -e "\n=== 5. Gatekeeper Assessment ==="
+spctl --assess --verbose=4 --type execute "$APP" 2>&1
+
+echo -e "\n=== 6. Notarization Check ==="
+spctl -a -vvv -t execute "$APP" 2>&1
+
+echo -e "\n=== 7. Quarantine Status ==="
+xattr -l "$APP"
+
+echo -e "\n=== 8. Framework Issues ==="
+find "$APP" -name "*.framework" | while read fw; do
+    echo "Framework: $fw"
+    codesign -dvv "$fw" 2>&1 | grep -E "Authority|Timestamp|flags"
+done
+
+echo -e "\n=== 9. Unsigned Binaries ==="
+find "$APP" -type f -perm +111 | while read bin; do
+    codesign -vv "$bin" 2>&1 | grep -q "not signed" && echo "Unsigned: $bin"
+done
+
+echo -e "\n=== 10. Info.plist Validation ==="
+plutil -lint "$APP/Contents/Info.plist"
+
+echo -e "\n=== 11. Bundle Structure ==="
+find "$APP" -name "*.app" -o -name "*.framework" -o -name "*.bundle" | head -20
+
+echo -e "\n=== 12. Recent System Logs ==="
+log show --predicate 'subsystem == "com.apple.Security" OR subsystem == "com.apple.gatekeeper"' --last 5m | grep -i "$(basename "$APP")"
+```
+
+### The "Death by a Thousand Cuts" Issues
+
+Small issues that compound:
+
+1. **Windows line endings in Info.plist**: Use `dos2unix`
+2. **Hidden .DS_Store files**: Remove with `find YourApp.app -name .DS_Store -delete`
+3. **Extended attributes**: Check with `xattr -l YourApp.app`
+4. **Symlink issues**: Verify with `find YourApp.app -type l -ls`
+5. **Resource fork data**: Strip with `xattr -cr YourApp.app`
+6. **Wrong file permissions**: Fix with `chmod -R 755 YourApp.app`
+7. **Corrupted nibs**: Recompile from xibs
+
+### Security-Scoped Bookmarks (Sandboxed Apps)
+
+For persistent file access in sandboxed apps:
+
+```xml
+<!-- Required entitlement -->
+<key>com.apple.security.files.bookmarks.app-scope</key>
+<true/>
+```
+
+```swift
+// Create bookmark
+let bookmarkData = try url.bookmarkData(options: .withSecurityScope)
+UserDefaults.standard.set(bookmarkData, forKey: "savedPath")
+
+// Restore access - CRITICAL: Must bracket with start/stop
+var isStale = false
+let url = try URL(resolvingBookmarkData: bookmarkData, bookmarkDataIsStale: &isStale)
+guard url.startAccessingSecurityScopedResource() else { return }
+defer { url.stopAccessingSecurityScopedResource() }
+// Use url here...
+```
+
+### Testing Strategies That Prevent Disasters
+
+**The Three Essential Tests:**
+
+1. **Clean Install Test**
+   ```bash
+   # On fresh system/VM
+   # 1. Download DMG via Safari
+   # 2. Check quarantine: xattr -l YourApp.dmg
+   # 3. Install and launch
+   # 4. Should open without warnings
+   ```
+
+2. **Update Test**
+   ```bash
+   # 1. Install old version
+   # 2. Trigger update check
+   # 3. Monitor Console.app during update
+   # 4. Verify new version launches
+   ```
+
+3. **Offline Test**
+   ```bash
+   # 1. Disconnect network
+   # 2. Install from DMG
+   # 3. App should launch (stapled ticket)
+   # 4. Reconnect and verify updates work
+   ```
+
+**Automated Testing Script:**
+
+```bash
+#!/bin/bash
+# test-distribution.sh
+
+APP="YourApp.app"
+DMG="YourApp.dmg"
+
+echo "1. Verifying signatures..."
+codesign --verify --strict "$APP" || exit 1
+
+echo "2. Checking notarization..."
+spctl --assess --type execute "$APP" || exit 1
+
+echo "3. Simulating download..."
+xattr -w com.apple.quarantine "0081;$(printf '%016x' $(date +%s));Safari;" "$APP"
+spctl --assess --type execute "$APP" || exit 1
+
+echo "4. Testing DMG..."
+hdiutil attach "$DMG" -nobrowse
+cp -R "/Volumes/YourApp/$APP" "/tmp/"
+hdiutil detach "/Volumes/YourApp"
+spctl --assess --type execute "/tmp/$APP" || exit 1
+
+echo "✅ All distribution tests passed!"
+```
+
+### Testing Update Scenarios
+
+For Sparkle updates:
+
+```bash
+# Force immediate update check
+defaults delete com.company.app SULastCheckTime
+
+# Test delta updates
+# Keep multiple versions for delta generation
+./bin/generate_appcast updates_folder/
+
+# Monitor update process
+log stream --predicate 'subsystem == "org.sparkle-project.Sparkle"'
 ```
 
 ## Recent macOS Changes {#recent-changes}
@@ -581,6 +997,78 @@ xattr -l App.app | grep quarantine
 6. **Use simple integers for CFBundleVersion**
 7. **Store credentials securely** in Keychain
 8. **Monitor Console.app** for hidden errors
+
+## Hyperchat-Specific Deployment {#hyperchat}
+
+### Prerequisites for Hyperchat
+
+Before running the deployment script, ensure:
+
+- **Team ID**: `$(APPLE_TEAM_ID)`
+- **Apple ID**: `your-apple-id@example.com`
+- **Certificate Hash**: `***REMOVED-CERTIFICATE***`
+
+### One-Time Credential Setup
+
+```bash
+# 1. Create app-specific password at appleid.apple.com
+# 2. Store credentials
+xcrun notarytool store-credentials "hyperchat-notarize" \
+  --apple-id "your-apple-id@example.com" \
+  --team-id "$(APPLE_TEAM_ID)" \
+  --password "xxxx-xxxx-xxxx-xxxx"
+```
+
+### Hyperchat Deployment Script
+
+The complete deployment workflow is automated in `deploy-hyperchat.sh`:
+
+```bash
+cd /Users/***REMOVED-USERNAME***/Documents/GitHub/hyperchat/hyperchat-macos
+./deploy-hyperchat.sh
+```
+
+This script handles:
+1. ✅ Prerequisites check (credentials and certificate)
+2. 📝 Build number increment
+3. 🧹 Clean previous builds
+4. 🔨 Archive the app
+5. 🔏 Sign all components
+6. 💿 Create DMG
+7. 🍎 Submit for notarization
+8. 📎 Staple the ticket
+9. 🚀 Deploy to website
+10. 📋 Update appcast.xml for Sparkle
+
+### Emergency Recovery
+
+If deployment fails:
+```bash
+# Clean all artifacts
+sudo rm -rf build Export DerivedData Hyperchat.xcarchive *.dmg
+
+# Reset build number if needed
+/usr/libexec/PlistBuddy -c "Set :CFBundleVersion 50" Info.plist
+
+# Run again
+./deploy-hyperchat.sh
+```
+
+### Manual Override
+
+For manual notarization:
+```bash
+# Submit
+xcrun notarytool submit "Hyperchat-v1.0.dmg" \
+  --keychain-profile "hyperchat-notarize" \
+  --wait
+
+# Staple
+xcrun stapler staple "Hyperchat-v1.0.dmg"
+
+# Verify
+spctl -a -vvv -t open --context context:primary-signature "Hyperchat-v1.0.dmg"
+```
 
 ## Conclusion
 
