@@ -13,7 +13,9 @@ APP_NAME="Hyperchat"
 BUNDLE_ID="com.transcendence.hyperchat"
 TEAM_ID="$(APPLE_TEAM_ID)"
 APPLE_ID="your-apple-id@example.com"
-CERTIFICATE_HASH="***REMOVED-CERTIFICATE***"
+# Using specific certificate hash to avoid ambiguity (you have 2 certs with same name)
+CERTIFICATE_IDENTITY="***REMOVED-CERTIFICATE***"
+# This is "Developer ID Application: Matt Mireles ($(APPLE_TEAM_ID))"
 PROJECT_DIR="/Users/***REMOVED-USERNAME***/Documents/GitHub/hyperchat"
 MACOS_DIR="${PROJECT_DIR}/hyperchat-macos"
 WEB_DIR="${PROJECT_DIR}/hyperchat-web"
@@ -84,12 +86,12 @@ fi
 
 # Check if certificate is valid
 echo -n "  Checking code signing certificate... "
-if security find-identity -v -p codesigning | grep "$CERTIFICATE_HASH" >/dev/null 2>&1; then
+if security find-identity -v -p codesigning | grep "$CERTIFICATE_IDENTITY" >/dev/null 2>&1; then
     echo -e "${GREEN}✓${NC}"
 else
     echo -e "${RED}✗${NC}"
     echo -e "${RED}❌ Code signing certificate not found!${NC}"
-    echo "Certificate hash: $CERTIFICATE_HASH"
+    echo "Certificate identity: $CERTIFICATE_IDENTITY"
     echo "Available certificates:"
     security find-identity -v -p codesigning
     exit 1
@@ -167,7 +169,7 @@ echo -e "${BLUE}  Signing Autoupdate binary...${NC}"
 AUTOUPDATE_PATH="${SPARKLE_PATH}/Versions/B/Autoupdate"
 if [ -f "${AUTOUPDATE_PATH}" ]; then
     xattr -cr "${AUTOUPDATE_PATH}"
-    codesign --force --sign "${CERTIFICATE_HASH}" --options runtime --timestamp --verbose "${AUTOUPDATE_PATH}"
+    codesign --force --sign "${CERTIFICATE_IDENTITY}" --options runtime --timestamp --verbose "${AUTOUPDATE_PATH}"
 fi
 
 # 1. Sparkle's XPC Services
@@ -176,23 +178,23 @@ echo -e "${BLUE}  Signing XPC services...${NC}"
 find "${XPC_PATH}" -type f -name ".DS_Store" -delete 2>/dev/null || true
 find "${XPC_PATH}" -name $'Icon\r' -delete 2>/dev/null || true
 xattr -cr "${XPC_PATH}/Downloader.xpc"
-codesign --force --sign "${CERTIFICATE_HASH}" --options runtime --timestamp --verbose "${XPC_PATH}/Downloader.xpc"
+codesign --force --sign "${CERTIFICATE_IDENTITY}" --options runtime --timestamp --verbose "${XPC_PATH}/Downloader.xpc"
 xattr -cr "${XPC_PATH}/Installer.xpc"
-codesign --force --sign "${CERTIFICATE_HASH}" --options runtime --timestamp --verbose "${XPC_PATH}/Installer.xpc"
+codesign --force --sign "${CERTIFICATE_IDENTITY}" --options runtime --timestamp --verbose "${XPC_PATH}/Installer.xpc"
 
 # 2. Sparkle's Updater.app
 echo -e "${BLUE}  Signing Updater.app...${NC}"
 xattr -cr "${UPDATER_APP_PATH}"
-codesign --force --sign "${CERTIFICATE_HASH}" --options runtime --timestamp --verbose "${UPDATER_APP_PATH}"
+codesign --force --sign "${CERTIFICATE_IDENTITY}" --options runtime --timestamp --verbose "${UPDATER_APP_PATH}"
 
 # 3. The Sparkle Framework itself
 echo -e "${BLUE}  Signing Sparkle.framework...${NC}"
 xattr -cr "${SPARKLE_PATH}"
-codesign --force --sign "${CERTIFICATE_HASH}" --options runtime --timestamp --verbose "${SPARKLE_PATH}"
+codesign --force --sign "${CERTIFICATE_IDENTITY}" --options runtime --timestamp --verbose "${SPARKLE_PATH}"
 
 # 4. Sign the main app bundle BEFORE moving (while it's not .app yet)
 echo -e "${YELLOW}🔏 Signing main app bundle (in temp location)...${NC}"
-codesign --force --sign "${CERTIFICATE_HASH}" \
+codesign --force --sign "${CERTIFICATE_IDENTITY}" \
     --options runtime \
     --timestamp \
     --entitlements "${MACOS_DIR}/HyperChat.Release.entitlements" \
@@ -286,7 +288,7 @@ rm -rf "${DMG_DIR}"
 
 # Step 9: Sign the DMG
 echo -e "${YELLOW}🔏 Signing DMG...${NC}"
-codesign --force --sign "${CERTIFICATE_HASH}" --timestamp "${DMG_NAME}"
+codesign --force --sign "${CERTIFICATE_IDENTITY}" --timestamp "${DMG_NAME}"
 
 # Step 10: Notarize the DMG
 echo -e "${YELLOW}🍎 Submitting DMG for notarization...${NC}"
