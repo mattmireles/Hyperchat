@@ -1,0 +1,136 @@
+name: Run Tests
+
+on:
+  push:
+    branches: [ main, develop ]
+  pull_request:
+    branches: [ main ]
+
+jobs:
+  test:
+    name: Test on macOS
+    runs-on: macos-latest
+    
+    steps:
+    - name: Checkout code
+      uses: actions/checkout@v3
+    
+    - name: Select Xcode version
+      run: sudo xcode-select -s /Applications/Xcode.app/Contents/Developer
+    
+    - name: Show Xcode version
+      run: xcodebuild -version
+    
+    - name: Install Swift dependencies
+      run: |
+        swift package resolve
+    
+    - name: Build for testing
+      run: |
+        xcodebuild build-for-testing \
+          -scheme Hyperchat \
+          -destination 'platform=macOS' \
+          -derivedDataPath build/DerivedData
+    
+    - name: Run unit tests
+      run: |
+        xcodebuild test \
+          -scheme Hyperchat \
+          -destination 'platform=macOS' \
+          -only-testing:HyperchatTests \
+          -derivedDataPath build/DerivedData \
+          -resultBundlePath TestResults/unit-tests.xcresult \
+          | xcpretty --report junit --output TestResults/unit-tests.xml
+      continue-on-error: true
+    
+    - name: Run UI tests
+      run: |
+        xcodebuild test \
+          -scheme Hyperchat \
+          -destination 'platform=macOS' \
+          -only-testing:HyperchatUITests \
+          -derivedDataPath build/DerivedData \
+          -resultBundlePath TestResults/ui-tests.xcresult \
+          | xcpretty --report junit --output TestResults/ui-tests.xml
+      continue-on-error: true
+    
+    - name: Upload test results
+      if: always()
+      uses: actions/upload-artifact@v3
+      with:
+        name: test-results
+        path: |
+          TestResults/*.xcresult
+          TestResults/*.xml
+    
+    - name: Upload coverage reports
+      if: always()
+      uses: actions/upload-artifact@v3
+      with:
+        name: coverage-reports
+        path: build/DerivedData/Logs/Test/*.xcresult
+    
+    - name: Test Report
+      uses: dorny/test-reporter@v1
+      if: always()
+      with:
+        name: Test Results
+        path: 'TestResults/*.xml'
+        reporter: java-junit
+
+  code-coverage:
+    name: Code Coverage
+    runs-on: macos-latest
+    needs: test
+    if: always()
+    
+    steps:
+    - name: Checkout code
+      uses: actions/checkout@v3
+    
+    - name: Download test results
+      uses: actions/download-artifact@v3
+      with:
+        name: coverage-reports
+        path: coverage
+    
+    - name: Generate coverage report
+      run: |
+        xcrun xccov view --report --json coverage/*.xcresult > coverage.json
+    
+    - name: Upload coverage to Codecov
+      uses: codecov/codecov-action@v3
+      with:
+        file: ./coverage.json
+        flags: unittests
+        name: codecov-umbrella
+        fail_ci_if_error: false
+
+  lint:
+    name: SwiftLint
+    runs-on: macos-latest
+    
+    steps:
+    - name: Checkout code
+      uses: actions/checkout@v3
+    
+    - name: Install SwiftLint
+      run: brew install swiftlint
+    
+    - name: Run SwiftLint
+      run: swiftlint lint --reporter junit > swiftlint.xml
+      continue-on-error: true
+    
+    - name: Upload SwiftLint results
+      uses: actions/upload-artifact@v3
+      with:
+        name: swiftlint-results
+        path: swiftlint.xml
+    
+    - name: Publish SwiftLint results
+      uses: dorny/test-reporter@v1
+      if: always()
+      with:
+        name: SwiftLint Results
+        path: 'swiftlint.xml'
+        reporter: java-junit
