@@ -48,3 +48,11 @@ Here is the step-by-step flow of a typical user interaction:
 - **Notification-Based Communication**: Components are loosely coupled. Instead of direct calls, they communicate by posting and observing notifications (e.g., .showOverlay). This makes the system easier to modify.
 - **Dedicated ServiceManager per Window**: Each OverlayWindow gets its own ServiceManager. This is a critical design choice for stability, isolating the web environments from each other and preventing crashes in one window from affecting others.
 - **Shared WKProcessPool**: While each window has its own ServiceManager, all WKWebViews share a single WKProcessPool. This is a key memory optimization that significantly reduces the app's overall footprint.
+
+**Core Technologies & Practices**
+
+- **Dependency Management**: The project uses Swift Package Manager (SPM) to manage third-party libraries like Sparkle and KeyboardShortcuts.
+- **Automated Testing**: A suite of unit and UI tests runs automatically via GitHub Actions to ensure stability. The testing strategy is detailed in `Testing.md`.
+- **Automated Deployment**: The release process is fully automated via the `./deploy-hyperchat.sh` script, which handles signing, notarization, and DMG creation.
+- **Direct Distribution (Not Sandboxed)**: Hyperchat is distributed directly and is not sandboxed. This simplifies development and enables more powerful system-level features.
+- **Automatic Updates (Sparkle)**: The Sparkle framework is integrated to provide seamless, automatic updates to users.

@@ -1,3 +1,0 @@
-Failed saving result bundle for error: The file “UI” couldn’t be saved in the folder “TestResults” because a file with the same name already exists.
-xcodebuild: error: Existing file at -resultBundlePath "/Users/mattmireles/Documents/GitHub/hyperchat/hyperchat-macos/TestResults/UI"
-

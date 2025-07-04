@@ -1196,10 +1196,43 @@ class ServiceManager: NSObject, ObservableObject {
         
         setupServices()
         registerManager()
+        
+        // Listen for service updates
+        NotificationCenter.default.addObserver(
+            self,
+            selector: #selector(servicesDidUpdate),
+            name: .servicesUpdated,
+            object: nil
+        )
+    }
+    
+    @objc private func servicesDidUpdate() {
+        // Only reload if this manager is still active
+        guard !isCleaningUp else { return }
+        
+        print("📱 ServiceManager: Services updated, reloading configuration")
+        
+        // Clear existing services
+        for (_, webService) in webServices {
+            webService.browserView.webView.stopLoading()
+            webService.browserView.removeFromSuperview()
+        }
+        
+        webServices.removeAll()
+        activeServices.removeAll()
+        loadingStates.removeAll()
+        serviceLoadingQueue.removeAll()
+        currentlyLoadingService = nil
+        
+        // Reload services with new configuration
+        setupServices()
     }
     
     deinit {
         print("🔴 [\(Date().timeIntervalSince1970)] ServiceManager DEINIT \(instanceId) starting cleanup")
+        
+        // Remove notification observer
+        NotificationCenter.default.removeObserver(self)
         
         // Wrap all cleanup in autoreleasepool to ensure WebKit's autoreleased objects
         // are released immediately, preventing over-release crashes
@@ -1252,8 +1285,9 @@ class ServiceManager: NSObject, ObservableObject {
     }
     
     private func setupServices() {
-        // Sort services by their order property to ensure correct loading sequence
-        let sortedServices = defaultServices.filter { $0.enabled }.sorted { $0.order < $1.order }
+        // Get services from SettingsManager and sort by order
+        let savedServices = SettingsManager.shared.getServices()
+        let sortedServices = savedServices.filter { $0.enabled }.sorted { $0.order < $1.order }
         
         for (index, service) in sortedServices.enumerated() {
             let webView = createWebView(for: service)

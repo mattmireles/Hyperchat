@@ -8,3 +8,8 @@ build/
 *.backup
 *.backup-*
 .build/
+
+# Test artifacts
+TestResults/
+Tests.log
+*.xcresult
