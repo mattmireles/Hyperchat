@@ -13,6 +13,25 @@ GREEN='\033[0;32m'
 YELLOW='\033[1;33m'
 NC='\033[0m' # No Color
 
+# Parse command line arguments
+NO_CLEANUP=false
+for arg in "$@"; do
+    case $arg in
+        --no-cleanup)
+            NO_CLEANUP=true
+            shift
+            ;;
+        --help|-h)
+            echo "Usage: $0 [options]"
+            echo ""
+            echo "Options:"
+            echo "  --no-cleanup    Keep test artifacts after successful run"
+            echo "  --help, -h      Show this help message"
+            exit 0
+            ;;
+    esac
+done
+
 # Clean up old test results
 rm -rf TestResults
 
@@ -77,15 +96,34 @@ if command -v xcpretty &> /dev/null; then
 fi
 
 # Open test results in Xcode (optional)
-echo -e "\n${YELLOW}Would you like to open the test results in Xcode? (y/n)${NC}"
-read -r response
-if [[ "$response" =~ ^[Yy]$ ]]; then
-    open TestResults/Unit\ Tests.xcresult
+if [ "$NO_CLEANUP" = true ]; then
+    echo -e "\n${YELLOW}Would you like to open the test results in Xcode? (y/n)${NC}"
+    read -r response
+    if [[ "$response" =~ ^[Yy]$ ]]; then
+        open TestResults/Unit\ Tests.xcresult
+    fi
 fi
+
+# Function to clean up test artifacts
+cleanup_test_artifacts() {
+    echo -e "\n${YELLOW}Cleaning up test artifacts...${NC}"
+    rm -rf TestResults
+    rm -f Tests.log
+    echo -e "${GREEN}✅ Test artifacts cleaned${NC}"
+}
 
 # Exit with failure if any tests failed
 if [ $unit_result -ne 0 ] || [ $ui_result -ne 0 ]; then
+    echo -e "\n${RED}⚠️  Tests failed. Keeping artifacts for debugging.${NC}"
+    echo -e "Run 'rm -rf TestResults Tests.log' to clean up manually."
     exit 1
 fi
 
 echo -e "\n${GREEN}🎉 All tests passed!${NC}"
+
+# Clean up test artifacts if not disabled
+if [ "$NO_CLEANUP" = false ]; then
+    cleanup_test_artifacts
+else
+    echo -e "\n${YELLOW}Test artifacts preserved (--no-cleanup flag used)${NC}"
+fi

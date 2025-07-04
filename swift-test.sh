@@ -12,6 +12,10 @@ YELLOW='\033[1;33m'
 BLUE='\033[0;34m'
 NC='\033[0m' # No Color
 
+# Parse cleanup options
+CLEANUP=true
+KEEP_BUILD=false
+
 echo -e "${BLUE}🧪 Hyperchat Test Runner (SPM)${NC}"
 echo "================================"
 
@@ -66,13 +70,26 @@ else
             echo "  --list              List all available tests"
             echo "  --parallel          Run tests in parallel"
             echo "  --verbose           Show detailed output"
+            echo "  --no-cleanup        Don't clean build artifacts after success"
+            echo "  --keep-build        Keep .build directory (clean only logs)"
             echo ""
             echo "Examples:"
             echo "  $0                          # Run all tests"
             echo "  $0 unit                     # Run unit tests only"
             echo "  $0 --filter testChatGPT     # Run tests containing 'testChatGPT'"
             echo "  $0 --parallel               # Run tests in parallel"
+            echo "  $0 --no-cleanup             # Run tests, keep artifacts"
             exit 0
+            ;;
+        --no-cleanup)
+            CLEANUP=false
+            echo -e "\n${YELLOW}Running all tests (cleanup disabled)...${NC}"
+            swift test
+            ;;
+        --keep-build)
+            KEEP_BUILD=true
+            echo -e "\n${YELLOW}Running all tests (keeping build directory)...${NC}"
+            swift test
             ;;
         --parallel)
             echo -e "\n${YELLOW}Running tests in parallel...${NC}"
@@ -90,10 +107,40 @@ else
     esac
 fi
 
+# Store test result
+TEST_RESULT=$?
+
+# Function to clean up test artifacts
+cleanup_test_artifacts() {
+    echo -e "\n${YELLOW}Cleaning up test artifacts...${NC}"
+    
+    # Always remove log files
+    rm -f Tests.log
+    rm -f *.xcresult
+    
+    # Only remove .build if not keeping it
+    if [ "$KEEP_BUILD" = false ]; then
+        rm -rf .build
+        echo -e "${GREEN}✅ Build directory cleaned${NC}"
+    else
+        echo -e "${YELLOW}Build directory preserved${NC}"
+    fi
+    
+    echo -e "${GREEN}✅ Test artifacts cleaned${NC}"
+}
+
 # Check exit status
-if [ $? -eq 0 ]; then
+if [ $TEST_RESULT -eq 0 ]; then
     echo -e "\n${GREEN}✅ Tests passed!${NC}"
+    
+    # Clean up if enabled
+    if [ "$CLEANUP" = true ]; then
+        cleanup_test_artifacts
+    else
+        echo -e "\n${YELLOW}Test artifacts preserved (--no-cleanup flag used)${NC}"
+    fi
 else
     echo -e "\n${RED}❌ Tests failed!${NC}"
+    echo -e "${RED}⚠️  Keeping artifacts for debugging.${NC}"
     exit 1
 fi

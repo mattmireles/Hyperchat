@@ -2,11 +2,12 @@ import Cocoa
 import SwiftUI
 import Sparkle
 
-class AppDelegate: NSObject, NSApplicationDelegate, SPUUpdaterDelegate {
+@objc class AppDelegate: NSObject, NSApplicationDelegate, SPUUpdaterDelegate {
     var floatingButtonManager: FloatingButtonManager
     var overlayController: OverlayController
     var promptWindowController: PromptWindowController
     var updaterController: SPUStandardUpdaterController?
+    var settingsWindowController: SettingsWindowController?
 
     override init() {
         self.floatingButtonManager = FloatingButtonManager()
@@ -17,12 +18,18 @@ class AppDelegate: NSObject, NSApplicationDelegate, SPUUpdaterDelegate {
     }
 
     func applicationDidFinishLaunching(_ aNotification: Notification) {
+        print("🚀 AppDelegate: applicationDidFinishLaunching")
+        
         // Register custom fonts
         registerCustomFonts()
         
         floatingButtonManager.promptWindowController = promptWindowController
         floatingButtonManager.overlayController = self.overlayController
-        floatingButtonManager.showFloatingButton()
+        
+        // Only show floating button if enabled in settings
+        if SettingsManager.shared.isFloatingButtonEnabled {
+            floatingButtonManager.showFloatingButton()
+        }
         
         // Check for auto-installation on first launch
         AutoInstaller.shared.checkAndPromptInstallation()
@@ -45,6 +52,18 @@ class AppDelegate: NSObject, NSApplicationDelegate, SPUUpdaterDelegate {
         // Listen for overlay hide to ensure floating button stays visible
         NotificationCenter.default.addObserver(forName: .overlayDidHide, object: nil, queue: .main) { [weak self] _ in
             self?.floatingButtonManager.ensureFloatingButtonVisible()
+        }
+        
+        // Listen for floating button toggle
+        NotificationCenter.default.addObserver(forName: .floatingButtonToggled, object: nil, queue: .main) { [weak self] notification in
+            guard let self = self else { return }
+            if let isEnabled = notification.object as? Bool {
+                if isEnabled {
+                    self.floatingButtonManager.showFloatingButton()
+                } else {
+                    self.floatingButtonManager.hideFloatingButton()
+                }
+            }
         }
     }
     
@@ -78,6 +97,7 @@ class AppDelegate: NSObject, NSApplicationDelegate, SPUUpdaterDelegate {
     }
     
     @objc func checkForUpdates(_ sender: Any?) {
+        print("📱 Menu: Check for Updates clicked")
         guard let updaterController = updaterController else {
             print("Sparkle: Updater controller not initialized")
             return
@@ -92,6 +112,14 @@ class AppDelegate: NSObject, NSApplicationDelegate, SPUUpdaterDelegate {
             }
         }
         updaterController.checkForUpdates(sender)
+    }
+    
+    @objc func showSettings(_ sender: Any?) {
+        print("📱 Menu: Settings clicked")
+        if settingsWindowController == nil {
+            settingsWindowController = SettingsWindowController()
+        }
+        settingsWindowController?.showWindow(sender)
     }
     
     private func startUpdater() {
