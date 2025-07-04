@@ -17,7 +17,7 @@
 	<key>CFBundleShortVersionString</key>
 	<string>1.0</string>
 	<key>CFBundleVersion</key>
-	<string>61</string>
+	<string>63</string>
 	<key>LSMinimumSystemVersion</key>
 	<string>$(MACOSX_DEPLOYMENT_TARGET)</string>
 	<key>NSMainNibFile</key>
@@ -31,6 +31,6 @@
 	<key>SUPublicEDKey</key>
 	<string>***REMOVED-SPARKLE-KEY***=</string>
 	<key>SUScheduledCheckInterval</key>
-	<integer>86400</integer>
+	<integer>1800</integer>
 </dict>
 </plist>
