@@ -844,7 +844,8 @@ struct UnifiedInputBar: View {
                 
                 // Refresh button - mirrors the Hyperchat logo
                 Button(action: {
-                    serviceManager.reloadAllServices()
+                    // Always start new threads with current prompt (may be empty)
+                    serviceManager.startNewThreadWithPrompt()
                 }) {
                     ZStack {
                         // Background - black on hover, matching logo style
@@ -880,7 +881,7 @@ struct UnifiedInputBar: View {
                     .shadow(color: Color.black.opacity(0.1), radius: 2, x: 0, y: 1)
                 }
                 .buttonStyle(.plain)
-                .help("Create New Chat Thread & Refresh All")
+                .help("Start New Chat Thread")
                 .onHover { hovering in
                     withAnimation(.easeInOut(duration: 0.2)) {
                         isRefreshHovering = hovering

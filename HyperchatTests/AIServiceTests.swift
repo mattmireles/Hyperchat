@@ -1,5 +1,5 @@
 import XCTest
-import Hyperchat
+@testable import Hyperchat
 
 class AIServiceTests: XCTestCase {
     
