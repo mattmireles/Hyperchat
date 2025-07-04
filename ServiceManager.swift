@@ -1452,6 +1452,8 @@ class ServiceManager: NSObject, ObservableObject {
     }
     
     func reloadAllServices() {
+        print("🔥 reloadAllServices() called from: \(Thread.callStackSymbols[1])")
+        
         // Clear and repopulate the loading queue
         serviceLoadingQueue.removeAll()
         
@@ -1472,6 +1474,60 @@ class ServiceManager: NSObject, ObservableObject {
         
         // Start loading the first service with force reload
         loadNextServiceFromQueue(forceReload: true)
+    }
+    
+    func resetThreadState() {
+        // Reset to first submit mode to create new threads
+        isFirstSubmit = true
+        replyToAll = true  // Reset UI to default state
+        
+        // Don't clear the prompt here - let the UI handle it after submission
+        
+        // Don't reload all services - this was causing unwanted reloads after GET param navigation
+        // reloadAllServices()
+    }
+    
+    func startNewThreadWithPrompt() {
+        // Store the current prompt (may be empty)
+        let promptToExecute = sharedPrompt.trimmingCharacters(in: .whitespacesAndNewlines)
+        
+        // Clear the prompt immediately for UI feedback
+        sharedPrompt = ""
+        
+        // Reset to first submit mode for new threads
+        isFirstSubmit = true
+        // Don't set replyToAll here - we want URL navigation, not paste
+        
+        // CRITICAL: Clear all loading state to prevent queue processing
+        serviceLoadingQueue.removeAll()
+        currentlyLoadingService = nil
+        
+        // Mark all services as loaded to prevent sequential loading from continuing
+        hasNotifiedAllServicesLoaded = true
+        
+        // Navigate each service to a new thread with the prompt as URL parameter
+        for (serviceId, webService) in webServices {
+            guard let service = activeServices.first(where: { $0.id == serviceId }),
+                  let config = ServiceConfigurations.config(for: serviceId) else { continue }
+            
+            let urlString: String
+            if promptToExecute.isEmpty {
+                // No prompt - just load the home page
+                urlString = config.homeURL
+            } else {
+                // Build URL with query parameters
+                urlString = config.buildURL(with: promptToExecute)
+            }
+            
+            // Navigate directly to the URL
+            if let url = URL(string: urlString) {
+                print("🔗 \(service.name): New thread navigation to: \(urlString)")
+                webService.browserView.webView.load(URLRequest(url: url))
+            }
+        }
+        
+        // Don't reset loading tracking - we're not using the queue mechanism here
+        // This prevents the cascade of reloads after navigation
     }
     
     private func createWebView(for service: AIService) -> WKWebView {
@@ -1737,7 +1793,7 @@ extension ServiceManager: WKNavigationDelegate {
                 loadingStates[serviceId] = false
                 
                 // Check if this was the service we were waiting for
-                if serviceId == currentlyLoadingService {
+                if serviceId == currentlyLoadingService && !hasNotifiedAllServicesLoaded {
                     print("❌ Service \(serviceId) failed during navigation - proceeding to next service")
                     currentlyLoadingService = nil
                     
@@ -1805,7 +1861,7 @@ extension ServiceManager: WKNavigationDelegate {
                 loadingStates[serviceId] = false
                 
                 // Check if this was the service we were waiting for
-                if serviceId == currentlyLoadingService {
+                if serviceId == currentlyLoadingService && !hasNotifiedAllServicesLoaded {
                     print("❌ Service \(serviceId) failed to load - proceeding to next service anyway")
                     currentlyLoadingService = nil
                     
@@ -1869,7 +1925,7 @@ extension ServiceManager: WKNavigationDelegate {
                 loadingStates[serviceId] = false
                 
                 // Check if this was the service we were waiting for
-                if serviceId == currentlyLoadingService {
+                if serviceId == currentlyLoadingService && !hasNotifiedAllServicesLoaded {
                     print("✅ Service \(serviceId) finished loading - proceeding to next service")
                     currentlyLoadingService = nil
                     

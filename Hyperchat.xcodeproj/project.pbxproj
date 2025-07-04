@@ -18,11 +18,35 @@
 		3EE13BAC2C4F6B2900A8A61E /* UserAgentGenerator.swift in Sources */ = {isa = PBXBuildFile; fileRef = 3EE13BA62C4F6B2900A8A61E /* UserAgentGenerator.swift */; };
 		3EE13BAD2C4F6B2900A8A61E /* NSScreen+Extensions.swift in Sources */ = {isa = PBXBuildFile; fileRef = 3EE13BA72C4F6B2900A8A61E /* NSScreen+Extensions.swift */; };
 		3EE13BAE2C4F6B2900A8A61E /* ServiceConfiguration.swift in Sources */ = {isa = PBXBuildFile; fileRef = 3EE13BA82C4F6B2900A8A61E /* ServiceConfiguration.swift */; };
+		3EE13BB22C4F6B2900A8A61E /* Orbitron-Bold.ttf in Resources */ = {isa = PBXBuildFile; fileRef = 3EE13BB32C4F6B2900A8A61E /* Orbitron-Bold.ttf */; };
 		BE8135E42E01E24D0059C681 /* Sparkle in Frameworks */ = {isa = PBXBuildFile; productRef = BE8135E32E01E24D0059C681 /* Sparkle */; };
+		BEC467CB2E16481D007B45D0 /* ServiceConfigurationTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = BEC467972E164215007B45D0 /* ServiceConfigurationTests.swift */; };
+		BEC467CC2E16481D007B45D0 /* AIServiceTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = BEC467952E164215007B45D0 /* AIServiceTests.swift */; };
+		BEC467CD2E16481D007B45D0 /* WebViewMocks.swift in Sources */ = {isa = PBXBuildFile; fileRef = BEC467992E164215007B45D0 /* WebViewMocks.swift */; };
+		BEC467CE2E16481D007B45D0 /* ServiceManagerTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = BEC467982E164215007B45D0 /* ServiceManagerTests.swift */; };
+		BEC467CF2E164831007B45D0 /* Info.plist in Resources */ = {isa = PBXBuildFile; fileRef = BEC467962E164215007B45D0 /* Info.plist */; };
+		BEC467D02E16483D007B45D0 /* Info.plist in Resources */ = {isa = PBXBuildFile; fileRef = BEC4679C2E164215007B45D0 /* Info.plist */; };
+		BEC467D12E16483D007B45D0 /* HyperchatUITests.swift in Sources */ = {isa = PBXBuildFile; fileRef = BEC4679B2E164215007B45D0 /* HyperchatUITests.swift */; };
 		BEE13BAF2C4F6B2900A8A61E /* WebViewLogger.swift in Sources */ = {isa = PBXBuildFile; fileRef = BEE13BA92C4F6B2900A8A61E /* WebViewLogger.swift */; };
 		BEE13BB02C4F6B2900A8A61E /* AutoInstaller.swift in Sources */ = {isa = PBXBuildFile; fileRef = BEE13BB12C4F6B2900A8A61E /* AutoInstaller.swift */; };
-		3EE13BB22C4F6B2900A8A61E /* Orbitron-Bold.ttf in Resources */ = {isa = PBXBuildFile; fileRef = 3EE13BB32C4F6B2900A8A61E /* Orbitron-Bold.ttf */; };
 /* End PBXBuildFile section */
+
+/* Begin PBXContainerItemProxy section */
+		BEC467AD2E164429007B45D0 /* PBXContainerItemProxy */ = {
+			isa = PBXContainerItemProxy;
+			containerPortal = 3EE13B842C4F6B2900A8A61E /* Project object */;
+			proxyType = 1;
+			remoteGlobalIDString = 3EE13B8A2C4F6B2900A8A61E;
+			remoteInfo = Hyperchat;
+		};
+		BEC467C42E164462007B45D0 /* PBXContainerItemProxy */ = {
+			isa = PBXContainerItemProxy;
+			containerPortal = 3EE13B842C4F6B2900A8A61E /* Project object */;
+			proxyType = 1;
+			remoteGlobalIDString = 3EE13B8A2C4F6B2900A8A61E;
+			remoteInfo = Hyperchat;
+		};
+/* End PBXContainerItemProxy section */
 
 /* Begin PBXFileReference section */
 		3EE13B8B2C4F6B2900A8A61E /* Hyperchat.app */ = {isa = PBXFileReference; explicitFileType = wrapper.application; includeInIndex = 0; path = Hyperchat.app; sourceTree = BUILT_PRODUCTS_DIR; };
@@ -39,9 +63,18 @@
 		3EE13BA62C4F6B2900A8A61E /* UserAgentGenerator.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = UserAgentGenerator.swift; sourceTree = "<group>"; };
 		3EE13BA72C4F6B2900A8A61E /* NSScreen+Extensions.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = "NSScreen+Extensions.swift"; sourceTree = "<group>"; };
 		3EE13BA82C4F6B2900A8A61E /* ServiceConfiguration.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ServiceConfiguration.swift; sourceTree = "<group>"; };
+		3EE13BB32C4F6B2900A8A61E /* Orbitron-Bold.ttf */ = {isa = PBXFileReference; lastKnownFileType = file; path = "Orbitron-Bold.ttf"; sourceTree = "<group>"; };
+		BEC467952E164215007B45D0 /* AIServiceTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = AIServiceTests.swift; sourceTree = "<group>"; };
+		BEC467962E164215007B45D0 /* Info.plist */ = {isa = PBXFileReference; lastKnownFileType = text.plist.xml; path = Info.plist; sourceTree = "<group>"; };
+		BEC467972E164215007B45D0 /* ServiceConfigurationTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ServiceConfigurationTests.swift; sourceTree = "<group>"; };
+		BEC467982E164215007B45D0 /* ServiceManagerTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ServiceManagerTests.swift; sourceTree = "<group>"; };
+		BEC467992E164215007B45D0 /* WebViewMocks.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = WebViewMocks.swift; sourceTree = "<group>"; };
+		BEC4679B2E164215007B45D0 /* HyperchatUITests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = HyperchatUITests.swift; sourceTree = "<group>"; };
+		BEC4679C2E164215007B45D0 /* Info.plist */ = {isa = PBXFileReference; lastKnownFileType = text.plist.xml; path = Info.plist; sourceTree = "<group>"; };
+		BEC467A92E164429007B45D0 /* HyperchatTests.xctest */ = {isa = PBXFileReference; explicitFileType = wrapper.cfbundle; includeInIndex = 0; path = HyperchatTests.xctest; sourceTree = BUILT_PRODUCTS_DIR; };
+		BEC467C02E164462007B45D0 /* HyperchatUITests.xctest */ = {isa = PBXFileReference; explicitFileType = wrapper.cfbundle; includeInIndex = 0; path = HyperchatUITests.xctest; sourceTree = BUILT_PRODUCTS_DIR; };
 		BEE13BA92C4F6B2900A8A61E /* WebViewLogger.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = WebViewLogger.swift; sourceTree = "<group>"; };
 		BEE13BB12C4F6B2900A8A61E /* AutoInstaller.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = AutoInstaller.swift; sourceTree = "<group>"; };
-		3EE13BB32C4F6B2900A8A61E /* Orbitron-Bold.ttf */ = {isa = PBXFileReference; lastKnownFileType = file; path = "Orbitron-Bold.ttf"; sourceTree = "<group>"; };
 /* End PBXFileReference section */
 
 /* Begin PBXFrameworksBuildPhase section */
@@ -53,6 +86,20 @@
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 		};
+		BEC467A62E164429007B45D0 /* Frameworks */ = {
+			isa = PBXFrameworksBuildPhase;
+			buildActionMask = 2147483647;
+			files = (
+			);
+			runOnlyForDeploymentPostprocessing = 0;
+		};
+		BEC467BD2E164462007B45D0 /* Frameworks */ = {
+			isa = PBXFrameworksBuildPhase;
+			buildActionMask = 2147483647;
+			files = (
+			);
+			runOnlyForDeploymentPostprocessing = 0;
+		};
 /* End PBXFrameworksBuildPhase section */
 
 /* Begin PBXGroup section */
@@ -60,6 +107,8 @@
 			isa = PBXGroup;
 			children = (
 				3EE13B8D2C4F6B2900A8A61E /* . */,
+				BEC4679A2E164215007B45D0 /* HyperchatTests */,
+				BEC4679D2E164215007B45D0 /* HyperchatUITests */,
 				3EE13B8C2C4F6B2900A8A61E /* Products */,
 			);
 			sourceTree = "<group>";
@@ -68,6 +117,8 @@
 			isa = PBXGroup;
 			children = (
 				3EE13B8B2C4F6B2900A8A61E /* Hyperchat.app */,
+				BEC467A92E164429007B45D0 /* HyperchatTests.xctest */,
+				BEC467C02E164462007B45D0 /* HyperchatUITests.xctest */,
 			);
 			name = Products;
 			sourceTree = "<group>";
@@ -92,7 +143,28 @@
 				BEE13BB12C4F6B2900A8A61E /* AutoInstaller.swift */,
 				3EE13BB32C4F6B2900A8A61E /* Orbitron-Bold.ttf */,
 			);
-			path = .;
+			path = Sources/Hyperchat;
+			sourceTree = "<group>";
+		};
+		BEC4679A2E164215007B45D0 /* HyperchatTests */ = {
+			isa = PBXGroup;
+			children = (
+				BEC467952E164215007B45D0 /* AIServiceTests.swift */,
+				BEC467962E164215007B45D0 /* Info.plist */,
+				BEC467972E164215007B45D0 /* ServiceConfigurationTests.swift */,
+				BEC467982E164215007B45D0 /* ServiceManagerTests.swift */,
+				BEC467992E164215007B45D0 /* WebViewMocks.swift */,
+			);
+			path = HyperchatTests;
+			sourceTree = "<group>";
+		};
+		BEC4679D2E164215007B45D0 /* HyperchatUITests */ = {
+			isa = PBXGroup;
+			children = (
+				BEC4679B2E164215007B45D0 /* HyperchatUITests.swift */,
+				BEC4679C2E164215007B45D0 /* Info.plist */,
+			);
+			path = HyperchatUITests;
 			sourceTree = "<group>";
 		};
 /* End PBXGroup section */
@@ -115,6 +187,46 @@
 			productReference = 3EE13B8B2C4F6B2900A8A61E /* Hyperchat.app */;
 			productType = "com.apple.product-type.application";
 		};
+		BEC467A82E164429007B45D0 /* HyperchatTests */ = {
+			isa = PBXNativeTarget;
+			buildConfigurationList = BEC467AF2E164429007B45D0 /* Build configuration list for PBXNativeTarget "HyperchatTests" */;
+			buildPhases = (
+				BEC467A52E164429007B45D0 /* Sources */,
+				BEC467A62E164429007B45D0 /* Frameworks */,
+				BEC467A72E164429007B45D0 /* Resources */,
+			);
+			buildRules = (
+			);
+			dependencies = (
+				BEC467AE2E164429007B45D0 /* PBXTargetDependency */,
+			);
+			name = HyperchatTests;
+			packageProductDependencies = (
+			);
+			productName = HyperchatTests;
+			productReference = BEC467A92E164429007B45D0 /* HyperchatTests.xctest */;
+			productType = "com.apple.product-type.bundle.unit-test";
+		};
+		BEC467BF2E164462007B45D0 /* HyperchatUITests */ = {
+			isa = PBXNativeTarget;
+			buildConfigurationList = BEC467C62E164462007B45D0 /* Build configuration list for PBXNativeTarget "HyperchatUITests" */;
+			buildPhases = (
+				BEC467BC2E164462007B45D0 /* Sources */,
+				BEC467BD2E164462007B45D0 /* Frameworks */,
+				BEC467BE2E164462007B45D0 /* Resources */,
+			);
+			buildRules = (
+			);
+			dependencies = (
+				BEC467C52E164462007B45D0 /* PBXTargetDependency */,
+			);
+			name = HyperchatUITests;
+			packageProductDependencies = (
+			);
+			productName = HyperchatUITests;
+			productReference = BEC467C02E164462007B45D0 /* HyperchatUITests.xctest */;
+			productType = "com.apple.product-type.bundle.unit-test";
+		};
 /* End PBXNativeTarget section */
 
 /* Begin PBXProject section */
@@ -127,6 +239,14 @@
 				TargetAttributes = {
 					3EE13B8A2C4F6B2900A8A61E = {
 						CreatedOnToolsVersion = 16.4;
+					};
+					BEC467A82E164429007B45D0 = {
+						CreatedOnToolsVersion = 16.4;
+						TestTargetID = 3EE13B8A2C4F6B2900A8A61E;
+					};
+					BEC467BF2E164462007B45D0 = {
+						CreatedOnToolsVersion = 16.4;
+						TestTargetID = 3EE13B8A2C4F6B2900A8A61E;
 					};
 				};
 			};
@@ -147,6 +267,8 @@
 			projectRoot = "";
 			targets = (
 				3EE13B8A2C4F6B2900A8A61E /* Hyperchat */,
+				BEC467A82E164429007B45D0 /* HyperchatTests */,
+				BEC467BF2E164462007B45D0 /* HyperchatUITests */,
 			);
 		};
 /* End PBXProject section */
@@ -159,6 +281,22 @@
 				3EE13B9F2C4F6B2900A8A61E /* MainMenu.xib in Resources */,
 				3EE13B9C2C4F6B2900A8A61E /* Assets.xcassets in Resources */,
 				3EE13BB22C4F6B2900A8A61E /* Orbitron-Bold.ttf in Resources */,
+			);
+			runOnlyForDeploymentPostprocessing = 0;
+		};
+		BEC467A72E164429007B45D0 /* Resources */ = {
+			isa = PBXResourcesBuildPhase;
+			buildActionMask = 2147483647;
+			files = (
+				BEC467CF2E164831007B45D0 /* Info.plist in Resources */,
+			);
+			runOnlyForDeploymentPostprocessing = 0;
+		};
+		BEC467BE2E164462007B45D0 /* Resources */ = {
+			isa = PBXResourcesBuildPhase;
+			buildActionMask = 2147483647;
+			files = (
+				BEC467D02E16483D007B45D0 /* Info.plist in Resources */,
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 		};
@@ -183,7 +321,39 @@
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 		};
+		BEC467A52E164429007B45D0 /* Sources */ = {
+			isa = PBXSourcesBuildPhase;
+			buildActionMask = 2147483647;
+			files = (
+				BEC467CB2E16481D007B45D0 /* ServiceConfigurationTests.swift in Sources */,
+				BEC467CC2E16481D007B45D0 /* AIServiceTests.swift in Sources */,
+				BEC467CD2E16481D007B45D0 /* WebViewMocks.swift in Sources */,
+				BEC467CE2E16481D007B45D0 /* ServiceManagerTests.swift in Sources */,
+			);
+			runOnlyForDeploymentPostprocessing = 0;
+		};
+		BEC467BC2E164462007B45D0 /* Sources */ = {
+			isa = PBXSourcesBuildPhase;
+			buildActionMask = 2147483647;
+			files = (
+				BEC467D12E16483D007B45D0 /* HyperchatUITests.swift in Sources */,
+			);
+			runOnlyForDeploymentPostprocessing = 0;
+		};
 /* End PBXSourcesBuildPhase section */
+
+/* Begin PBXTargetDependency section */
+		BEC467AE2E164429007B45D0 /* PBXTargetDependency */ = {
+			isa = PBXTargetDependency;
+			target = 3EE13B8A2C4F6B2900A8A61E /* Hyperchat */;
+			targetProxy = BEC467AD2E164429007B45D0 /* PBXContainerItemProxy */;
+		};
+		BEC467C52E164462007B45D0 /* PBXTargetDependency */ = {
+			isa = PBXTargetDependency;
+			target = 3EE13B8A2C4F6B2900A8A61E /* Hyperchat */;
+			targetProxy = BEC467C42E164462007B45D0 /* PBXContainerItemProxy */;
+		};
+/* End PBXTargetDependency section */
 
 /* Begin XCBuildConfiguration section */
 		3EE13B982C4F6B2900A8A61E /* Debug */ = {
@@ -207,6 +377,7 @@
 				DEVELOPMENT_TEAM = $(APPLE_TEAM_ID);
 				ENABLE_HARDENED_RUNTIME = YES;
 				ENABLE_PREVIEWS = YES;
+				ENABLE_TESTABILITY = YES;
 				GCC_C_LANGUAGE_STANDARD = gnu11;
 				GCC_NO_COMMON_BLOCKS = YES;
 				INFOPLIST_FILE = Info.plist;
@@ -269,6 +440,236 @@
 			};
 			name = Release;
 		};
+		BEC467B02E164429007B45D0 /* Debug */ = {
+			isa = XCBuildConfiguration;
+			buildSettings = {
+				ASSETCATALOG_COMPILER_GENERATE_SWIFT_ASSET_SYMBOL_EXTENSIONS = YES;
+				BUNDLE_LOADER = "$(TEST_HOST)";
+				CLANG_CXX_LANGUAGE_STANDARD = "gnu++20";
+				CLANG_WARN_BLOCK_CAPTURE_AUTORELEASING = YES;
+				CLANG_WARN_BOOL_CONVERSION = YES;
+				CLANG_WARN_COMMA = YES;
+				CLANG_WARN_CONSTANT_CONVERSION = YES;
+				CLANG_WARN_DEPRECATED_OBJC_IMPLEMENTATIONS = YES;
+				CLANG_WARN_DIRECT_OBJC_ISA_USAGE = YES_ERROR;
+				CLANG_WARN_EMPTY_BODY = YES;
+				CLANG_WARN_ENUM_CONVERSION = YES;
+				CLANG_WARN_INFINITE_RECURSION = YES;
+				CLANG_WARN_INT_CONVERSION = YES;
+				CLANG_WARN_NON_LITERAL_NULL_CONVERSION = YES;
+				CLANG_WARN_OBJC_IMPLICIT_RETAIN_SELF = YES;
+				CLANG_WARN_OBJC_LITERAL_CONVERSION = YES;
+				CLANG_WARN_OBJC_ROOT_CLASS = YES_ERROR;
+				CLANG_WARN_QUOTED_INCLUDE_IN_FRAMEWORK_HEADER = YES;
+				CLANG_WARN_RANGE_LOOP_ANALYSIS = YES;
+				CLANG_WARN_STRICT_PROTOTYPES = YES;
+				CLANG_WARN_SUSPICIOUS_MOVE = YES;
+				CLANG_WARN_UNREACHABLE_CODE = YES;
+				CLANG_WARN__DUPLICATE_METHOD_MATCH = YES;
+				CODE_SIGN_STYLE = Automatic;
+				CURRENT_PROJECT_VERSION = 1;
+				DEVELOPMENT_TEAM = $(APPLE_TEAM_ID);
+				ENABLE_STRICT_OBJC_MSGSEND = YES;
+				ENABLE_TESTABILITY = YES;
+				ENABLE_USER_SCRIPT_SANDBOXING = YES;
+				GCC_C_LANGUAGE_STANDARD = gnu17;
+				GCC_DYNAMIC_NO_PIC = NO;
+				GCC_OPTIMIZATION_LEVEL = 0;
+				GCC_PREPROCESSOR_DEFINITIONS = (
+					"DEBUG=1",
+					"$(inherited)",
+				);
+				GCC_WARN_64_TO_32_BIT_CONVERSION = YES;
+				GCC_WARN_ABOUT_RETURN_TYPE = YES_ERROR;
+				GCC_WARN_UNDECLARED_SELECTOR = YES;
+				GCC_WARN_UNINITIALIZED_AUTOS = YES_AGGRESSIVE;
+				GCC_WARN_UNUSED_FUNCTION = YES;
+				GCC_WARN_UNUSED_VARIABLE = YES;
+				GENERATE_INFOPLIST_FILE = YES;
+				LOCALIZATION_PREFERS_STRING_CATALOGS = YES;
+				MACOSX_DEPLOYMENT_TARGET = 15.5;
+				MARKETING_VERSION = 1.0;
+				MTL_FAST_MATH = YES;
+				ONLY_ACTIVE_ARCH = YES;
+				PRODUCT_BUNDLE_IDENTIFIER = com.Transcendence.HyperchatTests;
+				PRODUCT_NAME = "$(TARGET_NAME)";
+				SDKROOT = macosx;
+				SWIFT_ACTIVE_COMPILATION_CONDITIONS = "DEBUG $(inherited)";
+				SWIFT_EMIT_LOC_STRINGS = NO;
+				SWIFT_VERSION = 5.0;
+				TEST_HOST = "$(BUILT_PRODUCTS_DIR)/Hyperchat.app/$(BUNDLE_EXECUTABLE_FOLDER_PATH)/Hyperchat";
+			};
+			name = Debug;
+		};
+		BEC467B12E164429007B45D0 /* Release */ = {
+			isa = XCBuildConfiguration;
+			buildSettings = {
+				ASSETCATALOG_COMPILER_GENERATE_SWIFT_ASSET_SYMBOL_EXTENSIONS = YES;
+				BUNDLE_LOADER = "$(TEST_HOST)";
+				CLANG_CXX_LANGUAGE_STANDARD = "gnu++20";
+				CLANG_WARN_BLOCK_CAPTURE_AUTORELEASING = YES;
+				CLANG_WARN_BOOL_CONVERSION = YES;
+				CLANG_WARN_COMMA = YES;
+				CLANG_WARN_CONSTANT_CONVERSION = YES;
+				CLANG_WARN_DEPRECATED_OBJC_IMPLEMENTATIONS = YES;
+				CLANG_WARN_DIRECT_OBJC_ISA_USAGE = YES_ERROR;
+				CLANG_WARN_EMPTY_BODY = YES;
+				CLANG_WARN_ENUM_CONVERSION = YES;
+				CLANG_WARN_INFINITE_RECURSION = YES;
+				CLANG_WARN_INT_CONVERSION = YES;
+				CLANG_WARN_NON_LITERAL_NULL_CONVERSION = YES;
+				CLANG_WARN_OBJC_IMPLICIT_RETAIN_SELF = YES;
+				CLANG_WARN_OBJC_LITERAL_CONVERSION = YES;
+				CLANG_WARN_OBJC_ROOT_CLASS = YES_ERROR;
+				CLANG_WARN_QUOTED_INCLUDE_IN_FRAMEWORK_HEADER = YES;
+				CLANG_WARN_RANGE_LOOP_ANALYSIS = YES;
+				CLANG_WARN_STRICT_PROTOTYPES = YES;
+				CLANG_WARN_SUSPICIOUS_MOVE = YES;
+				CLANG_WARN_UNREACHABLE_CODE = YES;
+				CLANG_WARN__DUPLICATE_METHOD_MATCH = YES;
+				CODE_SIGN_STYLE = Automatic;
+				COPY_PHASE_STRIP = NO;
+				CURRENT_PROJECT_VERSION = 1;
+				DEVELOPMENT_TEAM = $(APPLE_TEAM_ID);
+				ENABLE_NS_ASSERTIONS = NO;
+				ENABLE_STRICT_OBJC_MSGSEND = YES;
+				ENABLE_USER_SCRIPT_SANDBOXING = YES;
+				GCC_C_LANGUAGE_STANDARD = gnu17;
+				GCC_WARN_64_TO_32_BIT_CONVERSION = YES;
+				GCC_WARN_ABOUT_RETURN_TYPE = YES_ERROR;
+				GCC_WARN_UNDECLARED_SELECTOR = YES;
+				GCC_WARN_UNINITIALIZED_AUTOS = YES_AGGRESSIVE;
+				GCC_WARN_UNUSED_FUNCTION = YES;
+				GCC_WARN_UNUSED_VARIABLE = YES;
+				GENERATE_INFOPLIST_FILE = YES;
+				LOCALIZATION_PREFERS_STRING_CATALOGS = YES;
+				MACOSX_DEPLOYMENT_TARGET = 15.5;
+				MARKETING_VERSION = 1.0;
+				MTL_FAST_MATH = YES;
+				PRODUCT_BUNDLE_IDENTIFIER = com.Transcendence.HyperchatTests;
+				PRODUCT_NAME = "$(TARGET_NAME)";
+				SDKROOT = macosx;
+				SWIFT_EMIT_LOC_STRINGS = NO;
+				SWIFT_VERSION = 5.0;
+				TEST_HOST = "$(BUILT_PRODUCTS_DIR)/Hyperchat.app/$(BUNDLE_EXECUTABLE_FOLDER_PATH)/Hyperchat";
+			};
+			name = Release;
+		};
+		BEC467C72E164462007B45D0 /* Debug */ = {
+			isa = XCBuildConfiguration;
+			buildSettings = {
+				ASSETCATALOG_COMPILER_GENERATE_SWIFT_ASSET_SYMBOL_EXTENSIONS = YES;
+				BUNDLE_LOADER = "$(TEST_HOST)";
+				CLANG_CXX_LANGUAGE_STANDARD = "gnu++20";
+				CLANG_WARN_BLOCK_CAPTURE_AUTORELEASING = YES;
+				CLANG_WARN_BOOL_CONVERSION = YES;
+				CLANG_WARN_COMMA = YES;
+				CLANG_WARN_CONSTANT_CONVERSION = YES;
+				CLANG_WARN_DEPRECATED_OBJC_IMPLEMENTATIONS = YES;
+				CLANG_WARN_DIRECT_OBJC_ISA_USAGE = YES_ERROR;
+				CLANG_WARN_EMPTY_BODY = YES;
+				CLANG_WARN_ENUM_CONVERSION = YES;
+				CLANG_WARN_INFINITE_RECURSION = YES;
+				CLANG_WARN_INT_CONVERSION = YES;
+				CLANG_WARN_NON_LITERAL_NULL_CONVERSION = YES;
+				CLANG_WARN_OBJC_IMPLICIT_RETAIN_SELF = YES;
+				CLANG_WARN_OBJC_LITERAL_CONVERSION = YES;
+				CLANG_WARN_OBJC_ROOT_CLASS = YES_ERROR;
+				CLANG_WARN_QUOTED_INCLUDE_IN_FRAMEWORK_HEADER = YES;
+				CLANG_WARN_RANGE_LOOP_ANALYSIS = YES;
+				CLANG_WARN_STRICT_PROTOTYPES = YES;
+				CLANG_WARN_SUSPICIOUS_MOVE = YES;
+				CLANG_WARN_UNREACHABLE_CODE = YES;
+				CLANG_WARN__DUPLICATE_METHOD_MATCH = YES;
+				CODE_SIGN_STYLE = Automatic;
+				CURRENT_PROJECT_VERSION = 1;
+				DEVELOPMENT_TEAM = $(APPLE_TEAM_ID);
+				ENABLE_STRICT_OBJC_MSGSEND = YES;
+				ENABLE_TESTABILITY = YES;
+				ENABLE_USER_SCRIPT_SANDBOXING = YES;
+				GCC_C_LANGUAGE_STANDARD = gnu17;
+				GCC_DYNAMIC_NO_PIC = NO;
+				GCC_OPTIMIZATION_LEVEL = 0;
+				GCC_PREPROCESSOR_DEFINITIONS = (
+					"DEBUG=1",
+					"$(inherited)",
+				);
+				GCC_WARN_64_TO_32_BIT_CONVERSION = YES;
+				GCC_WARN_ABOUT_RETURN_TYPE = YES_ERROR;
+				GCC_WARN_UNDECLARED_SELECTOR = YES;
+				GCC_WARN_UNINITIALIZED_AUTOS = YES_AGGRESSIVE;
+				GCC_WARN_UNUSED_FUNCTION = YES;
+				GCC_WARN_UNUSED_VARIABLE = YES;
+				GENERATE_INFOPLIST_FILE = YES;
+				LOCALIZATION_PREFERS_STRING_CATALOGS = YES;
+				MACOSX_DEPLOYMENT_TARGET = 15.5;
+				MARKETING_VERSION = 1.0;
+				MTL_FAST_MATH = YES;
+				ONLY_ACTIVE_ARCH = YES;
+				PRODUCT_BUNDLE_IDENTIFIER = com.Transcendence.HyperchatUITests;
+				PRODUCT_NAME = "$(TARGET_NAME)";
+				SDKROOT = macosx;
+				SWIFT_ACTIVE_COMPILATION_CONDITIONS = "DEBUG $(inherited)";
+				SWIFT_EMIT_LOC_STRINGS = NO;
+				SWIFT_VERSION = 5.0;
+				TEST_HOST = "$(BUILT_PRODUCTS_DIR)/Hyperchat.app/$(BUNDLE_EXECUTABLE_FOLDER_PATH)/Hyperchat";
+			};
+			name = Debug;
+		};
+		BEC467C82E164462007B45D0 /* Release */ = {
+			isa = XCBuildConfiguration;
+			buildSettings = {
+				ASSETCATALOG_COMPILER_GENERATE_SWIFT_ASSET_SYMBOL_EXTENSIONS = YES;
+				BUNDLE_LOADER = "$(TEST_HOST)";
+				CLANG_CXX_LANGUAGE_STANDARD = "gnu++20";
+				CLANG_WARN_BLOCK_CAPTURE_AUTORELEASING = YES;
+				CLANG_WARN_BOOL_CONVERSION = YES;
+				CLANG_WARN_COMMA = YES;
+				CLANG_WARN_CONSTANT_CONVERSION = YES;
+				CLANG_WARN_DEPRECATED_OBJC_IMPLEMENTATIONS = YES;
+				CLANG_WARN_DIRECT_OBJC_ISA_USAGE = YES_ERROR;
+				CLANG_WARN_EMPTY_BODY = YES;
+				CLANG_WARN_ENUM_CONVERSION = YES;
+				CLANG_WARN_INFINITE_RECURSION = YES;
+				CLANG_WARN_INT_CONVERSION = YES;
+				CLANG_WARN_NON_LITERAL_NULL_CONVERSION = YES;
+				CLANG_WARN_OBJC_IMPLICIT_RETAIN_SELF = YES;
+				CLANG_WARN_OBJC_LITERAL_CONVERSION = YES;
+				CLANG_WARN_OBJC_ROOT_CLASS = YES_ERROR;
+				CLANG_WARN_QUOTED_INCLUDE_IN_FRAMEWORK_HEADER = YES;
+				CLANG_WARN_RANGE_LOOP_ANALYSIS = YES;
+				CLANG_WARN_STRICT_PROTOTYPES = YES;
+				CLANG_WARN_SUSPICIOUS_MOVE = YES;
+				CLANG_WARN_UNREACHABLE_CODE = YES;
+				CLANG_WARN__DUPLICATE_METHOD_MATCH = YES;
+				CODE_SIGN_STYLE = Automatic;
+				COPY_PHASE_STRIP = NO;
+				CURRENT_PROJECT_VERSION = 1;
+				DEVELOPMENT_TEAM = $(APPLE_TEAM_ID);
+				ENABLE_NS_ASSERTIONS = NO;
+				ENABLE_STRICT_OBJC_MSGSEND = YES;
+				ENABLE_USER_SCRIPT_SANDBOXING = YES;
+				GCC_C_LANGUAGE_STANDARD = gnu17;
+				GCC_WARN_64_TO_32_BIT_CONVERSION = YES;
+				GCC_WARN_ABOUT_RETURN_TYPE = YES_ERROR;
+				GCC_WARN_UNDECLARED_SELECTOR = YES;
+				GCC_WARN_UNINITIALIZED_AUTOS = YES_AGGRESSIVE;
+				GCC_WARN_UNUSED_FUNCTION = YES;
+				GCC_WARN_UNUSED_VARIABLE = YES;
+				GENERATE_INFOPLIST_FILE = YES;
+				LOCALIZATION_PREFERS_STRING_CATALOGS = YES;
+				MACOSX_DEPLOYMENT_TARGET = 15.5;
+				MARKETING_VERSION = 1.0;
+				MTL_FAST_MATH = YES;
+				PRODUCT_BUNDLE_IDENTIFIER = com.Transcendence.HyperchatUITests;
+				PRODUCT_NAME = "$(TARGET_NAME)";
+				SDKROOT = macosx;
+				SWIFT_EMIT_LOC_STRINGS = NO;
+				SWIFT_VERSION = 5.0;
+				TEST_HOST = "$(BUILT_PRODUCTS_DIR)/Hyperchat.app/$(BUNDLE_EXECUTABLE_FOLDER_PATH)/Hyperchat";
+			};
+			name = Release;
+		};
 /* End XCBuildConfiguration section */
 
 /* Begin XCConfigurationList section */
@@ -286,6 +687,24 @@
 			buildConfigurations = (
 				3EE13B982C4F6B2900A8A61E /* Debug */,
 				3EE13B992C4F6B2900A8A61E /* Release */,
+			);
+			defaultConfigurationIsVisible = 0;
+			defaultConfigurationName = Release;
+		};
+		BEC467AF2E164429007B45D0 /* Build configuration list for PBXNativeTarget "HyperchatTests" */ = {
+			isa = XCConfigurationList;
+			buildConfigurations = (
+				BEC467B02E164429007B45D0 /* Debug */,
+				BEC467B12E164429007B45D0 /* Release */,
+			);
+			defaultConfigurationIsVisible = 0;
+			defaultConfigurationName = Release;
+		};
+		BEC467C62E164462007B45D0 /* Build configuration list for PBXNativeTarget "HyperchatUITests" */ = {
+			isa = XCConfigurationList;
+			buildConfigurations = (
+				BEC467C72E164462007B45D0 /* Debug */,
+				BEC467C82E164462007B45D0 /* Release */,
 			);
 			defaultConfigurationIsVisible = 0;
 			defaultConfigurationName = Release;

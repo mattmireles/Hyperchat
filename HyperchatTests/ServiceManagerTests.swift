@@ -1,6 +1,6 @@
 import XCTest
 import WebKit
-import Hyperchat
+@testable import Hyperchat
 
 class ServiceManagerTests: XCTestCase {
     
