@@ -171,9 +171,7 @@ Every line of documentation should answer the question: "What would an AI need t
 ## Getting Started
 
 ### Architecture Documentation
-When starting work on this codebase, orient yourself by reading these key documentation files:
-1. **Architecture Map**: `hyperchat-macos/documentation/architecture-map.md` - Overview of system architecture and component relationships
-2. **WebView Loading Issues**: `hyperchat-macos/documentation/webview-loading-issues.md` - Critical WebView performance and error handling patterns
+When starting work on this codebase, orient yourself by reading **Architecture Map**: `hyperchat-macos/documentation/architecture-map.md` - Overview of system architecture and component relationships
 
 ### ⚠️ CRITICAL: WebView Loading Issues
 We've repeatedly encountered slow loading times and NSURLErrorDomain -999 errors with WebViews. This is a **recurring issue** that must be understood before making WebView-related changes.

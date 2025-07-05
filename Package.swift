@@ -18,7 +18,6 @@ let package = Package(
             dependencies: ["Sparkle"],
             resources: [
                 .process("Assets.xcassets"),
-                .process("MainMenu.xib"),
                 .process("Orbitron-Bold.ttf")
             ]
         ),

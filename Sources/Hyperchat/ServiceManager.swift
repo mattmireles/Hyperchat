@@ -99,16 +99,16 @@ struct AIService {
 }
 
 /// Default service configurations.
-/// The actual URLs and parameters are defined in ServiceConfigurations.swift.
-/// These placeholder values are overridden at runtime.
+/// These values are used when no saved settings exist.
+/// URLs and parameters come from ServiceConfigurations.
 let defaultServices = [
     AIService(
         id: "google",
         name: "Google",
         iconName: "google-icon",
         activationMethod: .urlParameter(
-            baseURL: "placeholder", // Actual config is in ServiceConfigurations
-            parameter: "placeholder"
+            baseURL: ServiceConfigurations.google.baseURL,
+            parameter: ServiceConfigurations.google.queryParam
         ),
         enabled: true,
         order: 3  // Third position from left
@@ -118,8 +118,8 @@ let defaultServices = [
         name: "Perplexity",
         iconName: "perplexity-icon",
         activationMethod: .urlParameter(
-            baseURL: "placeholder", // Actual config is in ServiceConfigurations
-            parameter: "placeholder"
+            baseURL: ServiceConfigurations.perplexity.baseURL,
+            parameter: ServiceConfigurations.perplexity.queryParam
         ),
         enabled: true,
         order: 2
@@ -129,8 +129,8 @@ let defaultServices = [
         name: "ChatGPT",
         iconName: "chatgpt-icon",
         activationMethod: .urlParameter(
-            baseURL: "placeholder", // Actual config is in ServiceConfigurations
-            parameter: "placeholder"
+            baseURL: ServiceConfigurations.chatGPT.baseURL,
+            parameter: ServiceConfigurations.chatGPT.queryParam
         ),
         enabled: true,
         order: 1
@@ -140,7 +140,7 @@ let defaultServices = [
         name: "Claude",
         iconName: "claude-icon",
         activationMethod: .clipboardPaste(
-            baseURL: "https://claude.ai"
+            baseURL: ServiceConfigurations.claude.baseURL
         ),
         enabled: false,
         order: 4
@@ -606,6 +606,14 @@ class ServiceManager: NSObject, ObservableObject {
         
         setupServices()
         registerManager()
+        
+        // Listen for service updates from settings
+        NotificationCenter.default.addObserver(
+            self,
+            selector: #selector(servicesUpdated),
+            name: .servicesUpdated,
+            object: nil
+        )
     }
     
     /// Cleans up all WebView resources when the window closes.
@@ -626,6 +634,9 @@ class ServiceManager: NSObject, ObservableObject {
     /// - `BrowserViewController.cleanup()`
     deinit {
         print("🔴 [\(Date().timeIntervalSince1970)] ServiceManager DEINIT \(instanceId) starting cleanup")
+        
+        // Remove notification observer
+        NotificationCenter.default.removeObserver(self)
         
         // Wrap all cleanup in autoreleasepool to ensure WebKit's autoreleased objects
         // are released immediately, preventing over-release crashes
@@ -685,7 +696,8 @@ class ServiceManager: NSObject, ObservableObject {
         // Filter out disabled services and sort by display order
         // Order values: ChatGPT=1, Perplexity=2, Google=3, Claude=4
         // This ensures consistent left-to-right display in the UI
-        let enabledServices = defaultServices.filter { service in
+        let allServices = SettingsManager.shared.getServices()
+        let enabledServices = allServices.filter { service in
             return service.enabled == true
         }
         let sortedServices = enabledServices.sorted { firstService, secondService in
@@ -721,6 +733,47 @@ class ServiceManager: NSObject, ObservableObject {
         
         // Start loading the first service
         loadNextServiceFromQueue()
+    }
+    
+    /// Handles notification when services are updated in settings.
+    ///
+    /// Called by:
+    /// - Notification from SettingsManager when services are changed
+    ///
+    /// Process:
+    /// 1. Clear existing WebViews
+    /// 2. Reload services from SettingsManager
+    /// 3. Create new WebViews for enabled services
+    /// 4. Start loading sequence
+    @objc private func servicesUpdated() {
+        print("🔄 Services updated notification received, reloading services...")
+        
+        // Clear existing WebViews
+        stateQueue.sync {
+            for (_, webService) in webServices {
+                let webView = webService.webView
+                webView.stopLoading()
+                webView.navigationDelegate = nil
+                webView.uiDelegate = nil
+                webView.removeFromSuperview()
+            }
+            
+            webServices.removeAll()
+            activeServices.removeAll()
+            loadingStates.removeAll()
+            serviceLoadingQueue.removeAll()
+            currentlyLoadingService = nil
+            loadedServicesCount = 0
+            hasNotifiedAllServicesLoaded = false
+        }
+        
+        // Set up services again with updated settings
+        setupServices()
+        
+        // Notify UI to update
+        DispatchQueue.main.async { [weak self] in
+            self?.objectWillChange.send()
+        }
     }
     
     /// Loads the next service from the sequential loading queue.

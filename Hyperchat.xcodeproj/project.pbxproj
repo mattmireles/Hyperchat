@@ -10,7 +10,6 @@
 		3EE13B9B2C4F6B2900A8A61E /* AppDelegate.swift in Sources */ = {isa = PBXBuildFile; fileRef = 3EE13B8E2C4F6B2900A8A61E /* AppDelegate.swift */; };
 		3EE13B9C2C4F6B2900A8A61E /* Assets.xcassets in Resources */ = {isa = PBXBuildFile; fileRef = 3EE13B932C4F6B2900A8A61E /* Assets.xcassets */; };
 		3EE13B9D2C4F6B2900A8A61E /* FloatingButtonManager.swift in Sources */ = {isa = PBXBuildFile; fileRef = 3EE13B8F2C4F6B2900A8A61E /* FloatingButtonManager.swift */; };
-		3EE13B9F2C4F6B2900A8A61E /* Sources/Hyperchat/MainMenu.xib in Resources */ = {isa = PBXBuildFile; fileRef = 3EE13B942C4F6B2900A8A61E /* Sources/Hyperchat/MainMenu.xib */; };
 		3EE13BA92C4F6B2900A8A61E /* OverlayController.swift in Sources */ = {isa = PBXBuildFile; fileRef = 3EE13BA32C4F6B2900A8A61E /* OverlayController.swift */; };
 		3EE13BAA2C4F6B2900A8A61E /* PromptWindowController.swift in Sources */ = {isa = PBXBuildFile; fileRef = 3EE13BA42C4F6B2900A8A61E /* PromptWindowController.swift */; };
 		3EE13BAB2C4F6B2900A8A61E /* ServiceManager.swift in Sources */ = {isa = PBXBuildFile; fileRef = 3EE13BA52C4F6B2900A8A61E /* ServiceManager.swift */; };
@@ -63,7 +62,6 @@
 		3EE13B8F2C4F6B2900A8A61E /* FloatingButtonManager.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = FloatingButtonManager.swift; sourceTree = "<group>"; };
 		3EE13B922C4F6B2900A8A61E /* Info.plist */ = {isa = PBXFileReference; lastKnownFileType = text.plist.xml; path = Info.plist; sourceTree = "<group>"; };
 		3EE13B932C4F6B2900A8A61E /* Assets.xcassets */ = {isa = PBXFileReference; lastKnownFileType = folder.assetcatalog; path = Assets.xcassets; sourceTree = "<group>"; };
-		3EE13B942C4F6B2900A8A61E /* Sources/Hyperchat/MainMenu.xib */ = {isa = PBXFileReference; lastKnownFileType = file.xib; path = Sources/Hyperchat/MainMenu.xib; sourceTree = SOURCE_ROOT; };
 		3EE13BA32C4F6B2900A8A61E /* OverlayController.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = OverlayController.swift; sourceTree = "<group>"; };
 		3EE13BA42C4F6B2900A8A61E /* PromptWindowController.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = PromptWindowController.swift; sourceTree = "<group>"; };
 		3EE13BA52C4F6B2900A8A61E /* ServiceManager.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ServiceManager.swift; sourceTree = "<group>"; };
@@ -155,7 +153,6 @@
 				3EE13B8F2C4F6B2900A8A61E /* FloatingButtonManager.swift */,
 				3EE13B922C4F6B2900A8A61E /* Info.plist */,
 				3EE13B932C4F6B2900A8A61E /* Assets.xcassets */,
-				3EE13B942C4F6B2900A8A61E /* Sources/Hyperchat/MainMenu.xib */,
 				3EE13BA32C4F6B2900A8A61E /* OverlayController.swift */,
 				3EE13BA42C4F6B2900A8A61E /* PromptWindowController.swift */,
 				3EE13BA52C4F6B2900A8A61E /* ServiceManager.swift */,
@@ -303,7 +300,6 @@
 			isa = PBXResourcesBuildPhase;
 			buildActionMask = 2147483647;
 			files = (
-				3EE13B9F2C4F6B2900A8A61E /* Sources/Hyperchat/MainMenu.xib in Resources */,
 				3EE13B9C2C4F6B2900A8A61E /* Assets.xcassets in Resources */,
 				3EE13BB22C4F6B2900A8A61E /* Orbitron-Bold.ttf in Resources */,
 			);

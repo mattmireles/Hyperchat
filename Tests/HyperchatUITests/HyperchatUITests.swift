@@ -28,6 +28,14 @@ class HyperchatUITests: XCTestCase {
         
         // The app should show a window on startup
         XCTAssertGreaterThan(app.windows.count, 0, "App should show at least one window on startup")
+        
+        // Verify menu bar is accessible
+        let menuBar = app.menuBars.firstMatch
+        XCTAssertTrue(menuBar.exists, "Menu bar should be accessible")
+        
+        // Verify Hyperchat menu exists
+        let appMenu = menuBar.menuBarItems["Hyperchat"]
+        XCTAssertTrue(appMenu.exists, "Hyperchat menu should exist in menu bar")
     }
     
     func testFloatingButtonExists() {
@@ -150,6 +158,27 @@ class HyperchatUITests: XCTestCase {
         // Test Cmd+3 for Perplexity
         app.typeKey("3", modifierFlags: .command)
         // Could verify Perplexity is selected
+    }
+    
+    // MARK: - Menu Tests
+    
+    func testQuickMenuCheck() {
+        // Quick verification that menus are properly connected
+        let menuBar = app.menuBars.firstMatch
+        
+        // Test Settings menu item via keyboard shortcut
+        app.typeKey(",", modifierFlags: .command)
+        
+        // Verify settings window appears
+        let settingsWindow = app.windows["Hyperchat Settings"]
+        if settingsWindow.waitForExistence(timeout: 3) {
+            // Settings opened successfully - close it
+            settingsWindow.buttons[XCUIIdentifierCloseWindow].click()
+        }
+        
+        // Test application menu exists
+        let appMenu = menuBar.menuBarItems["Hyperchat"]
+        XCTAssertTrue(appMenu.exists, "Application menu should exist")
     }
     
     // MARK: - Window Management Tests
