@@ -13,4 +13,4 @@ struct HyperchatApp: App {
             EmptyView()
         }
     }
-} 
+}

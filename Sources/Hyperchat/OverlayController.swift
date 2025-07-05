@@ -183,6 +183,9 @@ class OverlayController: NSObject, NSWindowDelegate {
     // Per-window ServiceManager instances
     private var windowServiceManagers: [NSWindow: ServiceManager] = [:]
     
+    // Per-window BrowserViewController instances
+    private var windowBrowserViewControllers: [NSWindow: [BrowserViewController]] = [:]
+    
     // Window hibernation support
     private var windowSnapshots: [NSWindow: NSImageView] = [:]
     private var hibernatedWindows: Set<NSWindow> = []
@@ -360,9 +363,22 @@ class OverlayController: NSObject, NSWindowDelegate {
     
     private func setupBrowserViews(in containerView: NSView, using windowServiceManager: ServiceManager, for window: NSWindow) {
         let sortedServices = windowServiceManager.activeServices.sorted { $0.order < $1.order }
-        let browserViews = sortedServices.compactMap { service in
-            windowServiceManager.webServices[service.id]?.browserView
+        
+        var browserViewControllers: [BrowserViewController] = []
+        var browserViews: [NSView] = []
+        
+        for (index, service) in sortedServices.enumerated() {
+            if let webService = windowServiceManager.webServices[service.id] {
+                let webView = webService.webView
+                let isFirstService = index == 0
+                let controller = BrowserViewController(webView: webView, service: service, isFirstService: isFirstService)
+                browserViewControllers.append(controller)
+                browserViews.append(controller.view)
+            }
         }
+        
+        // Store controllers for this window
+        windowBrowserViewControllers[window] = browserViewControllers
         
         let browserStackView = NSStackView(views: browserViews)
         browserStackView.distribution = .fillEqually
@@ -404,8 +420,9 @@ class OverlayController: NSObject, NSWindowDelegate {
             window.close()
         }
         windows.removeAll()
-        // Clean up all window-specific ServiceManagers
+        // Clean up all window-specific ServiceManagers and controllers
         windowServiceManagers.removeAll()
+        windowBrowserViewControllers.removeAll()
         // Clean up hibernation data
         windowSnapshots.removeAll()
         hibernatedWindows.removeAll()
@@ -426,6 +443,9 @@ class OverlayController: NSObject, NSWindowDelegate {
         
         // Note: WebView cleanup is now handled in windowWillClose delegate method
         // This ensures script message handlers are removed before deallocation
+        
+        // Clean up view controllers for this window
+        windowBrowserViewControllers.removeValue(forKey: window)
         
         // Clean up hibernation data
         windowSnapshots.removeValue(forKey: window)
@@ -662,7 +682,7 @@ class OverlayController: NSObject, NSWindowDelegate {
         autoreleasepool {
             // Critical: Remove script message handlers BEFORE anything else deallocates
             for (serviceId, webService) in serviceManager.webServices {
-                let webView = webService.browserView.webView
+                let webView = webService.webView
                 let controller = webView.configuration.userContentController
                 
                 print("🧨 [\(Date().timeIntervalSince1970)] Beginning cleanup for \(serviceId)")
@@ -675,7 +695,7 @@ class OverlayController: NSObject, NSWindowDelegate {
                 webView.loadHTMLString("<html><body></body></html>", baseURL: nil)
                 
                 // 3. Remove ALL message handlers using centralized names - this prevents the crash
-                for handlerName in ServiceManager.scriptMessageHandlerNames {
+                for handlerName in WebViewFactory.scriptMessageHandlerNames {
                     controller.removeScriptMessageHandler(forName: handlerName)
                 }
                 
@@ -706,6 +726,9 @@ class OverlayController: NSObject, NSWindowDelegate {
             
             // Clean up ServiceManager reference
             windowServiceManagers.removeValue(forKey: window)
+            
+            // Clean up view controller references
+            windowBrowserViewControllers.removeValue(forKey: window)
             
             print("✅ [\(Date().timeIntervalSince1970)] windowWillClose cleanup complete")
         }
