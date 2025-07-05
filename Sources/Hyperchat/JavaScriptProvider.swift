@@ -1,12 +1,62 @@
+/// JavaScriptProvider.swift - JavaScript Code Generation for Service Automation
+///
+/// This file centralizes all JavaScript code generation for automating AI services.
+/// It provides type-safe Swift functions that generate JavaScript for prompt injection,
+/// form submission, and WebView state management.
+///
+/// Key responsibilities:
+/// - Generates JavaScript for URL parameter services (ChatGPT, Perplexity, Google)
+/// - Provides specialized scripts for Claude's clipboard paste method
+/// - Creates hibernation scripts for pausing/resuming WebView timers
+/// - Generates debug scripts for troubleshooting
+/// - Handles proper string escaping and service-specific selectors
+///
+/// Related files:
+/// - `ServiceManager.swift`: Uses these scripts for prompt execution
+/// - `BrowserViewController.swift`: May use debug scripts
+/// - `WebViewFactory.swift`: Injects some scripts during WebView creation
+///
+/// Architecture:
+/// - Static struct with no state (pure functions)
+/// - Service-specific selector arrays for robust element finding
+/// - Comprehensive error handling and fallback strategies
+/// - Console logging for debugging automation issues
+
 import Foundation
 
-/// Centralized provider for all JavaScript code generation
-/// This isolates brittle JavaScript strings and makes them testable
+/// Centralized provider for all JavaScript code generation.
+///
+/// Design principles:
+/// - Isolates brittle JavaScript strings from Swift code
+/// - Makes JavaScript testable through generated output
+/// - Provides service-specific customizations
+/// - Handles all string escaping in one place
 struct JavaScriptProvider {
     
     // MARK: - Paste and Submit Scripts
     
-    /// Generates JavaScript to paste prompt and submit for URL parameter services
+    /// Generates JavaScript to paste prompt and submit for URL parameter services.
+    ///
+    /// Used by:
+    /// - `ServiceManager.executePasteAndSubmit()` for ChatGPT, Perplexity, Google
+    ///
+    /// Process:
+    /// 1. Escapes prompt text for JavaScript string literal
+    /// 2. Selects appropriate CSS selectors for the service
+    /// 3. Finds visible input field using multiple strategies
+    /// 4. Sets text directly (avoids clipboard issues)
+    /// 5. Fires events to notify frameworks (React, etc.)
+    /// 6. Attempts auto-submit via button click or Enter key
+    ///
+    /// Service-specific selectors:
+    /// - ChatGPT: textarea[data-testid="textbox"], contenteditable divs
+    /// - Perplexity: textarea[placeholder*="Ask"], avoids sidebar
+    /// - Google: input[name="q"], search boxes
+    ///
+    /// Error handling:
+    /// - Logs all steps for debugging
+    /// - Returns error messages for Swift side
+    /// - Provides element details when no input found
     static func pasteAndSubmitScript(prompt: String, for service: AIService) -> String {
         let escapedPrompt = prompt
             .replacingOccurrences(of: "\\", with: "\\\\")
@@ -15,7 +65,8 @@ struct JavaScriptProvider {
             .replacingOccurrences(of: "\r", with: "\\r")
             .replacingOccurrences(of: "\t", with: "\\t")
         
-        // Service-specific selectors - comprehensive list from production code
+        // Service-specific selectors updated for 2024/2025 UI changes
+        // These are ordered by likelihood of success
         let selectors: String
         switch service.id {
         case "chatgpt":
@@ -78,9 +129,11 @@ struct JavaScriptProvider {
         
         return """
         (function() {
+            // Store prompt text in JavaScript variable
             const promptText = `\(escapedPrompt)`;
             console.log('PASTE: Starting with prompt:', promptText.substring(0, 50));
             
+            // Service-specific selectors
             \(selectors)
             
             let input = null;
@@ -107,10 +160,11 @@ struct JavaScriptProvider {
             
             if (input) {
                 try {
-                    // For Perplexity, be extra careful to avoid sidebar expansion
+                    // CRITICAL: Perplexity sidebar bug workaround
+                    // Focusing input can trigger unwanted sidebar expansion
                     const isPerplexity = window.location.hostname.includes('perplexity');
                     
-                    // For Perplexity, skip focus to avoid sidebar expansion
+                    // Skip focus for Perplexity to avoid UI disruption
                     if (!isPerplexity) {
                         input.focus();
                     }
@@ -160,7 +214,8 @@ struct JavaScriptProvider {
                             reactInputEvent.simulated = true;
                             input.dispatchEvent(reactInputEvent);
                             
-                            // Auto-submit after a short delay - PRIMARY METHOD: Click submit button
+                            // Auto-submit after ensuring DOM updates are complete
+                            // 300ms delay allows React/Vue/Angular to process changes
                             setTimeout(() => {
                                 try {
                                     \(submitScript(for: service))
@@ -210,7 +265,21 @@ struct JavaScriptProvider {
         """
     }
     
-    /// Generates service-specific submit logic
+    /// Generates service-specific submit button clicking logic.
+    ///
+    /// Called by:
+    /// - `pasteAndSubmitScript()` after text insertion
+    ///
+    /// Strategy:
+    /// 1. Try service-specific submit button selectors
+    /// 2. Check button visibility and enabled state
+    /// 3. Click first matching button
+    /// 4. Fall back to Enter key simulation if no button found
+    ///
+    /// Service patterns:
+    /// - ChatGPT: data-testid="send-button", aria-label="Send message"
+    /// - Perplexity: aria-label="Submit", button.bg-super
+    /// - Google: aria-label="Search", type="submit"
     private static func submitScript(for service: AIService) -> String {
         return """
             // Service-specific submit button selectors
@@ -305,7 +374,26 @@ struct JavaScriptProvider {
     
     // MARK: - Claude Scripts
     
-    /// Generates JavaScript for Claude's clipboard paste method
+    /// Generates JavaScript for Claude's clipboard paste method.
+    ///
+    /// Used by:
+    /// - `ServiceManager.executeClaudeScript()` for Claude only
+    ///
+    /// Claude-specific approach:
+    /// - Cannot use URL parameters like other services
+    /// - Must simulate paste operation into contenteditable div
+    /// - Uses execCommand for compatibility
+    /// - Falls back to direct DOM manipulation
+    ///
+    /// Process:
+    /// 1. Find Claude's ProseMirror editor div
+    /// 2. Clear existing content
+    /// 3. Insert text via execCommand('insertText')
+    /// 4. Fire input events for React
+    /// 5. Look for submit button and click
+    ///
+    /// Timing: Requires 3-second delay before execution
+    /// to allow Claude's React app to fully initialize
     static func claudePasteScript(prompt: String) -> String {
         let escapedPrompt = prompt
             .replacingOccurrences(of: "\\", with: "\\\\")
@@ -318,9 +406,9 @@ struct JavaScriptProvider {
         (function() {
             console.log('[Claude] Starting Claude paste operation...');
             
-            // Function to find the input field
+            // Function to find Claude's input field
+            // Claude uses ProseMirror editor with contenteditable div
             function findClaudeInput() {
-                // Claude uses a contenteditable div
                 const selectors = [
                     'div[contenteditable="true"]',
                     'div.ProseMirror',
@@ -375,9 +463,10 @@ struct JavaScriptProvider {
             // Focus the input
             input.focus();
             
-            // Use execCommand as fallback for Claude
+            // execCommand is deprecated but still works in WebKit
+            // This is more reliable than DOM manipulation for Claude
             try {
-                // First, try to clear any existing content
+                // Clear any existing content first
                 document.execCommand('selectAll', false, null);
                 document.execCommand('delete', false, null);
                 
@@ -424,7 +513,19 @@ struct JavaScriptProvider {
     
     // MARK: - Hibernation Scripts
     
-    /// JavaScript to pause timers and animations for hibernation
+    /// JavaScript to pause all timers and animations for window hibernation.
+    ///
+    /// Used by:
+    /// - `ServiceManager.pauseAllWebViews()` when window loses focus
+    ///
+    /// Hibernation strategy:
+    /// 1. Save original timer functions
+    /// 2. Replace with no-op functions
+    /// 3. All new timers return 0 (do nothing)
+    /// 4. Existing timers continue but new ones don't start
+    ///
+    /// This dramatically reduces CPU usage for hidden windows
+    /// while maintaining visual state for screenshots
     static func hibernationPauseScript() -> String {
         return """
         // Pause all timers and animations
@@ -441,7 +542,19 @@ struct JavaScriptProvider {
         """
     }
     
-    /// JavaScript to resume timers and animations after hibernation
+    /// JavaScript to resume timers and animations after hibernation.
+    ///
+    /// Used by:
+    /// - `ServiceManager.resumeAllWebViews()` when window gains focus
+    ///
+    /// Process:
+    /// 1. Check if hibernation state exists
+    /// 2. Restore original timer functions
+    /// 3. Delete hibernation state marker
+    /// 4. New timers work normally again
+    ///
+    /// Note: Existing timers that were created during
+    /// hibernation remain as no-ops (returning 0)
     static func hibernationResumeScript() -> String {
         return """
         // Restore all timers and animations
@@ -456,7 +569,20 @@ struct JavaScriptProvider {
     
     // MARK: - Debug Scripts
     
-    /// JavaScript to check if query was processed (for debugging)
+    /// JavaScript to check if URL query parameter was processed.
+    ///
+    /// Used by:
+    /// - `ServiceManager` for debugging URL parameter services
+    ///
+    /// Diagnostic process:
+    /// 1. Extract 'q' parameter from current URL
+    /// 2. Search all input fields for the query text
+    /// 3. Log whether query was found in any input
+    ///
+    /// Helps diagnose:
+    /// - Service loaded but didn't process URL parameter
+    /// - Timing issues with page initialization
+    /// - Selector mismatches
     static func debugCheckQueryScript() -> String {
         return """
         // Check if the query parameter was processed

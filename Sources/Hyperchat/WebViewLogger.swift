@@ -1,9 +1,70 @@
+/// WebViewLogger.swift - Comprehensive WebView Debugging and Analytics System
+///
+/// This file implements a multi-layered logging system for debugging WebView behavior,
+/// tracking user interactions, and monitoring network activity. It provides configurable
+/// logging with file persistence and console output.
+///
+/// Key responsibilities:
+/// - Injects JavaScript monitoring scripts into WebViews
+/// - Captures console.log/warn/error messages from web pages
+/// - Monitors network requests (fetch/XHR) with analytics filtering
+/// - Tracks DOM mutations in batches for performance
+/// - Records user interactions (clicks, form submits, etc.)
+/// - Persists logs to dated files per service
+/// - Provides configurable logging levels via settings
+///
+/// Related files:
+/// - `WebViewFactory.swift`: Injects logging scripts during WebView creation
+/// - `BrowserViewController.swift`: Uses navigation logging methods
+/// - `ServiceManager.swift`: May enable/disable logging for specific operations
+/// - `SettingsWindowController.swift`: Provides UI for logging configuration
+///
+/// Architecture:
+/// - Singleton pattern for global access (WebViewLogger.shared)
+/// - Concurrent queue for thread-safe file operations
+/// - Per-service log files organized by date
+/// - Message handlers cleanup to prevent memory leaks
+/// - Configurable filtering of analytics domains
+
 import Foundation
 import WebKit
 import os.log
 import SwiftUI
 
 // MARK: - Logging Settings
+
+/// Timing constants for logging behavior.
+private enum LoggingTimings {
+    /// Delay between DOM mutation batches to reduce noise
+    static let domMutationBatchDelay: TimeInterval = 1.0
+    
+    /// Debounce delay for input events to avoid spam
+    static let inputEventDebounce: TimeInterval = 1.0
+}
+
+/// Batch processing limits to prevent memory issues.
+private enum LoggingLimits {
+    /// Maximum mutations to process per batch
+    static let maxMutationsPerBatch: Int = 10
+    
+    /// Maximum queue size before truncation
+    static let maxMutationQueueSize: Int = 1000
+    
+    /// Queue size after truncation
+    static let truncatedQueueSize: Int = 500
+    
+    /// Maximum characters to log from element text
+    static let maxElementTextLength: Int = 100
+}
+
+/// Persistent settings for logging configuration.
+///
+/// Used by:
+/// - `SettingsWindowController`: Provides UI for configuration
+/// - `WebViewLogger`: Checks flags before logging
+///
+/// Settings are stored in UserDefaults with @AppStorage
+/// for automatic persistence and SwiftUI integration.
 class LoggingSettings: ObservableObject {
     static let shared = LoggingSettings()
     
@@ -51,7 +112,14 @@ class LoggingSettings: ObservableObject {
 }
 
 // MARK: - Analytics Domains
-// Analytics domains to filter when analyticsFilter is enabled
+
+/// Analytics and tracking domains to filter out when analyticsFilter is enabled.
+///
+/// These domains generate high-volume, low-value logging that clutters
+/// debug output. When analyticsFilter is true, all requests/responses
+/// to these domains are silently dropped from logs.
+///
+/// Maintained as a static list for performance (avoiding regex).
 private let analyticsDomains = [
     "googletagmanager.com",
     "google-analytics.com", 
@@ -70,12 +138,35 @@ private let analyticsDomains = [
     "ab.chatgpt.com"
 ]
 
+/// Main logging coordinator for all WebView-related events.
+///
+/// Lifecycle:
+/// 1. Created as singleton on first access
+/// 2. Sets up log directory structure in ~/Library/Logs/Hyperchat/
+/// 3. Creates per-service subdirectories as needed
+/// 4. Opens file handles lazily on first write
+/// 5. Closes file handles via closeLogFile() when service destroyed
+///
+/// Thread safety:
+/// - Uses concurrent queue with barrier for writes
+/// - File handles dictionary protected by queue
+/// - OSLog instances cached per service
 class WebViewLogger: NSObject {
+    /// Shared singleton instance
     static let shared = WebViewLogger()
     
+    /// Concurrent queue for thread-safe file operations
+    /// Barrier flag used for writes to ensure consistency
     private let logQueue = DispatchQueue(label: "com.hyperchat.webviewlogger", attributes: .concurrent)
+    
+    /// Cached OSLog instances per service to avoid recreation
     private var loggers: [String: OSLog] = [:]
+    
+    /// Open file handles for active log files
+    /// Key: service name, Value: handle to service's current log file
     private var fileHandles: [String: FileHandle] = [:]
+    
+    /// Date formatter for consistent timestamp formatting
     private let dateFormatter: DateFormatter
     
     override init() {
@@ -106,6 +197,23 @@ class WebViewLogger: NSObject {
         return logDir.appendingPathComponent("\(dateString).log")
     }
     
+    /// Logs a message for a specific service.
+    ///
+    /// Called by:
+    /// - All handle* methods after processing WebKit messages
+    /// - Navigation delegate methods in extensions
+    /// - External code for custom logging needs
+    ///
+    /// Process:
+    /// 1. Formats message with timestamp
+    /// 2. Writes to system console via OSLog
+    /// 3. Persists to service-specific log file
+    /// 4. Uses barrier for thread safety
+    ///
+    /// - Parameters:
+    ///   - message: The log message to write
+    ///   - service: Service name (e.g., "chatgpt", "claude")
+    ///   - type: Log severity level
     func log(_ message: String, for service: String, type: LogType = .info) {
         logQueue.async(flags: .barrier) { [weak self] in
             guard let self = self else { return }
@@ -197,7 +305,24 @@ extension WebViewLogger {
 }
 
 // MARK: - JavaScript Console Capture
+
+/// Extension for capturing JavaScript console output from web pages.
 extension WebViewLogger {
+    /// JavaScript code that intercepts console.* methods.
+    ///
+    /// Injected by:
+    /// - `WebViewFactory.createWebView()` during setup
+    ///
+    /// Captures:
+    /// - console.log/warn/error/info/debug calls
+    /// - Unhandled JavaScript errors
+    /// - Unhandled promise rejections
+    ///
+    /// The script:
+    /// 1. Saves original console methods
+    /// 2. Wraps them to send messages to native code
+    /// 3. Preserves original behavior (logs still appear in web inspector)
+    /// 4. Serializes objects to JSON for native consumption
     var consoleLogScript: String {
         return """
         (function() {
@@ -280,7 +405,22 @@ extension WebViewLogger {
 }
 
 // MARK: - Network Monitoring
+
+/// Extension for monitoring network requests from web pages.
 extension WebViewLogger {
+    /// JavaScript code that intercepts fetch() and XMLHttpRequest.
+    ///
+    /// Injected by:
+    /// - `WebViewFactory.createWebView()` if network logging enabled
+    ///
+    /// Monitors:
+    /// - All fetch() API calls
+    /// - All XMLHttpRequest (XHR) calls
+    /// - Request URLs, methods, and timing
+    /// - Response status codes and timing
+    ///
+    /// Note: Headers and body content are not captured for privacy.
+    /// Analytics requests are filtered based on domain list.
     var networkMonitorScript: String {
         return """
         (function() {
@@ -437,14 +577,32 @@ struct LogEntry {
 }
 
 // MARK: - DOM Monitoring
+
+/// Extension for monitoring DOM mutations in web pages.
 extension WebViewLogger {
+    /// JavaScript code that observes DOM changes via MutationObserver.
+    ///
+    /// Injected by:
+    /// - `WebViewFactory.createWebView()` if DOM logging enabled
+    ///
+    /// Features:
+    /// - Batches mutations to reduce message frequency
+    /// - Limits queue size to prevent memory issues
+    /// - Aggregates similar mutations into summaries
+    /// - Only sends significant changes to native code
+    ///
+    /// Performance optimizations:
+    /// - 10 mutations per batch maximum
+    /// - 1 second delay between batches
+    /// - Queue truncation at 1000 items
+    /// - No old values captured (reduces memory)
     var domMonitorScript: String {
         return """
         (function() {
             let mutationQueue = [];
             let isProcessing = false;
-            const MAX_MUTATIONS_PER_BATCH = 10;
-            const BATCH_DELAY_MS = 1000;
+            const MAX_MUTATIONS_PER_BATCH = \(LoggingLimits.maxMutationsPerBatch);
+            const BATCH_DELAY_MS = \(Int(LoggingTimings.domMutationBatchDelay * 1000));
             
             // Throttled function to process mutations
             function processMutations() {
@@ -495,8 +653,8 @@ extension WebViewLogger {
                 mutationQueue.push(...mutations);
                 
                 // Limit queue size to prevent memory issues
-                if (mutationQueue.length > 1000) {
-                    mutationQueue = mutationQueue.slice(-500);
+                if (mutationQueue.length > \(LoggingLimits.maxMutationQueueSize)) {
+                    mutationQueue = mutationQueue.slice(-\(LoggingLimits.truncatedQueueSize));
                 }
                 
                 // Trigger processing
@@ -557,7 +715,25 @@ extension WebViewLogger {
 }
 
 // MARK: - User Interaction Tracking
+
+/// Extension for tracking user interactions with web pages.
 extension WebViewLogger {
+    /// JavaScript code that tracks user interactions.
+    ///
+    /// Injected by:
+    /// - `WebViewFactory.createWebView()` if interaction logging enabled
+    ///
+    /// Tracks:
+    /// - Click events (with element details)
+    /// - Form submissions
+    /// - Input field changes (debounced)
+    /// - Focus events on form fields
+    /// - Copy/paste operations
+    ///
+    /// Privacy considerations:
+    /// - Input values are not logged, only length
+    /// - Passwords fields are not tracked
+    /// - Text content truncated to 100 characters
     var userInteractionScript: String {
         return """
         (function() {
@@ -569,7 +745,7 @@ extension WebViewLogger {
                     tagName: target.tagName,
                     id: target.id || null,
                     className: target.className || null,
-                    text: target.textContent ? target.textContent.substring(0, 100) : null,
+                    text: target.textContent ? target.textContent.substring(0, \(LoggingLimits.maxElementTextLength)) : null,
                     href: target.href || null,
                     timestamp: new Date().toISOString()
                 };
@@ -605,7 +781,7 @@ extension WebViewLogger {
                         timestamp: new Date().toISOString()
                     };
                     window.webkit.messageHandlers.userInteraction.postMessage(data);
-                }, 1000); // Debounce for 1 second
+                }, \(Int(LoggingTimings.inputEventDebounce * 1000))); // Debounce for 1 second
             }, true);
             
             // Track focus events
@@ -704,11 +880,38 @@ extension WebViewLogger {
 }
 
 // MARK: - Script Message Handler
+
+/// Handles JavaScript messages sent from injected scripts.
+///
+/// Created by:
+/// - `WebViewFactory` for each message type per WebView
+///
+/// Lifecycle:
+/// 1. Created when WebView is configured
+/// 2. Added to WKUserContentController
+/// 3. Receives messages from JavaScript
+/// 4. Routes to appropriate WebViewLogger handler
+/// 5. Must be manually removed to prevent leaks
+///
+/// Memory management:
+/// - Weak reference from JavaScript side
+/// - Strong reference from WKUserContentController
+/// - Must call markCleanedUp() before removal
+/// - Tracks cleanup state to prevent use-after-free
 class ConsoleMessageHandler: NSObject, WKScriptMessageHandler {
+    /// Service name for routing (e.g., "chatgpt")
     let service: String
+    
+    /// Message type this handler processes
     let messageType: String
+    
+    /// Unique ID for debugging lifecycle
     private let instanceId = UUID().uuidString.prefix(8)
+    
+    /// Parent controller reference (unused but kept for future)
     private weak var parentController: WKUserContentController?
+    
+    /// Tracks if cleanup was called to prevent use-after-free
     private var isCleanedUp = false
     
     init(service: String, messageType: String) {

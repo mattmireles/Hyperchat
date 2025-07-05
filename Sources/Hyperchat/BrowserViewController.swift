@@ -1,19 +1,88 @@
+/// BrowserViewController.swift - WebView Display and Navigation Management
+///
+/// This file manages the browser interface for each AI service, including navigation controls,
+/// URL display, and WebView delegation. Each service gets its own BrowserViewController instance.
+///
+/// Key responsibilities:
+/// - Displays WKWebView with navigation toolbar
+/// - Manages back/forward/reload navigation
+/// - Handles URL display with smart formatting
+/// - Implements WKNavigationDelegate for page load tracking
+/// - Manages focus behavior to prevent unwanted text selection
+/// - Provides URL copying functionality
+///
+/// Related files:
+/// - `ServiceManager.swift`: Creates BrowserViewController for each service
+/// - `BrowserView.swift`: SwiftUI view that provides the UI layout
+/// - `WebViewLogger.swift`: Logs navigation events and errors
+/// - `GradientToolbarButton.swift`: Custom toolbar button component
+/// - `ButtonState.swift`: Observable state for button enable/disable
+///
+/// Architecture:
+/// - Uses NSViewController with SwiftUI view for modern UI
+/// - Delegates navigation events to WebViewLogger for debugging
+/// - Prevents focus stealing during initial page load
+/// - Takes over navigation delegation after ServiceManager completes initial load
+
 import AppKit
 import WebKit
 import SwiftUI
 
+// MARK: - Timing Constants
+
+/// Timing constants for browser behavior.
+private enum BrowserTimings {
+    /// Delay before allowing WebView to capture focus
+    /// Prevents unwanted text selection during initial page load
+    static let focusCaptureDelay: TimeInterval = 3.0
+}
+
+// MARK: - Browser View Controller
+
+/// Manages the browser interface for a single AI service.
+///
+/// Created by:
+/// - `ServiceManager.createBrowserView()` for each enabled service
+///
+/// Lifecycle:
+/// 1. Created with pre-configured WKWebView from WebViewFactory
+/// 2. ServiceManager performs initial page load
+/// 3. Takes over navigation delegation via `takeOverNavigationDelegate()`
+/// 4. Manages navigation and URL display throughout service lifetime
+///
+/// Navigation delegation handoff:
+/// - ServiceManager needs delegate during initial load for state tracking
+/// - After load completes, this controller takes over for navigation tracking
+/// - This prevents race conditions during startup
 class BrowserViewController: NSViewController {
+    /// The WKWebView instance for this service (created by WebViewFactory)
     private let webView: WKWebView
+    
+    /// The AI service configuration (ChatGPT, Claude, etc.)
     private let service: AIService
+    
+    /// SwiftUI view that provides the browser UI layout
     private let browserView: BrowserView
+    
+    /// Whether this is the first service (leftmost in UI)
+    /// Used for keyboard shortcuts (Cmd+1 focuses first service)
     private let isFirstService: Bool
     
-    // Button states
+    // MARK: - Button States
+    
+    /// Observable state for back button (disabled when can't go back)
     private let backButtonState = ButtonState(isEnabled: false)
+    
+    /// Observable state for forward button (disabled when can't go forward)
     private let forwardButtonState = ButtonState(isEnabled: false)
     
-    // Allow focus capture after initial load delay
+    // MARK: - Focus Management
+    
+    /// Controls whether WebView can capture focus
+    /// Prevents unwanted text selection during initial page load
     private var allowFocusCapture = false
+    
+    /// Unique identifier for debugging lifecycle (first 8 chars of UUID)
     private let instanceId = UUID().uuidString.prefix(8)
     
     init(webView: WKWebView, service: AIService, isFirstService: Bool = false) {
@@ -24,15 +93,16 @@ class BrowserViewController: NSViewController {
         
         super.init(nibName: nil, bundle: nil)
         
-        // Don't claim navigation delegate here - ServiceManager needs it for initial load
-        // We'll take over after the initial page load completes
+        // CRITICAL: Don't claim navigation delegate here
+        // ServiceManager needs it for initial load state tracking
+        // We'll take over via takeOverNavigationDelegate() after load completes
         
         let wvAddress = Unmanaged.passUnretained(webView).toOpaque()
         let retainCount = CFGetRetainCount(webView)
         print("🟢 [\(Date().timeIntervalSince1970)] BrowserViewController INIT \(instanceId) for \(service.name), WebView at \(wvAddress), retain count: \(retainCount)")
         
         // Enable focus capture after initial load delay
-        DispatchQueue.main.asyncAfter(deadline: .now() + 3.0) {
+        DispatchQueue.main.asyncAfter(deadline: .now() + BrowserTimings.focusCaptureDelay) {
             self.allowFocusCapture = true
         }
     }
@@ -45,6 +115,15 @@ class BrowserViewController: NSViewController {
         print("🔴 [\(Date().timeIntervalSince1970)] BrowserViewController DEINIT \(instanceId) for \(service.name)")
     }
     
+    /// Takes over navigation delegation from ServiceManager.
+    ///
+    /// Called by:
+    /// - `ServiceManager` after initial page load completes
+    ///
+    /// This handoff allows:
+    /// - ServiceManager to track initial load state
+    /// - BrowserViewController to handle subsequent navigation
+    /// - Clean separation of concerns during startup
     func takeOverNavigationDelegate() {
         webView.navigationDelegate = self
         print("🎯 [\(Date().timeIntervalSince1970)] BrowserViewController \(instanceId) took over navigation delegate for \(service.name)")
@@ -59,6 +138,18 @@ class BrowserViewController: NSViewController {
         setupToolbarButtons()
     }
     
+    /// Sets up navigation toolbar buttons with actions.
+    ///
+    /// Called by:
+    /// - `viewDidLoad()` during view setup
+    ///
+    /// Creates four toolbar buttons:
+    /// 1. Back (chevron.backward) - disabled until navigation history exists
+    /// 2. Forward (chevron.forward) - disabled until forward history exists
+    /// 3. Reload (arrow.clockwise) - always enabled
+    /// 4. Copy URL (clipboard) - always enabled
+    ///
+    /// Each button is a SwiftUI GradientToolbarButton wrapped in NSHostingView.
     private func setupToolbarButtons() {
         // Create SwiftUI gradient buttons
         let backButtonView = NSHostingView(rootView: GradientToolbarButton(
@@ -102,18 +193,48 @@ class BrowserViewController: NSViewController {
         browserView.urlField.action = #selector(loadURL)
     }
     
+    /// Navigates back in WebView history.
+    ///
+    /// Called by:
+    /// - Back button action in toolbar
+    ///
+    /// Only enabled when webView.canGoBack is true.
     @objc private func goBack() {
         webView.goBack()
     }
     
+    /// Navigates forward in WebView history.
+    ///
+    /// Called by:
+    /// - Forward button action in toolbar
+    ///
+    /// Only enabled when webView.canGoForward is true.
     @objc private func goForward() {
         webView.goForward()
     }
     
+    /// Reloads the current page.
+    ///
+    /// Called by:
+    /// - Reload button action in toolbar
+    ///
+    /// Always enabled, triggers full page reload.
     @objc private func reload() {
         webView.reload()
     }
     
+    /// Loads URL from the URL text field.
+    ///
+    /// Called by:
+    /// - URL field when user presses Enter
+    ///
+    /// URL processing:
+    /// 1. Gets text from URL field
+    /// 2. Adds https:// prefix if missing
+    /// 3. Creates URL and loads in WebView
+    ///
+    /// The URL field shows cleaned URLs (no https://)
+    /// but this method reconstructs the full URL.
     @objc private func loadURL() {
         guard let urlString = browserView.urlField.stringValue.isEmpty ? nil : browserView.urlField.stringValue else { return }
         
@@ -128,6 +249,13 @@ class BrowserViewController: NSViewController {
         webView.load(URLRequest(url: url))
     }
     
+    /// Copies the current URL to clipboard.
+    ///
+    /// Called by:
+    /// - Copy URL button action in toolbar
+    ///
+    /// Copies the full URL including protocol (https://)
+    /// even though the display shows cleaned version.
     @objc private func copyURL() {
         let pasteboard = NSPasteboard.general
         pasteboard.clearContents()
@@ -137,12 +265,36 @@ class BrowserViewController: NSViewController {
         }
     }
     
+    /// Updates navigation button states based on WebView history.
+    ///
+    /// Called by:
+    /// - All WKNavigationDelegate methods after navigation changes
+    ///
+    /// Updates:
+    /// - Back button: enabled if canGoBack
+    /// - Forward button: enabled if canGoForward
+    ///
+    /// SwiftUI buttons observe these states and update automatically.
     private func updateBackButton() {
         // Update the SwiftUI button states
         backButtonState.isEnabled = webView.canGoBack
         forwardButtonState.isEnabled = webView.canGoForward
     }
     
+    /// Cleans URL for display in the URL field.
+    ///
+    /// Called by:
+    /// - All navigation delegate methods when updating URL field
+    ///
+    /// Removes common prefixes for cleaner display:
+    /// - https://www. -> (removed)
+    /// - https:// -> (removed)
+    /// - http://www. -> (removed)
+    /// - http:// -> (removed)
+    ///
+    /// Example: "https://www.google.com" -> "google.com"
+    ///
+    /// The full URL is preserved in the tooltip.
     private func cleanURLForDisplay(_ urlString: String?) -> String {
         guard let urlString = urlString else { return "" }
         
@@ -162,8 +314,19 @@ class BrowserViewController: NSViewController {
     }
 }
 
-// MARK: - Responder chain handling
+// MARK: - Responder Chain Handling
 
+/// Focus management to prevent unwanted text selection.
+///
+/// Problem solved:
+/// - WebViews can steal focus during page load
+/// - This causes unwanted text selection in input fields
+/// - Users lose their place when typing prompts
+///
+/// Solution:
+/// - Delay focus capture for 3 seconds after creation
+/// - Only allow focus on explicit mouse clicks
+/// - Let WebView handle focus after initial delay
 extension BrowserViewController {
     override var acceptsFirstResponder: Bool {
         return true
@@ -171,8 +334,10 @@ extension BrowserViewController {
     
     override func becomeFirstResponder() -> Bool {
         // Only allow the webView to become first responder if:
-        // 1. It's been explicitly clicked, or
-        // 2. Focus capture is allowed (after initial load period)
+        // 1. Focus capture is allowed (after 3-second delay), AND
+        // 2. It's been explicitly clicked (left or right mouse)
+        //
+        // This prevents WebView from stealing focus during page loads
         if allowFocusCapture && (NSApp.currentEvent?.type == .leftMouseDown || 
                                   NSApp.currentEvent?.type == .rightMouseDown) {
             return webView.becomeFirstResponder()
@@ -183,7 +348,28 @@ extension BrowserViewController {
 
 // MARK: - WKNavigationDelegate
 
+/// Handles WebView navigation events and updates UI accordingly.
+///
+/// Delegate methods called during page navigation:
+/// 1. didStartProvisionalNavigation - Navigation initiated
+/// 2. didCommit - Server responded, content loading
+/// 3. didFinish - Page fully loaded
+/// 4. didFail/didFailProvisionalNavigation - Errors occurred
+///
+/// Each method:
+/// - Logs to WebViewLogger for debugging
+/// - Updates URL field with cleaned display
+/// - Sets full URL as tooltip
+/// - Updates navigation button states
 extension BrowserViewController: WKNavigationDelegate {
+    /// Called when navigation starts (user clicks link or loads URL).
+    ///
+    /// This is the earliest navigation event, fired when:
+    /// - User clicks a link
+    /// - JavaScript changes location
+    /// - loadRequest is called
+    ///
+    /// Updates URL field immediately for responsive UI.
     func webView(_ webView: WKWebView, didStartProvisionalNavigation navigation: WKNavigation!) {
         print("🌐 \(service.name): didStartProvisionalNavigation")
         // Log navigation start
@@ -200,6 +386,14 @@ extension BrowserViewController: WKNavigationDelegate {
         }
     }
     
+    /// Called when server responds and content starts loading.
+    ///
+    /// At this point:
+    /// - Server has responded with content
+    /// - Page is starting to render
+    /// - URL is finalized (after redirects)
+    ///
+    /// This is a good time to update UI with final URL.
     func webView(_ webView: WKWebView, didCommit navigation: WKNavigation!) {
         WebViewLogger.shared.logPageLoad(start: true, service: service.name, url: webView.url)
         
@@ -212,6 +406,14 @@ extension BrowserViewController: WKNavigationDelegate {
         }
     }
     
+    /// Called when page finishes loading completely.
+    ///
+    /// At this point:
+    /// - All resources loaded
+    /// - JavaScript executed
+    /// - Page is interactive
+    ///
+    /// Final UI update to ensure consistency.
     func webView(_ webView: WKWebView, didFinish navigation: WKNavigation!) {
         WebViewLogger.shared.logPageLoad(start: false, service: service.name, url: webView.url)
         
@@ -224,6 +426,14 @@ extension BrowserViewController: WKNavigationDelegate {
         }
     }
     
+    /// Called when navigation fails after starting.
+    ///
+    /// Common errors:
+    /// - Network timeout
+    /// - Server errors (500, etc.)
+    /// - SSL certificate issues
+    ///
+    /// Still updates UI to show current state.
     func webView(_ webView: WKWebView, didFail navigation: WKNavigation!, withError error: Error) {
         WebViewLogger.shared.logNavigationError(error, service: service.name)
         
@@ -236,6 +446,15 @@ extension BrowserViewController: WKNavigationDelegate {
         }
     }
     
+    /// Called when navigation fails before receiving response.
+    ///
+    /// Common errors:
+    /// - Invalid URL
+    /// - DNS lookup failure  
+    /// - No internet connection
+    /// - Cancelled navigation (-999)
+    ///
+    /// Updates UI even on early failures.
     func webView(_ webView: WKWebView, didFailProvisionalNavigation navigation: WKNavigation!, withError error: Error) {
         WebViewLogger.shared.logNavigationError(error, service: service.name)
         
@@ -248,6 +467,15 @@ extension BrowserViewController: WKNavigationDelegate {
         }
     }
     
+    /// Called to decide whether to allow navigation based on response.
+    ///
+    /// Can inspect:
+    /// - HTTP status code
+    /// - MIME type
+    /// - Headers
+    ///
+    /// Currently allows all responses, but logs for debugging.
+    /// Could be extended to block certain content types.
     func webView(_ webView: WKWebView, decidePolicyFor navigationResponse: WKNavigationResponse, decisionHandler: @escaping (WKNavigationResponsePolicy) -> Void) {
         WebViewLogger.shared.logNavigationResponse(navigationResponse.response, service: service.name)
         decisionHandler(.allow)

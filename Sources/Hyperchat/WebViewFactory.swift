@@ -1,8 +1,45 @@
+/// WebViewFactory.swift - WebView Creation and Configuration
+///
+/// This file handles the creation of properly configured WKWebView instances for each AI service.
+/// It ensures consistent configuration, proper cleanup, and debugging support.
+///
+/// Key responsibilities:
+/// - Creates WKWebView instances with shared process pool
+/// - Configures user agents for service compatibility
+/// - Injects JavaScript for console logging and monitoring
+/// - Manages script message handlers lifecycle
+/// - Prevents common WebView issues (white flash, focus stealing)
+///
+/// Related files:
+/// - `ServiceManager.swift`: Uses factory to create WebViews for each service
+/// - `WebViewLogger.swift`: Provides JavaScript injection scripts
+/// - `UserAgentGenerator.swift`: Creates Safari-compatible user agents
+/// - `ServiceConfigurations.swift`: Provides service-specific settings
+///
+/// Critical patterns:
+/// - Always use WKProcessPool.shared (never create new pools)
+/// - Clean up message handlers before WebView deallocation
+/// - Use associated objects to retain message handlers
+
 import Foundation
 import WebKit
 
 // MARK: - Console Message Handler for WebViewFactory
 
+/// Handles JavaScript messages from WebViews.
+///
+/// Each handler is specific to:
+/// - A service (ChatGPT, Claude, etc.)
+/// - A message type (consoleLog, networkRequest, etc.)
+///
+/// Lifecycle:
+/// 1. Created during WebView setup
+/// 2. Added to WKUserContentController
+/// 3. Receives messages from JavaScript
+/// 4. Must be cleaned up before WebView deallocation
+///
+/// The isCleanedUp flag prevents crashes from messages arriving
+/// after the WebView has started cleanup.
 private class WebViewFactoryMessageHandler: NSObject, WKScriptMessageHandler {
     let service: String
     let messageType: String
@@ -51,19 +88,49 @@ private class WebViewFactoryMessageHandler: NSObject, WKScriptMessageHandler {
 
 // MARK: - WebViewFactory
 
+/// Factory for creating properly configured WKWebView instances.
+///
+/// Singleton pattern ensures:
+/// - Consistent WebView configuration
+/// - Shared WKProcessPool usage
+/// - Centralized cleanup logic
+///
+/// Used by:
+/// - `ServiceManager.setupServices()` to create WebViews
+///
+/// Creates WebViews with:
+/// - Shared cookies and authentication (WKWebsiteDataStore.default)
+/// - Console logging injection
+/// - Service-specific user agents
+/// - Black background to prevent white flash
 class WebViewFactory {
     static let shared = WebViewFactory()
     
-    // Script message handler names
+    /// Names of all script message handlers.
+    /// Used for both registration and cleanup.
     static let scriptMessageHandlerNames = [
-        "consoleLog",
-        "networkRequest",
-        "networkResponse",
-        "userInteraction"
+        "consoleLog",      // Console.log() messages
+        "networkRequest",  // XHR/Fetch requests
+        "networkResponse", // Network responses
+        "userInteraction" // Click/input events
     ]
     
     private init() {}
     
+    /// Creates a configured WKWebView for an AI service.
+    ///
+    /// Called by:
+    /// - `ServiceManager.setupServices()` for each enabled service
+    ///
+    /// Configuration includes:
+    /// - Shared process pool (critical for performance)
+    /// - Shared data store (maintains login state)
+    /// - Service-specific user agent
+    /// - JavaScript injection for debugging
+    /// - Visual optimizations (black background, rounded corners)
+    ///
+    /// - Parameter service: The AI service this WebView will display
+    /// - Returns: Configured WKWebView ready for use
     func createWebView(for service: AIService) -> WKWebView {
         let configuration = WKWebViewConfiguration()
         configuration.websiteDataStore = .default()  // Share cookies, passwords, and login state with Safari
@@ -125,13 +192,33 @@ class WebViewFactory {
         webView.layer?.masksToBounds = true
         
         // Re-enable navigation gestures after initial load
-        DispatchQueue.main.asyncAfter(deadline: .now() + 3.0) {
+        // Delay prevents gesture conflicts during page loading
+        let navigationGestureDelay: TimeInterval = 3.0
+        DispatchQueue.main.asyncAfter(deadline: .now() + navigationGestureDelay) {
             webView.allowsBackForwardNavigationGestures = true
         }
         
         return webView
     }
     
+    /// Sets up JavaScript logging and monitoring scripts.
+    ///
+    /// Called during WebView creation to inject:
+    /// - Console logging capture
+    /// - Network request/response monitoring
+    /// - User interaction tracking
+    /// - DOM change monitoring (disabled for performance)
+    ///
+    /// Message flow:
+    /// 1. JavaScript events occur in WebView
+    /// 2. Injected scripts capture events
+    /// 3. Scripts send messages via webkit.messageHandlers
+    /// 4. Message handlers route to WebViewLogger
+    ///
+    /// - Parameters:
+    ///   - configuration: WebView configuration to modify
+    ///   - service: Service for logging context
+    /// - Returns: Dictionary of message handlers for retention
     private func setupLoggingScripts(for configuration: WKWebViewConfiguration, service: AIService) -> [String: WebViewFactoryMessageHandler] {
         let userContentController = configuration.userContentController
         
@@ -200,7 +287,21 @@ class WebViewFactory {
         return handlers
     }
     
-    // Cleanup method to remove message handlers
+    /// Cleans up message handlers before WebView deallocation.
+    ///
+    /// Called by:
+    /// - `ServiceManager.deinit` during cleanup
+    /// - Window close operations
+    ///
+    /// CRITICAL: Must be called before WebView deallocation to prevent:
+    /// - JavaScript messages arriving after cleanup
+    /// - Crashes in WKScriptMessageHandler
+    /// - Memory leaks from retained handlers
+    ///
+    /// Cleanup process:
+    /// 1. Remove all script message handlers from controller
+    /// 2. Mark handlers as cleaned up
+    /// 3. Clear associated object references
     func cleanupMessageHandlers(for webView: WKWebView) {
         print("🧹 [\(Date().timeIntervalSince1970)] Cleaning up message handlers for WebView")
         
@@ -223,5 +324,7 @@ class WebViewFactory {
     }
 }
 
-// Key for associated object storage
+/// Key for associated object storage.
+/// Used to retain message handlers with the WebView instance.
+/// This prevents handlers from being deallocated while WebView is active.
 private var messageHandlerKey: UInt8 = 0
