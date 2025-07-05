@@ -72,6 +72,12 @@ struct ServiceRowView: View {
     
     var body: some View {
         HStack(spacing: 12) {
+            // Drag handle indicator
+            Image(systemName: "line.3.horizontal")
+                .font(.system(size: 14, weight: .medium))
+                .foregroundColor(.secondary.opacity(0.6))
+                .frame(width: 20)
+            
             // Service icon - TODO: Add actual icons later
             /*
             Image(service.iconName)

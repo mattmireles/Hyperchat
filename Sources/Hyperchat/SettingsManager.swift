@@ -93,15 +93,19 @@ extension AIService: Codable {
         enabled = try container.decode(Bool.self, forKey: .enabled)
         order = try container.decode(Int.self, forKey: .order)
         
-        // For activation method, we'll use the default from the service configurations
-        // since it's complex to encode/decode
+        // For activation method, use the actual configurations from ServiceConfigurations
         switch id {
-        case "google", "perplexity", "chatgpt":
-            activationMethod = .urlParameter(baseURL: "placeholder", parameter: "placeholder")
+        case "google":
+            activationMethod = .urlParameter(baseURL: ServiceConfigurations.google.baseURL, parameter: ServiceConfigurations.google.queryParam)
+        case "perplexity":
+            activationMethod = .urlParameter(baseURL: ServiceConfigurations.perplexity.baseURL, parameter: ServiceConfigurations.perplexity.queryParam)
+        case "chatgpt":
+            activationMethod = .urlParameter(baseURL: ServiceConfigurations.chatGPT.baseURL, parameter: ServiceConfigurations.chatGPT.queryParam)
         case "claude":
-            activationMethod = .clipboardPaste(baseURL: "placeholder")
+            activationMethod = .clipboardPaste(baseURL: ServiceConfigurations.claude.baseURL)
         default:
-            activationMethod = .urlParameter(baseURL: "placeholder", parameter: "placeholder")
+            // Fallback to URL parameter method
+            activationMethod = .urlParameter(baseURL: "https://\(id).com", parameter: "q")
         }
     }
     

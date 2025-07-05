@@ -454,9 +454,20 @@ class FloatingButtonManager {
     /// Timer that ensures button stays visible
     private var visibilityTimer: Timer?
 
+    init() {
+        // Listen for floating button toggle notification
+        NotificationCenter.default.addObserver(
+            self,
+            selector: #selector(floatingButtonToggled(_:)),
+            name: .floatingButtonToggled,
+            object: nil
+        )
+    }
+    
     deinit {
         screenUpdateTimer?.invalidate()
         visibilityTimer?.invalidate()
+        NotificationCenter.default.removeObserver(self)
     }
 
     /// Shows the floating button window.
@@ -478,6 +489,12 @@ class FloatingButtonManager {
     /// - Hides on deactivate: false (stays visible)
     func showFloatingButton() {
         logger.log("👇 showFloatingButton called.")
+        
+        // Check if floating button is enabled in settings
+        guard SettingsManager.shared.isFloatingButtonEnabled else {
+            logger.log("ℹ️ Floating button is disabled in settings")
+            return
+        }
         
         // Prevent creating duplicate buttons
         if let existingWindow = buttonWindow {
@@ -579,6 +596,28 @@ class FloatingButtonManager {
         // Close and remove button window
         buttonWindow?.close()
         buttonWindow = nil
+        
+        logger.log("✅ Floating button hidden")
+    }
+    
+    /// Handles notification when floating button is toggled in settings.
+    ///
+    /// Called by:
+    /// - Notification from SettingsManager when floating button is toggled
+    ///
+    /// Process:
+    /// - If enabled: Shows the floating button
+    /// - If disabled: Hides the floating button
+    @objc private func floatingButtonToggled(_ notification: Notification) {
+        if let isEnabled = notification.object as? Bool {
+            logger.log("🔔 Floating button toggled: \(isEnabled)")
+            
+            if isEnabled {
+                showFloatingButton()
+            } else {
+                hideFloatingButton()
+            }
+        }
     }
 
     /// Handles floating button click events.
