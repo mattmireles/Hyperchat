@@ -1,6 +1,15 @@
 import Cocoa
 import SwiftUI
 
+// MARK: - Settings Layout Constants
+
+private enum SettingsLayout {
+    static let serviceRowCornerRadius: CGFloat = 8
+    static let sectionHorizontalPadding: CGFloat = 16
+    static let floatingButtonRowPadding: CGFloat = 12
+    static let floatingButtonBackgroundOpacity: Double = 0.05
+}
+
 // MARK: - Settings View Model
 
 class SettingsViewModel: ObservableObject {
@@ -105,7 +114,7 @@ struct ServiceRowView: View {
         .padding(.horizontal, 16)
         .padding(.vertical, 8)
         .background(
-            RoundedRectangle(cornerRadius: 8)
+            RoundedRectangle(cornerRadius: SettingsLayout.serviceRowCornerRadius)
                 .fill(isHovering ? Color.gray.opacity(0.1) : Color.clear)
         )
         .onHover { hovering in
@@ -205,13 +214,13 @@ struct SettingsView: View {
                                     viewModel.toggleFloatingButton()
                                 }
                         }
-                        .padding(.horizontal, 16)
-                        .padding(.vertical, 12)
+                        .padding(.horizontal, SettingsLayout.sectionHorizontalPadding)
+                        .padding(.vertical, SettingsLayout.floatingButtonRowPadding)
                         .background(
-                            RoundedRectangle(cornerRadius: 8)
-                                .fill(Color.gray.opacity(0.05))
+                            RoundedRectangle(cornerRadius: SettingsLayout.serviceRowCornerRadius)
+                                .fill(Color.gray.opacity(SettingsLayout.floatingButtonBackgroundOpacity))
                         )
-                        .padding(.horizontal, 16)
+                        .padding(.horizontal, SettingsLayout.sectionHorizontalPadding)
                     }
                 }
                 .padding(.vertical, 20)
