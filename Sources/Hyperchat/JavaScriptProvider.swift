@@ -404,109 +404,137 @@ struct JavaScriptProvider {
         
         return """
         (function() {
-            console.log('[Claude] Starting Claude paste operation...');
+            console.log('[Claude] Starting Claude diagnostic paste operation...');
             
-            // Function to find Claude's input field
-            // Claude uses ProseMirror editor with contenteditable div
-            function findClaudeInput() {
+            // Initialize diagnostic report
+            const report = {
+                inputFound: false,
+                inputSelector: null,
+                textInserted: false,
+                enterDispatched: false,
+                submitButtonFound: false,
+                submitButtonSelector: null,
+                errorMessage: null,
+                pageURL: window.location.href,
+                timestamp: new Date().toISOString()
+            };
+            
+            try {
+                // Input field selectors for Claude
                 const selectors = [
-                    'div[contenteditable="true"]',
-                    'div.ProseMirror',
-                    'div[data-placeholder]'
+                    'div[contenteditable="true"].ProseMirror',
+                    'div.ProseMirror[contenteditable="true"]',
+                    'div[contenteditable="true"][data-placeholder]',
+                    'div[contenteditable="true"]'
                 ];
                 
+                let input = null;
                 for (const selector of selectors) {
                     const element = document.querySelector(selector);
                     if (element) {
                         console.log('[Claude] Found input with selector:', selector);
-                        return element;
+                        input = element;
+                        report.inputFound = true;
+                        report.inputSelector = selector;
+                        break;
                     }
                 }
-                return null;
-            }
-            
-            // Function to set text in contenteditable
-            function setTextInContentEditable(element, text) {
-                // Clear existing content
-                element.innerHTML = '';
+
+                if (!input) {
+                    report.errorMessage = 'No input field found';
+                    console.error('[Claude] No input field found');
+                    return JSON.stringify(report);
+                }
                 
-                // Create text node
-                const textNode = document.createTextNode(text);
-                element.appendChild(textNode);
+                console.log('[Claude] Found input field:', input);
+                input.focus();
+                
+                // Clear existing content and set new prompt
+                input.innerHTML = '';
+                const textNode = document.createTextNode(`\(escapedPrompt)`);
+                input.appendChild(textNode);
                 
                 // Set cursor to end
                 const range = document.createRange();
                 const selection = window.getSelection();
-                range.selectNodeContents(element);
+                range.selectNodeContents(input);
                 range.collapse(false);
                 selection.removeAllRanges();
                 selection.addRange(range);
+
+                // Fire input event to let React know something changed
+                input.dispatchEvent(new Event('input', { bubbles: true, cancelable: true }));
                 
-                // Dispatch input event
-                element.dispatchEvent(new Event('input', { bubbles: true, cancelable: true }));
+                // Verify text was inserted
+                const insertedText = input.textContent || input.innerText;
+                if (insertedText.includes(`\(escapedPrompt)`.substring(0, 10))) {
+                    report.textInserted = true;
+                    console.log('[Claude] Text successfully inserted');
+                } else {
+                    console.log('[Claude] Text may not have been inserted correctly');
+                }
+
+                console.log('[Claude] Attempting Enter key simulation...');
                 
-                // Also dispatch a paste event for good measure
-                const pasteEvent = new ClipboardEvent('paste', {
-                    clipboardData: new DataTransfer(),
+                // Define submit button selectors first
+                const submitSelectors = [
+                    'button[aria-label*="Send"]',
+                    'button[aria-label*="Submit"]',
+                    'button[data-testid="send-button"]',
+                    'button:has(svg[data-icon="arrow-up"])',
+                    'button svg',
+                    'button:has(svg)',
+                    'div[role="button"][aria-label*="Send"]',
+                    'div[role="button"]:has(svg)'
+                ];
+                
+                // Simulate Enter key - removed unsupported sourceCapabilities
+                const enterEvent = new KeyboardEvent('keydown', {
+                    key: 'Enter',
+                    code: 'Enter',
+                    keyCode: 13,
+                    which: 13,
                     bubbles: true,
-                    cancelable: true
+                    cancelable: true,
+                    composed: true,
+                    view: window,
+                    detail: 0
                 });
-                element.dispatchEvent(pasteEvent);
-            }
-            
-            const input = findClaudeInput();
-            if (!input) {
-                console.error('[Claude] No input field found');
-                return false;
-            }
-            
-            // Focus the input
-            input.focus();
-            
-            // execCommand is deprecated but still works in WebKit
-            // This is more reliable than DOM manipulation for Claude
-            try {
-                // Clear any existing content first
-                document.execCommand('selectAll', false, null);
-                document.execCommand('delete', false, null);
                 
-                // Insert the text
-                document.execCommand('insertText', false, "\(escapedPrompt)");
-                console.log('[Claude] Text inserted using execCommand');
+                const dispatched = input.dispatchEvent(enterEvent);
+                report.enterDispatched = dispatched;
+                console.log('[Claude] Enter key event dispatched:', dispatched);
                 
-                // Also try the modern approach
-                setTextInContentEditable(input, "\(escapedPrompt)");
-                
-                // Try to submit after a delay
-                setTimeout(() => {
-                    console.log('[Claude] Attempting to submit...');
-                    
-                    // Look for submit button
-                    const submitButton = document.querySelector('button[aria-label*="Send"], button:has(svg path[d*="M4"]), button:has(svg path[d*="m21"])');
-                    if (submitButton && !submitButton.disabled) {
-                        console.log('[Claude] Found submit button, clicking...');
-                        submitButton.click();
-                    } else {
-                        console.log('[Claude] No submit button found, trying Enter key...');
-                        const enterEvent = new KeyboardEvent('keydown', {
-                            key: 'Enter',
-                            code: 'Enter',
-                            keyCode: 13,
-                            which: 13,
-                            bubbles: true,
-                            cancelable: true
-                        });
-                        input.dispatchEvent(enterEvent);
+                // Look for submit button
+                let submitButton = null;
+                for (const selector of submitSelectors) {
+                    const button = document.querySelector(selector);
+                    if (button) {
+                        const rect = button.getBoundingClientRect();
+                        if (rect.width > 0 && rect.height > 0 && !button.disabled) {
+                            report.submitButtonFound = true;
+                            report.submitButtonSelector = selector;
+                            submitButton = button;
+                            console.log('[Claude] Found submit button with selector:', selector);
+                            break;
+                        }
                     }
-                }, 1000);
+                }
                 
-                return true;
-            } catch (e) {
-                console.error('[Claude] execCommand failed:', e);
-                // Try direct approach as last resort
-                setTextInContentEditable(input, "\(escapedPrompt)");
-                return true;
+                // If Enter didn't work, try clicking submit button
+                if (!dispatched && submitButton) {
+                    console.log('[Claude] Enter key failed, clicking submit button as fallback...');
+                    submitButton.click();
+                    report.submitButtonClicked = true;
+                }
+                
+            } catch (error) {
+                report.errorMessage = error.toString();
+                console.error('[Claude] Error during execution:', error);
             }
+            
+            console.log('[Claude] Diagnostic report:', report);
+            return JSON.stringify(report);
         })();
         """
     }
@@ -602,6 +630,43 @@ struct JavaScriptProvider {
                 console.log('[Debug] Query not found in any input field');
             }
         }
+        """
+    }
+    
+    // MARK: - Favicon Extraction
+    
+    /// JavaScript to extract the favicon URL from the current page.
+    ///
+    /// Used by:
+    /// - `BrowserViewController.webView(_:didFinish:)` after page loads
+    ///
+    /// Extraction strategy:
+    /// 1. Look for <link rel="icon"> and <link rel="shortcut icon"> tags
+    /// 2. If found, post the href URL to the faviconFound message handler
+    /// 3. If not found, fall back to /favicon.ico at the origin
+    ///
+    /// This simple approach covers 80% of websites without complex caching.
+    static func faviconExtractionScript() -> String {
+        return """
+        (function() {
+            console.log('[Favicon] Starting favicon extraction...');
+            
+            // Look for favicon in link tags
+            const iconLinks = document.querySelectorAll('link[rel~="icon"], link[rel~="shortcut icon"]');
+            
+            for (const link of iconLinks) {
+                if (link.href) {
+                    console.log('[Favicon] Found favicon link:', link.href);
+                    window.webkit.messageHandlers.faviconFound.postMessage(link.href);
+                    return;
+                }
+            }
+            
+            // Fallback to /favicon.ico
+            const fallbackURL = window.location.origin + '/favicon.ico';
+            console.log('[Favicon] No favicon link found, using fallback:', fallbackURL);
+            window.webkit.messageHandlers.faviconFound.postMessage(fallbackURL);
+        })();
         """
     }
 }

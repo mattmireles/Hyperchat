@@ -81,6 +81,18 @@ private class WebViewFactoryMessageHandler: NSObject, WKScriptMessageHandler {
                 
                 WebViewLogger.shared.log(logMessage, for: service, type: logType)
             }
+        } else if messageType == "faviconFound" {
+            // Post notification with favicon URL
+            let userInfo: [String: Any] = [
+                "service": service,
+                "faviconURL": messageBody
+            ]
+            NotificationCenter.default.post(
+                name: .faviconFound,
+                object: nil,
+                userInfo: userInfo
+            )
+            print("🎨 [\(service)] Favicon found: \(messageBody)")
         }
         // Add other message type handling as needed
     }
@@ -112,7 +124,8 @@ class WebViewFactory {
         "consoleLog",      // Console.log() messages
         "networkRequest",  // XHR/Fetch requests
         "networkResponse", // Network responses
-        "userInteraction" // Click/input events
+        "userInteraction", // Click/input events
+        "faviconFound"     // Favicon URL discovery
     ]
     
     private init() {}
@@ -229,13 +242,15 @@ class WebViewFactory {
         let networkRequestHandler = WebViewFactoryMessageHandler(service: service.name, messageType: "networkRequest")
         let networkResponseHandler = WebViewFactoryMessageHandler(service: service.name, messageType: "networkResponse")
         let userInteractionHandler = WebViewFactoryMessageHandler(service: service.name, messageType: "userInteraction")
+        let faviconHandler = WebViewFactoryMessageHandler(service: service.name, messageType: "faviconFound")
         
         // Store handlers for cleanup
         let handlers: [String: WebViewFactoryMessageHandler] = [
             "consoleLog": consoleHandler,
             "networkRequest": networkRequestHandler,
             "networkResponse": networkResponseHandler,
-            "userInteraction": userInteractionHandler
+            "userInteraction": userInteractionHandler,
+            "faviconFound": faviconHandler
         ]
         
         // Add message handlers using centralized names
@@ -328,3 +343,9 @@ class WebViewFactory {
 /// Used to retain message handlers with the WebView instance.
 /// This prevents handlers from being deallocated while WebView is active.
 private var messageHandlerKey: UInt8 = 0
+
+// MARK: - Notification Names
+
+extension Notification.Name {
+    static let faviconFound = Notification.Name("faviconFound")
+}

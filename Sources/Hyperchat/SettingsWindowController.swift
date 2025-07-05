@@ -20,6 +20,25 @@ class SettingsViewModel: ObservableObject {
     
     init() {
         loadSettings()
+        
+        // Listen for service updates to refresh the UI
+        NotificationCenter.default.addObserver(
+            self,
+            selector: #selector(handleServicesUpdated),
+            name: .servicesUpdated,
+            object: nil
+        )
+        
+        // Listen for favicon updates separately to avoid full reload
+        NotificationCenter.default.addObserver(
+            self,
+            selector: #selector(handleFaviconUpdated),
+            name: .faviconUpdated,
+            object: nil
+        )
+        
+        // Prefetch missing favicons for all services
+        prefetchMissingFavicons()
     }
     
     func loadSettings() {
@@ -42,6 +61,58 @@ class SettingsViewModel: ObservableObject {
         services.move(fromOffsets: source, toOffset: destination)
         settingsManager.reorderServices(services)
         NotificationCenter.default.post(name: .servicesUpdated, object: nil)
+    }
+    
+    @objc private func handleServicesUpdated() {
+        print("📱 Settings: Received servicesUpdated notification, reloading...")
+        loadSettings()
+    }
+    
+    @objc private func handleFaviconUpdated(_ notification: Notification) {
+        guard let serviceId = notification.object as? String else { return }
+        
+        print("🖼️ Settings: Received faviconUpdated notification for service: \(serviceId)")
+        
+        // Update only the specific service's favicon without reloading everything
+        if let index = services.firstIndex(where: { $0.id == serviceId }) {
+            let updatedServices = settingsManager.getServices()
+            if let updatedService = updatedServices.first(where: { $0.id == serviceId }) {
+                services[index].faviconURL = updatedService.faviconURL
+                print("✅ Updated favicon URL for \(serviceId): \(updatedService.faviconURL?.absoluteString ?? "nil")")
+            }
+        }
+    }
+    
+    /// Prefetches favicons for all services that don't have one.
+    ///
+    /// Called during init to ensure all services show icons in settings,
+    /// even if they've never been enabled.
+    ///
+    /// Process:
+    /// 1. Check each service for missing favicon
+    /// 2. Use FaviconFetcher to load favicon without WebView
+    /// 3. Updates are handled via faviconUpdated notifications
+    private func prefetchMissingFavicons() {
+        print("🔍 Prefetching missing favicons for all services...")
+        
+        for service in services {
+            if service.faviconURL == nil {
+                print("🔄 Fetching favicon for \(service.name)...")
+                
+                // Use known URLs first for better reliability
+                FaviconFetcher.shared.fetchFaviconWithKnownURL(for: service) { url in
+                    if let url = url {
+                        print("✅ Prefetched favicon for \(service.name): \(url)")
+                    } else {
+                        print("⚠️ Could not prefetch favicon for \(service.name)")
+                    }
+                }
+            }
+        }
+    }
+    
+    deinit {
+        NotificationCenter.default.removeObserver(self)
     }
 }
 
@@ -70,6 +141,18 @@ struct ServiceRowView: View {
     
     @State private var isHovering = false
     
+    private var coloredCircleFallback: some View {
+        ZStack {
+            Circle()
+                .fill(serviceColor(for: service.id))
+                .frame(width: 32, height: 32)
+            
+            Text(String(service.name.prefix(1)))
+                .font(.system(size: 16, weight: .bold))
+                .foregroundColor(.white)
+        }
+    }
+    
     var body: some View {
         HStack(spacing: 12) {
             // Drag handle indicator
@@ -91,15 +174,29 @@ struct ServiceRowView: View {
                 )
             */
             
-            // Temporary placeholder - colored circle with first letter
-            ZStack {
-                Circle()
-                    .fill(serviceColor(for: service.id))
+            // Service icon - favicon if available, colored circle as fallback
+            Group {
+                if let faviconURL = service.faviconURL {
+                    let _ = print("🖼️ Loading favicon for \(service.name): \(faviconURL)")
+                    AsyncImage(url: faviconURL) { image in
+                        image
+                            .resizable()
+                            .aspectRatio(contentMode: .fit)
+                    } placeholder: {
+                        // Fallback to colored circle while loading
+                        coloredCircleFallback
+                    }
                     .frame(width: 32, height: 32)
-                
-                Text(String(service.name.prefix(1)))
-                    .font(.system(size: 16, weight: .bold))
-                    .foregroundColor(.white)
+                    .clipShape(RoundedRectangle(cornerRadius: 8))
+                    .overlay(
+                        RoundedRectangle(cornerRadius: 8)
+                            .stroke(Color.secondary.opacity(0.2), lineWidth: 1)
+                    )
+                } else {
+                    let _ = print("⚪ No favicon URL for \(service.name), using colored circle")
+                    // No favicon URL, use colored circle
+                    coloredCircleFallback
+                }
             }
             
             // Service name
@@ -185,7 +282,7 @@ struct SettingsView: View {
                                     service: service,
                                     services: $viewModel.services,
                                     draggedService: $draggedService,
-                                    onReorder: { viewModel.settingsManager.reorderServices(viewModel.services) }
+                                    viewModel: viewModel
                                 ))
                             }
                         }
@@ -243,7 +340,7 @@ struct ServiceDropDelegate: DropDelegate {
     let service: AIService
     @Binding var services: [AIService]
     @Binding var draggedService: AIService?
-    let onReorder: () -> Void
+    let viewModel: SettingsViewModel
     
     func performDrop(info: DropInfo) -> Bool {
         guard let draggedService = draggedService else { return false }
@@ -252,10 +349,11 @@ struct ServiceDropDelegate: DropDelegate {
         let toIndex = services.firstIndex(where: { $0.id == service.id })
         
         if let from = fromIndex, let to = toIndex, from != to {
-            withAnimation {
-                services.move(fromOffsets: IndexSet(integer: from), toOffset: to > from ? to + 1 : to)
-            }
-            onReorder()
+            // Calculate the destination index for moveService
+            let destination = to > from ? to + 1 : to
+            
+            // Use the viewModel's moveService method which handles everything properly
+            viewModel.moveService(from: IndexSet(integer: from), to: destination)
         }
         
         self.draggedService = nil

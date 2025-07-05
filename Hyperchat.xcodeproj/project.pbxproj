@@ -37,6 +37,7 @@
 		BEC467D12E16483D007B45D0 /* HyperchatUITests.swift in Sources */ = {isa = PBXBuildFile; fileRef = BEC4679B2E164215007B45D0 /* HyperchatUITests.swift */; };
 		BEE13BAF2C4F6B2900A8A61E /* WebViewLogger.swift in Sources */ = {isa = PBXBuildFile; fileRef = BEE13BA92C4F6B2900A8A61E /* WebViewLogger.swift */; };
 		BEE13BB02C4F6B2900A8A61E /* AutoInstaller.swift in Sources */ = {isa = PBXBuildFile; fileRef = BEE13BB12C4F6B2900A8A61E /* AutoInstaller.swift */; };
+		EB2CF06672284D57B0FCBCA5 /* FaviconFetcher.swift in Sources */ = {isa = PBXBuildFile; fileRef = EB2CF06672284D57B0FCBCA6 /* FaviconFetcher.swift */; };
 /* End PBXBuildFile section */
 
 /* Begin PBXContainerItemProxy section */
@@ -72,9 +73,9 @@
 		3EE13BB52C4F6B2900A8A61E /* SettingsManager.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = SettingsManager.swift; sourceTree = "<group>"; };
 		3EE13BB72C4F6B2900A8A61E /* SettingsWindowController.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = SettingsWindowController.swift; sourceTree = "<group>"; };
 		BEB355BC2E18A3F7000164A8 /* HyperchatApp.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = HyperchatApp.swift; sourceTree = "<group>"; };
-		BEB355C02E18A6F4000164A8 /* BrowserView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = BrowserView.swift; sourceTree = "<group>"; };
-		BEB355C12E18A6F4000164A8 /* ButtonState.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ButtonState.swift; sourceTree = "<group>"; };
-		BEB355C22E18A6F4000164A8 /* GradientToolbarButton.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = GradientToolbarButton.swift; sourceTree = "<group>"; };
+		BEB355C02E18A6F4000164A8 /* BrowserView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = UI/BrowserView.swift; sourceTree = "<group>"; };
+		BEB355C12E18A6F4000164A8 /* ButtonState.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = UI/ButtonState.swift; sourceTree = "<group>"; };
+		BEB355C22E18A6F4000164A8 /* GradientToolbarButton.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = UI/GradientToolbarButton.swift; sourceTree = "<group>"; };
 		BEC2A9992E18A24500785B53 /* BrowserViewController.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = BrowserViewController.swift; sourceTree = "<group>"; };
 		BEC2A99A2E18A24500785B53 /* CrashDebugger.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = CrashDebugger.swift; sourceTree = "<group>"; };
 		BEC2A99C2E18A24500785B53 /* WebViewFactory.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = WebViewFactory.swift; sourceTree = "<group>"; };
@@ -90,6 +91,7 @@
 		BEC467C02E164462007B45D0 /* HyperchatUITests.xctest */ = {isa = PBXFileReference; explicitFileType = wrapper.cfbundle; includeInIndex = 0; path = HyperchatUITests.xctest; sourceTree = BUILT_PRODUCTS_DIR; };
 		BEE13BA92C4F6B2900A8A61E /* WebViewLogger.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = WebViewLogger.swift; sourceTree = "<group>"; };
 		BEE13BB12C4F6B2900A8A61E /* AutoInstaller.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = AutoInstaller.swift; sourceTree = "<group>"; };
+		EB2CF06672284D57B0FCBCA6 /* FaviconFetcher.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = FaviconFetcher.swift; sourceTree = "<group>"; };
 /* End PBXFileReference section */
 
 /* Begin PBXFrameworksBuildPhase section */
@@ -161,6 +163,7 @@
 				3EE13BA82C4F6B2900A8A61E /* ServiceConfiguration.swift */,
 				BEE13BA92C4F6B2900A8A61E /* WebViewLogger.swift */,
 				BEE13BB12C4F6B2900A8A61E /* AutoInstaller.swift */,
+				EB2CF06672284D57B0FCBCA6 /* FaviconFetcher.swift */,
 				3EE13BB52C4F6B2900A8A61E /* SettingsManager.swift */,
 				3EE13BB72C4F6B2900A8A61E /* SettingsWindowController.swift */,
 				3EE13BB32C4F6B2900A8A61E /* Orbitron-Bold.ttf */,
@@ -341,6 +344,7 @@
 				3EE13BAE2C4F6B2900A8A61E /* ServiceConfiguration.swift in Sources */,
 				BEE13BAF2C4F6B2900A8A61E /* WebViewLogger.swift in Sources */,
 				BEE13BB02C4F6B2900A8A61E /* AutoInstaller.swift in Sources */,
+				EB2CF06672284D57B0FCBCA5 /* FaviconFetcher.swift in Sources */,
 				BEC2A99D2E18A24500785B53 /* CrashDebugger.swift in Sources */,
 				BEB355BD2E18A3F7000164A8 /* HyperchatApp.swift in Sources */,
 				BEC2A99F2E18A24500785B53 /* BrowserViewController.swift in Sources */,

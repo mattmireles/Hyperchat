@@ -424,6 +424,17 @@ extension BrowserViewController: WKNavigationDelegate {
             self?.browserView.urlField.toolTip = fullURL.isEmpty ? "Enter URL..." : fullURL
             self?.updateBackButton()
         }
+        
+        // Extract favicon after page loads
+        print("🔍 Extracting favicon for \(service.name) from URL: \(webView.url?.absoluteString ?? "unknown")")
+        let faviconScript = JavaScriptProvider.faviconExtractionScript()
+        webView.evaluateJavaScript(faviconScript) { result, error in
+            if let error = error {
+                print("⚠️ Failed to extract favicon for \(self.service.name): \(error)")
+            } else {
+                print("✅ Favicon extraction script executed for \(self.service.name)")
+            }
+        }
     }
     
     /// Called when navigation fails after starting.

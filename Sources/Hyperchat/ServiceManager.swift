@@ -34,8 +34,8 @@ import Combine
 /// These values are carefully tuned to balance responsiveness with reliability.
 private enum ServiceTimings {
     /// Delay before pasting into Claude to ensure page is fully loaded.
-    /// Claude's React app requires ~3 seconds to initialize all JavaScript handlers.
-    static let claudePasteDelay: TimeInterval = 3.0
+    /// Claude's React app requires ~1.5 seconds to initialize all JavaScript handlers.
+    static let claudePasteDelay: TimeInterval = 1.5
     
     /// Delay after prompt execution to refocus the input field.
     /// Ensures paste operations complete before returning focus.
@@ -96,6 +96,9 @@ struct AIService {
     
     /// Display order in the UI (1 = leftmost, higher numbers = further right)
     var order: Int
+    
+    /// Dynamic favicon URL extracted from the website
+    var faviconURL: URL?
 }
 
 /// Default service configurations.
@@ -111,7 +114,8 @@ let defaultServices = [
             parameter: ServiceConfigurations.google.queryParam
         ),
         enabled: true,
-        order: 3  // Third position from left
+        order: 3,  // Third position from left
+        faviconURL: nil
     ),
     AIService(
         id: "perplexity",
@@ -122,7 +126,8 @@ let defaultServices = [
             parameter: ServiceConfigurations.perplexity.queryParam
         ),
         enabled: true,
-        order: 2
+        order: 2,
+        faviconURL: nil
     ),
     AIService(
         id: "chatgpt",
@@ -133,7 +138,8 @@ let defaultServices = [
             parameter: ServiceConfigurations.chatGPT.queryParam
         ),
         enabled: true,
-        order: 1
+        order: 1,
+        faviconURL: nil
     ),
     AIService(
         id: "claude",
@@ -143,7 +149,8 @@ let defaultServices = [
             baseURL: ServiceConfigurations.claude.baseURL
         ),
         enabled: false,
-        order: 4
+        order: 4,
+        faviconURL: nil
     )
 ]
 
@@ -418,19 +425,108 @@ class ClaudeService: WebService {
     ///
     /// Note: The replyToAll parameter is ignored for Claude as it always uses paste.
     func executePrompt(_ prompt: String, replyToAll: Bool) {
-        guard case .clipboardPaste(let baseURL) = service.activationMethod else { return }
-        
-        let pasteboard = NSPasteboard.general
-        pasteboard.clearContents()
-        pasteboard.setString(prompt, forType: .string)
-        
-        if let url = URL(string: baseURL) {
-            webView.load(URLRequest(url: url))
+        guard case .clipboardPaste(let baseURL) = service.activationMethod else { 
+            print("❌ [Claude] Not a clipboard paste service")
+            return 
         }
         
-        DispatchQueue.main.asyncAfter(deadline: .now() + ServiceTimings.claudePasteDelay) {
+        print("🤖 [Claude] Executing prompt: '\(prompt.prefix(50))...' replyToAll: \(replyToAll)")
+        
+        // Copy to clipboard
+        let pasteboard = NSPasteboard.general
+        pasteboard.clearContents()
+        let success = pasteboard.setString(prompt, forType: .string)
+        print("📋 [Claude] Clipboard set success: \(success)")
+        
+        // Check current URL to decide if we need to navigate
+        let currentURL = webView.url?.absoluteString ?? "none"
+        print("🌐 [Claude] Current URL: \(currentURL)")
+        
+        // Check if we need to navigate to Claude
+        let needsNavigation = !replyToAll || !currentURL.hasPrefix(baseURL)
+        
+        if needsNavigation {
+            if let url = URL(string: baseURL) {
+                print("🔗 [Claude] Navigating to: \(baseURL)")
+                webView.load(URLRequest(url: url))
+                
+                // Only delay when navigating to a new page
+                DispatchQueue.main.asyncAfter(deadline: .now() + ServiceTimings.claudePasteDelay) {
+                    print("⏰ [Claude] Executing paste script after \(ServiceTimings.claudePasteDelay)s delay (page was loading)")
+                    let script = JavaScriptProvider.claudePasteScript(prompt: prompt)
+                    self.webView.evaluateJavaScript(script) { result, error in
+                        if let error = error {
+                            print("❌ [Claude] JavaScript error: \(error)")
+                        } else {
+                            self.logClaudeDiagnostics(result)
+                        }
+                    }
+                }
+            }
+        } else {
+            print("✅ [Claude] Already at Claude, executing immediately")
+            // Execute paste script immediately - no delay!
             let script = JavaScriptProvider.claudePasteScript(prompt: prompt)
-            self.webView.evaluateJavaScript(script)
+            self.webView.evaluateJavaScript(script) { result, error in
+                if let error = error {
+                    print("❌ [Claude] JavaScript error: \(error)")
+                } else {
+                    self.logClaudeDiagnostics(result)
+                }
+            }
+        }
+    }
+    
+    /// Parses and logs the diagnostic JSON report from Claude script execution.
+    ///
+    /// This method extracts diagnostic information from the JavaScript response
+    /// to help debug submission issues. It logs:
+    /// - Whether the input field was found and which selector worked
+    /// - Whether text was successfully inserted
+    /// - Whether the Enter key event was dispatched
+    /// - Whether a submit button was found (for fallback options)
+    /// - Any error messages
+    private func logClaudeDiagnostics(_ result: Any?) {
+        guard let jsonString = result as? String,
+              let jsonData = jsonString.data(using: .utf8) else {
+            print("❌ [Claude] Invalid diagnostic response: \(String(describing: result))")
+            return
+        }
+        
+        do {
+            if let report = try JSONSerialization.jsonObject(with: jsonData) as? [String: Any] {
+                print("📊 [Claude] DIAGNOSTIC REPORT:")
+                print("   └─ Page URL: \(report["pageURL"] ?? "unknown")")
+                print("   └─ Input Found: \(report["inputFound"] ?? false)")
+                print("   └─ Input Selector: \(report["inputSelector"] ?? "none")")
+                print("   └─ Text Inserted: \(report["textInserted"] ?? false)")
+                print("   └─ Enter Dispatched: \(report["enterDispatched"] ?? false)")
+                print("   └─ Submit Button Found: \(report["submitButtonFound"] ?? false)")
+                print("   └─ Submit Button Selector: \(report["submitButtonSelector"] ?? "none")")
+                print("   └─ Error: \(report["errorMessage"] ?? "none")")
+                print("   └─ Timestamp: \(report["timestamp"] ?? "unknown")")
+                
+                // Analyze the results
+                let inputFound = report["inputFound"] as? Bool ?? false
+                let textInserted = report["textInserted"] as? Bool ?? false
+                let enterDispatched = report["enterDispatched"] as? Bool ?? false
+                let submitButtonFound = report["submitButtonFound"] as? Bool ?? false
+                
+                if inputFound && textInserted && enterDispatched {
+                    print("✅ [Claude] All steps completed successfully but submission may have failed")
+                    if submitButtonFound {
+                        print("💡 [Claude] Submit button detected - could try clicking it as fallback")
+                    }
+                } else if !inputFound {
+                    print("❌ [Claude] Failed to find input field - check selectors")
+                } else if !textInserted {
+                    print("❌ [Claude] Failed to insert text - input field may be readonly")
+                } else if !enterDispatched {
+                    print("❌ [Claude] Enter key event failed - event may be blocked")
+                }
+            }
+        } catch {
+            print("❌ [Claude] Failed to parse diagnostic JSON: \(error)")
         }
     }
 }
@@ -614,6 +710,14 @@ class ServiceManager: NSObject, ObservableObject {
             name: .servicesUpdated,
             object: nil
         )
+        
+        // Listen for favicon discoveries
+        NotificationCenter.default.addObserver(
+            self,
+            selector: #selector(handleFaviconFound(_:)),
+            name: .faviconFound,
+            object: nil
+        )
     }
     
     /// Cleans up all WebView resources when the window closes.
@@ -718,8 +822,10 @@ class ServiceManager: NSObject, ObservableObject {
             switch service.activationMethod {
             case .urlParameter:
                 webService = URLParameterService(webView: webView, service: service)
+                print("📱 Created URLParameterService for: \(service.name)")
             case .clipboardPaste:
                 webService = ClaudeService(webView: webView, service: service)
+                print("📋 Created ClaudeService for: \(service.name)")
             }
             
             // Store references and initialize state
@@ -748,6 +854,9 @@ class ServiceManager: NSObject, ObservableObject {
     @objc private func servicesUpdated() {
         print("🔄 Services updated notification received, reloading services...")
         
+        // Get previous service list for comparison
+        let previousServiceIds = Set(webServices.keys)
+        
         // Clear existing WebViews
         stateQueue.sync {
             for (_, webService) in webServices {
@@ -770,9 +879,61 @@ class ServiceManager: NSObject, ObservableObject {
         // Set up services again with updated settings
         setupServices()
         
+        // Get new service list
+        let newServiceIds = Set(webServices.keys)
+        
+        // Check if services were added/removed
+        if previousServiceIds != newServiceIds {
+            print("📱 Service enable/disable detected - notifying overlay to reload")
+            // Post notification to reload overlay UI
+            DispatchQueue.main.async {
+                NotificationCenter.default.post(name: .reloadOverlayUI, object: nil)
+            }
+        }
+        
         // Notify UI to update
         DispatchQueue.main.async { [weak self] in
             self?.objectWillChange.send()
+        }
+    }
+    
+    /// Handles favicon discovery notifications from WebView message handlers.
+    ///
+    /// Called by:
+    /// - Notification from WebViewFactory when JavaScript extracts a favicon URL
+    ///
+    /// Process:
+    /// 1. Extract service name and favicon URL from notification
+    /// 2. Find the corresponding service in activeServices
+    /// 3. Update the service's faviconURL property
+    /// 4. Notify SettingsManager to persist the change
+    /// 5. Trigger UI update
+    @objc private func handleFaviconFound(_ notification: Notification) {
+        guard let userInfo = notification.userInfo,
+              let serviceName = userInfo["service"] as? String,
+              let faviconURLString = userInfo["faviconURL"] as? String,
+              let faviconURL = URL(string: faviconURLString) else {
+            print("⚠️ Invalid favicon notification data")
+            return
+        }
+        
+        print("🎨 Favicon found for \(serviceName): \(faviconURL)")
+        
+        // Find the service and update its favicon URL
+        if let index = activeServices.firstIndex(where: { $0.name == serviceName }) {
+            print("📌 Updating favicon for service \(activeServices[index].id) at index \(index)")
+            activeServices[index].faviconURL = faviconURL
+            
+            // Update the service in SettingsManager to persist the change
+            SettingsManager.shared.updateServiceFavicon(serviceId: activeServices[index].id, faviconURL: faviconURL)
+            print("💾 Favicon URL saved to SettingsManager")
+            
+            // Notify UI to update
+            DispatchQueue.main.async { [weak self] in
+                self?.objectWillChange.send()
+            }
+        } else {
+            print("⚠️ Could not find service with name: \(serviceName)")
         }
     }
     
@@ -922,6 +1083,7 @@ class ServiceManager: NSObject, ObservableObject {
         // Execute prompt on all services
         for service in activeServices {
             if let webService = webServices[service.id] {
+                print("🎯 Executing prompt on service: \(service.name) (id: \(service.id))")
                 if replyToAll {
                     // Reply to All mode: immediate execution with clipboard paste
                     webService.executePrompt(prompt, replyToAll: true)
@@ -931,6 +1093,8 @@ class ServiceManager: NSObject, ObservableObject {
                         webService.executePrompt(prompt, replyToAll: false)
                     }
                 }
+            } else {
+                print("⚠️ No webService found for: \(service.name) (id: \(service.id))")
             }
         }
         
@@ -1176,6 +1340,49 @@ class ServiceManager: NSObject, ObservableObject {
             
             // Optionally trigger a small scroll to force re-render
             webView.evaluateJavaScript("window.scrollBy(0, 1); window.scrollBy(0, -1);")
+        }
+    }
+    
+    /// Extracts favicon from a loaded web page as a fallback.
+    ///
+    /// Called by:
+    /// - `webView(_:didFinish:)` when BrowserViewController handoff fails
+    ///
+    /// This ensures favicon extraction happens even if the normal
+    /// delegate handoff doesn't work properly.
+    private func extractFavicon(for webView: WKWebView, service: AIService?, retryCount: Int = 0) {
+        guard let service = service else { return }
+        
+        print("🔍 [Fallback] Extracting favicon for \(service.name) from URL: \(webView.url?.absoluteString ?? "unknown")")
+        let faviconScript = JavaScriptProvider.faviconExtractionScript()
+        webView.evaluateJavaScript(faviconScript) { [weak self] result, error in
+            if let error = error {
+                print("⚠️ [Fallback] Failed to extract favicon for \(service.name): \(error)")
+                
+                // Retry up to 3 times with exponential backoff
+                if retryCount < 3 {
+                    let delay = TimeInterval(pow(2.0, Double(retryCount))) // 1s, 2s, 4s
+                    print("🔄 [Fallback] Retrying favicon extraction for \(service.name) in \(delay)s (attempt \(retryCount + 1)/3)")
+                    
+                    DispatchQueue.main.asyncAfter(deadline: .now() + delay) { [weak self] in
+                        self?.extractFavicon(for: webView, service: service, retryCount: retryCount + 1)
+                    }
+                } else {
+                    print("❌ [Fallback] Failed to extract favicon for \(service.name) after 3 attempts")
+                    
+                    // Fall back to FaviconFetcher for HTTP-based extraction
+                    print("🌐 [Fallback] Attempting HTTP-based favicon fetch for \(service.name)")
+                    FaviconFetcher.shared.fetchFaviconWithKnownURL(for: service) { url in
+                        if let url = url {
+                            print("✅ [Fallback] HTTP favicon fetch succeeded for \(service.name): \(url)")
+                        } else {
+                            print("❌ [Fallback] HTTP favicon fetch also failed for \(service.name)")
+                        }
+                    }
+                }
+            } else {
+                print("✅ [Fallback] Favicon extraction script executed for \(service.name)")
+            }
         }
     }
 }
@@ -1433,6 +1640,11 @@ extension ServiceManager: WKNavigationDelegate {
                     // Hand off navigation delegate to BrowserViewController if available
                     if let browserViewController = browserViewControllers[serviceId] {
                         browserViewController.takeOverNavigationDelegate()
+                        print("✅ Successfully handed off navigation delegate for \(serviceId) to BrowserViewController")
+                    } else {
+                        print("⚠️ No BrowserViewController found for \(serviceId) - will extract favicon here as fallback")
+                        // Extract favicon as fallback if BrowserViewController isn't ready
+                        extractFavicon(for: webView, service: activeServices.first { $0.id == serviceId })
                     }
                     
                     // Load the next service after a small delay
@@ -1448,8 +1660,15 @@ extension ServiceManager: WKNavigationDelegate {
                     
                     // If this wasn't the currently loading service, still hand off delegate
                     // This handles cases where services load out of order or were pre-loaded
-                    if serviceId != currentlyLoadingService, let browserViewController = browserViewControllers[serviceId] {
-                        browserViewController.takeOverNavigationDelegate()
+                    if serviceId != currentlyLoadingService {
+                        if let browserViewController = browserViewControllers[serviceId] {
+                            browserViewController.takeOverNavigationDelegate()
+                            print("✅ Successfully handed off navigation delegate for \(serviceId) to BrowserViewController (out-of-order load)")
+                        } else {
+                            print("⚠️ No BrowserViewController found for \(serviceId) (out-of-order load) - will extract favicon here as fallback")
+                            // Extract favicon as fallback if BrowserViewController isn't ready
+                            extractFavicon(for: webView, service: activeServices.first { $0.id == serviceId })
+                        }
                     }
                     
                     // Check if all services have loaded

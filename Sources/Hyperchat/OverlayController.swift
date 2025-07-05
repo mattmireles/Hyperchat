@@ -390,6 +390,14 @@ class OverlayController: NSObject, NSWindowDelegate {
             object: nil
         )
         
+        // Observe reload overlay UI notification from SettingsManager
+        NotificationCenter.default.addObserver(
+            self,
+            selector: #selector(reloadOverlayUI(_:)),
+            name: .reloadOverlayUI,
+            object: nil
+        )
+        
         // Note: allServicesDidLoad is now handled via Combine subscription in createNormalWindow
     }
 
@@ -793,6 +801,56 @@ class OverlayController: NSObject, NSWindowDelegate {
         hibernatedWindows.remove(window)
         
         print("⏰ Restored window with \(serviceManager.activeServices.count) services")
+    }
+    
+    // MARK: - Service Reload
+    
+    /// Handles notification to reload overlay UI when services are enabled/disabled.
+    ///
+    /// Called by:
+    /// - ServiceManager when detecting service enable/disable changes
+    ///
+    /// Process:
+    /// 1. Iterates through all active windows
+    /// 2. Recreates browser views with updated service list
+    /// 3. Maintains window state and focus
+    ///
+    /// This ensures the UI instantly reflects settings changes without
+    /// requiring a new request or window recreation.
+    @objc private func reloadOverlayUI(_ notification: Notification) {
+        print("🔄 Received reloadOverlayUI notification, refreshing all windows...")
+        
+        // Refresh browser views for all windows
+        for window in windows {
+            guard let serviceManager = windowServiceManagers[window],
+                  let contentView = window.contentView else { continue }
+            
+            print("🔄 Refreshing browser views for window...")
+            
+            // Find and remove the existing browser stack view
+            if let browserStackView = contentView.subviews.first(where: { $0.identifier == NSUserInterfaceItemIdentifier("browserStackView") }) {
+                browserStackView.removeFromSuperview()
+            }
+            
+            // Remove the input bar hosting view
+            if let inputBar = self.inputBarHostingView {
+                inputBar.removeFromSuperview()
+            }
+            
+            // Deactivate existing constraints
+            NSLayoutConstraint.deactivate(stackViewConstraints)
+            stackViewConstraints.removeAll()
+            
+            // Clear browser view controllers for this window
+            windowBrowserViewControllers.removeValue(forKey: window)
+            
+            // Recreate browser views with updated services
+            setupBrowserViews(in: contentView, using: serviceManager, for: window)
+            
+            print("✅ Browser views refreshed for window")
+        }
+        
+        print("✅ All windows refreshed")
     }
     
     // MARK: - Loading Overlay Management
