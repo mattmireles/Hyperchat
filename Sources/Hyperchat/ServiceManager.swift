@@ -1,3 +1,28 @@
+/// ServiceManager.swift - Core AI Service Orchestration
+///
+/// This file manages all WebView instances for AI services (ChatGPT, Claude, Perplexity, Google).
+/// It coordinates prompt execution, handles sequential loading, and manages window-specific state.
+///
+/// Key responsibilities:
+/// - Creates and manages WKWebView instances for each AI service
+/// - Handles sequential loading to prevent memory spikes and race conditions
+/// - Coordinates prompt execution across all active services
+/// - Manages reply-to-all vs new-chat modes
+/// - Implements window hibernation support for resource efficiency
+///
+/// Related files:
+/// - `OverlayController.swift`: Creates ServiceManager instances for each window
+/// - `AppDelegate.swift`: Triggers prompt execution via notifications
+/// - `BrowserViewController.swift`: Displays the WebViews created here
+/// - `WebViewFactory.swift`: Creates properly configured WKWebView instances
+/// - `ServiceConfigurations.swift`: Defines URL patterns for each service
+/// - `JavaScriptProvider.swift`: Provides JavaScript for service automation
+///
+/// Threading model:
+/// - Main thread: All UI operations and WebView interactions
+/// - globalStateQueue: Synchronizes shared state across ServiceManager instances
+/// - stateQueue: Manages internal state for sequential loading
+
 import Foundation
 import WebKit
 import SwiftUI
@@ -5,20 +30,77 @@ import Combine
 
 // MARK: - Service Configuration
 
+/// Defines the timing delays used throughout the service loading and prompt execution.
+/// These values are carefully tuned to balance responsiveness with reliability.
+private enum ServiceTimings {
+    /// Delay before pasting into Claude to ensure page is fully loaded.
+    /// Claude's React app requires ~3 seconds to initialize all JavaScript handlers.
+    static let claudePasteDelay: TimeInterval = 3.0
+    
+    /// Delay after prompt execution to refocus the input field.
+    /// Ensures paste operations complete before returning focus.
+    static let promptRefocusDelay: TimeInterval = 1.5
+    
+    /// Delay after service loads to check if query was processed.
+    /// Used for debugging URL parameter services.
+    static let queryCheckDelay: TimeInterval = 2.0
+    
+    /// Delay between loading services sequentially.
+    /// Prevents WebKit race conditions and GPU process conflicts.
+    static let serviceLoadingDelay: TimeInterval = 0.5
+    
+    /// Delay before loading a service to prevent race conditions.
+    /// WebKit needs this minimal delay between certain operations.
+    static let webKitSafetyDelay: TimeInterval = 0.01
+    
+    /// Delay before executing paste operations.
+    /// Ensures page JavaScript is ready to receive input.
+    static let pasteExecutionDelay: TimeInterval = 1.0
+    
+    /// Delay after WebView crash before attempting recovery.
+    /// Allows WebKit process cleanup before reload.
+    static let crashRecoveryDelay: TimeInterval = 1.0
+    
+    /// Delay for gentle window activation.
+    /// Prevents WebView disruption when making window key.
+    static let windowActivationDelay: TimeInterval = 0.1
+}
+
+/// Defines how a service accepts prompt input.
+/// Services either accept URL parameters or require clipboard paste automation.
 enum ServiceActivationMethod {
+    /// Service accepts prompts via URL query parameters (e.g., ?q=prompt)
     case urlParameter(baseURL: String, parameter: String)
+    
+    /// Service requires clipboard paste automation (e.g., Claude)
     case clipboardPaste(baseURL: String)
 }
 
+/// Represents an AI service that can be displayed in the app.
+/// Each service runs in its own WKWebView with isolated process and cookies.
 struct AIService {
+    /// Unique identifier used throughout the app (e.g., "chatgpt", "claude")
     var id: String
+    
+    /// Display name shown in the UI (e.g., "ChatGPT", "Claude")
     var name: String
+    
+    /// Asset catalog name for the service's icon
     var iconName: String
+    
+    /// How this service accepts prompt input (URL params vs clipboard paste)
     var activationMethod: ServiceActivationMethod
+    
+    /// Whether this service is currently active and should be displayed
     var enabled: Bool
+    
+    /// Display order in the UI (1 = leftmost, higher numbers = further right)
     var order: Int
 }
 
+/// Default service configurations.
+/// The actual URLs and parameters are defined in ServiceConfigurations.swift.
+/// These placeholder values are overridden at runtime.
 let defaultServices = [
     AIService(
         id: "google",
@@ -29,7 +111,7 @@ let defaultServices = [
             parameter: "placeholder"
         ),
         enabled: true,
-        order: 3
+        order: 3  // Third position from left
     ),
     AIService(
         id: "perplexity",
@@ -67,13 +149,33 @@ let defaultServices = [
 
 // MARK: - WebService Protocol and Implementations
 
+/// Protocol defining the interface for all AI service implementations.
+/// Each service must provide prompt execution and WebView access.
+
 protocol WebService {
+    /// Executes a prompt using the service's default mode.
+    /// Delegates to the replyToAll variant with false parameter.
     func executePrompt(_ prompt: String)
+    
+    /// Executes a prompt with specific mode control.
+    /// - Parameters:
+    ///   - prompt: The text to send to the AI service
+    ///   - replyToAll: If true, pastes into existing chat; if false, creates new chat
     func executePrompt(_ prompt: String, replyToAll: Bool)
+    
+    /// The WebView instance displaying this service
     var webView: WKWebView { get }
+    
+    /// The service configuration for this instance
     var service: AIService { get }
 }
 
+/// Handles services that accept prompts via URL parameters.
+/// Used by ChatGPT, Perplexity, and Google Search.
+///
+/// Prompt execution flow:
+/// 1. New Chat mode: Navigate to service URL with ?q=prompt parameter
+/// 2. Reply to All mode: Use clipboard paste into current page
 class URLParameterService: WebService {
     let webView: WKWebView
     let service: AIService
@@ -87,6 +189,14 @@ class URLParameterService: WebService {
         executePrompt(prompt, replyToAll: false)
     }
     
+    /// Executes a prompt based on the current mode.
+    ///
+    /// Called by:
+    /// - `ServiceManager.executePrompt()` for all URL parameter services
+    ///
+    /// Execution modes:
+    /// - New Chat (replyToAll=false): Navigates to service URL with query parameter
+    /// - Reply to All (replyToAll=true): Pastes prompt into current page
     func executePrompt(_ prompt: String, replyToAll: Bool) {
         if replyToAll {
             // Reply to All mode: Use clipboard paste with auto-submit
@@ -106,7 +216,7 @@ class URLParameterService: WebService {
                 webView.load(request)
                 
                 // Add debugging to monitor when services auto-submit
-                DispatchQueue.main.asyncAfter(deadline: .now() + 2.0) {
+                DispatchQueue.main.asyncAfter(deadline: .now() + ServiceTimings.queryCheckDelay) {
                     let serviceName = self.service.name
                     self.webView.evaluateJavaScript("""
                         console.log('DEBUG \(serviceName): Checking if query was processed...');
@@ -152,6 +262,15 @@ class URLParameterService: WebService {
         }
     }
     
+    /// Pastes a prompt into the currently loaded page using clipboard automation.
+    ///
+    /// This method:
+    /// 1. Copies the prompt to system clipboard
+    /// 2. Waits for page JavaScript to be ready
+    /// 3. Executes paste and submit JavaScript from JavaScriptProvider
+    /// 4. Handles service-specific post-paste actions (e.g., Perplexity sidebar)
+    ///
+    /// Used when in Reply to All mode to paste into existing chat sessions.
     private func pastePromptIntoCurrentPage(_ prompt: String) {
         // Copy prompt to clipboard
         let pasteboard = NSPasteboard.general
@@ -161,7 +280,7 @@ class URLParameterService: WebService {
         print("PASTE \(service.name): Pasting prompt '\(prompt.prefix(50))...' into current page")
         
         // Execute JavaScript to find and paste into text field
-        DispatchQueue.main.asyncAfter(deadline: .now() + 1.0) {
+        DispatchQueue.main.asyncAfter(deadline: .now() + ServiceTimings.pasteExecutionDelay) {
             let script = JavaScriptProvider.pasteAndSubmitScript(prompt: prompt, for: self.service)
             self.webView.evaluateJavaScript(script) { result, error in
                 if let error = error {
@@ -273,6 +392,14 @@ class URLParameterService: WebService {
     }
 }
 
+/// Handles Claude.ai which requires clipboard paste automation.
+/// Claude doesn't support URL parameters, so all prompts use paste method.
+///
+/// Execution flow:
+/// 1. Copy prompt to clipboard
+/// 2. Navigate to Claude.ai (if not already there)
+/// 3. Wait 3 seconds for React app to initialize
+/// 4. Execute paste JavaScript from JavaScriptProvider
 class ClaudeService: WebService {
     let webView: WKWebView
     let service: AIService
@@ -286,6 +413,10 @@ class ClaudeService: WebService {
         executePrompt(prompt, replyToAll: false)
     }
     
+    /// Executes a prompt on Claude using clipboard paste.
+    /// Claude requires special handling as it doesn't support URL parameters.
+    ///
+    /// Note: The replyToAll parameter is ignored for Claude as it always uses paste.
     func executePrompt(_ prompt: String, replyToAll: Bool) {
         guard case .clipboardPaste(let baseURL) = service.activationMethod else { return }
         
@@ -297,7 +428,7 @@ class ClaudeService: WebService {
             webView.load(URLRequest(url: url))
         }
         
-        DispatchQueue.main.asyncAfter(deadline: .now() + 3.0) {
+        DispatchQueue.main.asyncAfter(deadline: .now() + ServiceTimings.claudePasteDelay) {
             let script = JavaScriptProvider.claudePasteScript(prompt: prompt)
             self.webView.evaluateJavaScript(script)
         }
@@ -306,23 +437,94 @@ class ClaudeService: WebService {
 
 // MARK: - ServiceManager
 
+/// Central orchestrator for all AI service WebViews in a window.
+///
+/// Each window creates its own ServiceManager instance to ensure WebView isolation.
+/// ServiceManagers coordinate through shared global state for prompt execution.
+///
+/// Key responsibilities:
+/// - Creates and manages WebView instances for each AI service
+/// - Implements sequential loading to prevent GPU process conflicts
+/// - Coordinates prompt execution across all services
+/// - Manages reply-to-all vs new-chat mode transitions
+/// - Handles WebView crashes and recovery
+/// - Supports window hibernation for resource efficiency
+///
+/// Created by:
+/// - `OverlayController.createNormalWindow()` for each new window
+/// - `OverlayController.showOverlay()` for the overlay window
+///
+/// Lifecycle:
+/// - Created when window is created
+/// - Destroyed when window closes (extensive cleanup in deinit)
+/// - Can be hibernated/resumed for inactive windows
 class ServiceManager: NSObject, ObservableObject {
-    @Published var activeServices: [AIService] = []
-    @Published var sharedPrompt: String = ""
-    @Published var replyToAll: Bool = true
-    @Published var loadingStates: [String: Bool] = [:]  // Track loading state per service (for UI only)
-    @Published var areAllServicesLoaded: Bool = false  // Replaces allServicesDidLoad notification
-    let focusInputPublisher = PassthroughSubject<Void, Never>()  // Replaces focusUnifiedInput notification
-    var webServices: [String: WebService] = [:]
-    private let processPool = WKProcessPool.shared  // Critical optimization
+    // MARK: - Published Properties (UI State)
     
-    // Track BrowserViewControllers for delegate handoff
+    /// List of AI services that are currently enabled and displayed.
+    /// Observed by ContentView to render service tabs.
+    @Published var activeServices: [AIService] = []
+    
+    /// The current prompt text entered by the user.
+    /// Bound to UnifiedInputBar in ContentView.
+    @Published var sharedPrompt: String = ""
+    
+    /// Whether to paste into existing chats (true) or create new chats (false).
+    /// Synchronized with UI toggle in UnifiedInputBar.
+    @Published var replyToAll: Bool = true
+    
+    /// Loading state for each service, keyed by service ID.
+    /// Used by UI to show loading indicators.
+    @Published var loadingStates: [String: Bool] = [:]
+    
+    /// Whether all services have completed initial loading.
+    /// Replaces the old allServicesDidLoad notification pattern.
+    @Published var areAllServicesLoaded: Bool = false
+    
+    // MARK: - Publishers
+    
+    /// Signals when the prompt input field should regain focus.
+    /// Triggered after prompt execution to return focus to input.
+    let focusInputPublisher = PassthroughSubject<Void, Never>()
+    
+    // MARK: - Service Management
+    
+    /// Map of service ID to WebService implementation.
+    /// Each service has either URLParameterService or ClaudeService.
+    var webServices: [String: WebService] = [:]
+    
+    /// Shared process pool for critical WebKit optimization.
+    /// NEVER create new WKProcessPool instances - always use this shared one.
+    private let processPool = WKProcessPool.shared
+    
+    /// BrowserViewControllers displaying each service's WebView.
+    /// Used for navigation delegate handoff after initial load.
     var browserViewControllers: [String: BrowserViewController] = [:]
     
     
-    // Thread-safe shared prompt execution state across all ServiceManager instances
+    // MARK: - Global State Management
+    
+    /// Queue for synchronizing shared state across all ServiceManager instances.
+    /// Ensures thread-safe access to global prompt execution state.
     private static let globalStateQueue = DispatchQueue(label: "com.hyperchat.servicemanager.globalstate")
+    
+    /// Backing storage for global isFirstSubmit flag.
     private static var _globalIsFirstSubmit: Bool = true
+    
+    /// Tracks whether this is the first prompt submission in the current session.
+    ///
+    /// State transitions:
+    /// - Starts as `true` when app launches or "New Chat" clicked
+    /// - Set to `false` after first prompt execution
+    /// - Reset to `true` by `resetThreadState()` or `reloadAllServices()`
+    ///
+    /// Why this matters:
+    /// - First submission: Always uses URL navigation (creates new chat threads)
+    /// - Subsequent submissions: Uses reply-to-all mode (pastes into existing chats)
+    ///
+    /// This flag is:
+    /// - Shared globally across all ServiceManager instances via thread-safe queue
+    /// - Synchronized with `replyToAll` UI toggle in ContentView
     private var isFirstSubmit: Bool {
         get { 
             ServiceManager.globalStateQueue.sync { ServiceManager._globalIsFirstSubmit }
@@ -331,20 +533,63 @@ class ServiceManager: NSObject, ObservableObject {
             ServiceManager.globalStateQueue.sync { ServiceManager._globalIsFirstSubmit = newValue }
         }
     }
-    private var perplexityInitialLoadComplete: Bool = false  // Track if Perplexity has completed initial load
-    private var lastAttemptedURLs: [WKWebView: URL] = [:]  // Track last attempted URL per WebView
-    // Thread-safe state management
-    private let stateQueue = DispatchQueue(label: "com.hyperchat.servicemanager.state", qos: .userInitiated)
-    private var serviceLoadingQueue: [AIService] = []  // Queue for sequential loading
-    private var currentlyLoadingService: String? = nil  // Track which service is currently being loaded
-    private var isForceReloading: Bool = false  // Track if we're in force reload mode
-    private var loadedServicesCount: Int = 0  // Track how many services have finished loading
-    private var hasNotifiedAllServicesLoaded: Bool = false  // Prevent duplicate notifications
     
-    // Cleanup state tracking
+    // MARK: - Service Loading State
+    
+    /// Whether Perplexity has completed its initial page load.
+    /// Perplexity requires special handling as it needs to load before accepting URL parameters.
+    private var perplexityInitialLoadComplete: Bool = false
+    
+    /// Maps WebViews to their last attempted URL.
+    /// Used to detect navigation cancellations (error -999) for query URLs.
+    private var lastAttemptedURLs: [WKWebView: URL] = [:]
+    
+    /// Queue for managing internal state operations.
+    /// Ensures thread-safe access to loading queue and state variables.
+    private let stateQueue = DispatchQueue(label: "com.hyperchat.servicemanager.state", qos: .userInitiated)
+    
+    /// Queue of services waiting to be loaded.
+    /// Services are loaded sequentially to prevent WebKit race conditions.
+    private var serviceLoadingQueue: [AIService] = []
+    
+    /// ID of the service currently being loaded.
+    /// Nil when no service is loading.
+    private var currentlyLoadingService: String? = nil
+    
+    /// Whether we're performing a force reload of all services.
+    /// Set by reloadAllServices() to ensure fresh page loads.
+    private var isForceReloading: Bool = false
+    
+    /// Count of services that have finished loading (successfully or failed).
+    /// Used to determine when all services are ready.
+    private var loadedServicesCount: Int = 0
+    
+    /// Whether we've already notified that all services are loaded.
+    /// Prevents duplicate notifications and state updates.
+    private var hasNotifiedAllServicesLoaded: Bool = false
+    
+    // MARK: - Cleanup State
+    
+    /// Whether this ServiceManager is currently being deallocated.
+    /// Used to prevent navigation delegate callbacks during cleanup.
     private var isCleaningUp = false
+    
+    /// Unique identifier for this ServiceManager instance.
+    /// Used for debugging lifecycle and memory management.
     private let instanceId = UUID().uuidString.prefix(8)
     
+    /// Initializes a new ServiceManager for a window.
+    ///
+    /// Called by:
+    /// - `OverlayController.createNormalWindow()`
+    /// - `OverlayController.showOverlay()`
+    ///
+    /// Initialization steps:
+    /// 1. Configure logging settings
+    /// 2. Create WebViews for all enabled services
+    /// 3. Add services to sequential loading queue
+    /// 4. Register this instance for global tracking
+    /// 5. Start loading the first service
     override init() {
         super.init()
         
@@ -363,6 +608,22 @@ class ServiceManager: NSObject, ObservableObject {
         registerManager()
     }
     
+    /// Cleans up all WebView resources when the window closes.
+    ///
+    /// CRITICAL WebKit cleanup requirements:
+    /// - Must wrap all cleanup in autoreleasepool
+    /// - Must stop loading before removing delegates
+    /// - Must clear all JavaScript handlers
+    /// - Must remove from superview
+    ///
+    /// Without proper cleanup:
+    /// - WebKit objects can be over-released causing EXC_BAD_ACCESS
+    /// - Navigation delegates can be called on deallocated objects
+    /// - Memory leaks from retained WebView references
+    ///
+    /// This cleanup pattern is also used in:
+    /// - `OverlayController.cleanupWindowResources()`
+    /// - `BrowserViewController.cleanup()`
     deinit {
         print("🔴 [\(Date().timeIntervalSince1970)] ServiceManager DEINIT \(instanceId) starting cleanup")
         
@@ -407,17 +668,40 @@ class ServiceManager: NSObject, ObservableObject {
         }
     }
     
+    /// Sets up WebViews for all enabled AI services.
+    ///
+    /// Called during init to:
+    /// 1. Filter and sort services by display order
+    /// 2. Create WebView for each service via WebViewFactory
+    /// 3. Create appropriate WebService implementation (URL vs Clipboard)
+    /// 4. Add services to sequential loading queue
+    /// 5. Start loading the first service
+    ///
+    /// Services are loaded sequentially to prevent:
+    /// - GPU process conflicts (multiple WebViews starting simultaneously)
+    /// - Memory spikes from parallel loading
+    /// - Race conditions in WebKit initialization
     private func setupServices() {
-        // Sort services by their order property to ensure correct loading sequence
-        let sortedServices = defaultServices.filter { $0.enabled }.sorted { $0.order < $1.order }
+        // Filter out disabled services and sort by display order
+        // Order values: ChatGPT=1, Perplexity=2, Google=3, Claude=4
+        // This ensures consistent left-to-right display in the UI
+        let enabledServices = defaultServices.filter { service in
+            return service.enabled == true
+        }
+        let sortedServices = enabledServices.sorted { firstService, secondService in
+            return firstService.order < secondService.order
+        }
         
         for service in sortedServices {
+            // Create WebView with proper configuration from WebViewFactory
             let webView = WebViewFactory.shared.createWebView(for: service)
             
             // Set ServiceManager as navigation delegate for sequential loading
+            // We'll hand off to BrowserViewController after initial load
             webView.navigationDelegate = self
             webView.uiDelegate = self
             
+            // Create appropriate WebService implementation based on activation method
             let webService: WebService
             switch service.activationMethod {
             case .urlParameter:
@@ -426,6 +710,7 @@ class ServiceManager: NSObject, ObservableObject {
                 webService = ClaudeService(webView: webView, service: service)
             }
             
+            // Store references and initialize state
             webServices[service.id] = webService
             activeServices.append(service)
             loadingStates[service.id] = false
@@ -438,6 +723,20 @@ class ServiceManager: NSObject, ObservableObject {
         loadNextServiceFromQueue()
     }
     
+    /// Loads the next service from the sequential loading queue.
+    ///
+    /// Called by:
+    /// - `setupServices()` to start initial loading
+    /// - `webView(_:didFinish:)` after each service loads
+    /// - `webView(_:didFail:)` if a service fails to load
+    ///
+    /// Sequential loading ensures:
+    /// - Only one WebView loads at a time
+    /// - GPU process has time to initialize
+    /// - Memory usage stays manageable
+    /// - Navigation delegates fire in predictable order
+    ///
+    /// - Parameter forceReload: If true, reloads even if already at home URL
     private func loadNextServiceFromQueue(forceReload: Bool = false) {
         // Check if we're already loading or if queue is empty
         guard currentlyLoadingService == nil, !serviceLoadingQueue.isEmpty else {
@@ -544,6 +843,24 @@ class ServiceManager: NSObject, ObservableObject {
         }
     }
     
+    /// Executes a prompt across all active AI services.
+    ///
+    /// This method is called from:
+    /// - `executeSharedPrompt()` when user submits via Enter key
+    /// - `PromptWindowController.submitPrompt()` via notification
+    /// - `AppDelegate.handlePromptSubmission()` via notification
+    ///
+    /// Execution modes:
+    /// - New Chat (replyToAll=false): Navigate to service URL with query parameter
+    /// - Reply to All (replyToAll=true): Paste prompt into existing chat sessions
+    ///
+    /// The execution flow continues to:
+    /// - `URLParameterService.executePrompt()` for ChatGPT/Perplexity/Google
+    /// - `ClaudeService.executePrompt()` for Claude's clipboard method
+    ///
+    /// - Parameters:
+    ///   - prompt: The user's text to send to AI services
+    ///   - replyToAll: If true, pastes into existing chats; if false, creates new chats
     func executePrompt(_ prompt: String, replyToAll: Bool = false) {
         if LoggingSettings.shared.debugPrompts {
             WebViewLogger.shared.log("🔄 executePrompt called - replyToAll: \(replyToAll), services: \(activeServices.map { $0.id }.joined(separator: ", "))", for: "system", type: .info)
@@ -557,7 +874,7 @@ class ServiceManager: NSObject, ObservableObject {
                     webService.executePrompt(prompt, replyToAll: true)
                 } else {
                     // New Chat mode: use URL navigation with minimal delay
-                    DispatchQueue.main.asyncAfter(deadline: .now() + 0.01) {
+                    DispatchQueue.main.asyncAfter(deadline: .now() + ServiceTimings.webKitSafetyDelay) {
                         webService.executePrompt(prompt, replyToAll: false)
                     }
                 }
@@ -565,11 +882,30 @@ class ServiceManager: NSObject, ObservableObject {
         }
         
         // Refocus the prompt input field after a delay to ensure paste operations complete
-        DispatchQueue.main.asyncAfter(deadline: .now() + 1.5) { [weak self] in
+        DispatchQueue.main.asyncAfter(deadline: .now() + ServiceTimings.promptRefocusDelay) { [weak self] in
             self?.focusInputPublisher.send()
         }
     }
     
+    /// Executes the current shared prompt based on submission mode.
+    ///
+    /// Called by:
+    /// - `UnifiedInputBar` when user presses Enter
+    /// - `ContentView.handleShortcutAction()` for keyboard shortcuts
+    ///
+    /// State-based execution logic:
+    /// 1. First submission (isFirstSubmit=true):
+    ///    - Always uses URL navigation to create new chat threads
+    ///    - Sets isFirstSubmit=false for subsequent submissions
+    ///    - Updates UI to show reply-to-all mode is now active
+    ///
+    /// 2. Subsequent submissions (isFirstSubmit=false):
+    ///    - Uses replyToAll toggle state from UI
+    ///    - If replyToAll=true: Pastes into existing chats
+    ///    - If replyToAll=false: Creates new chats via URL
+    ///
+    /// This method manages the complex state transitions between
+    /// "new chat" and "reply to all" modes across the app lifecycle.
     func executeSharedPrompt() {
         guard !sharedPrompt.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty else { return }
         
@@ -609,6 +945,22 @@ class ServiceManager: NSObject, ObservableObject {
         }
     }
     
+    /// Reloads all services to their home pages.
+    ///
+    /// Called by:
+    /// - "New Chat" button in UI
+    /// - `resetThreadState()` when starting fresh conversations
+    ///
+    /// This method:
+    /// 1. Clears and repopulates the loading queue
+    /// 2. Resets to "first submit" mode for new threads
+    /// 3. Forces reload of all services sequentially
+    /// 4. Resets loading state tracking
+    ///
+    /// Force reload ensures:
+    /// - All services return to home page
+    /// - Previous chat sessions are cleared
+    /// - Fresh state for new conversations
     func reloadAllServices() {
         print("🔥 reloadAllServices() called from: \(Thread.callStackSymbols[1])")
         
@@ -634,6 +986,16 @@ class ServiceManager: NSObject, ObservableObject {
         loadNextServiceFromQueue(forceReload: true)
     }
     
+    /// Resets the thread state without reloading services.
+    ///
+    /// Called when:
+    /// - User wants to start new conversations
+    /// - After navigation to preserve state
+    ///
+    /// Unlike `reloadAllServices()`, this method:
+    /// - Only resets the isFirstSubmit flag
+    /// - Doesn't reload WebViews
+    /// - Preserves current page state
     func resetThreadState() {
         // Reset to first submit mode to create new threads
         isFirstSubmit = true
@@ -645,6 +1007,17 @@ class ServiceManager: NSObject, ObservableObject {
         // reloadAllServices()
     }
     
+    /// Starts new chat threads with optional prompt via URL navigation.
+    ///
+    /// Called by:
+    /// - Plus button in UI for new chat
+    /// - Keyboard shortcuts for new thread
+    ///
+    /// This method bypasses the sequential loading queue and navigates
+    /// all services directly to their new thread URLs. This prevents
+    /// the cascade of reloads that would occur with queue processing.
+    ///
+    /// Critical: Clears loading queue to prevent interference.
     func startNewThreadWithPrompt() {
         // Store the current prompt (may be empty)
         let promptToExecute = sharedPrompt.trimmingCharacters(in: .whitespacesAndNewlines)
@@ -697,6 +1070,17 @@ class ServiceManager: NSObject, ObservableObject {
     
     // MARK: - Window Hibernation Support
     
+    /// Pauses all WebViews to reduce resource usage for inactive windows.
+    ///
+    /// Called by:
+    /// - `OverlayController.hibernateWindow()` when window loses focus
+    ///
+    /// Hibernation steps:
+    /// 1. Inject JavaScript to disable timers and animations
+    /// 2. Stop any ongoing page loads
+    /// 3. Hide WebViews to prevent GPU rendering
+    ///
+    /// This dramatically reduces CPU and memory usage for background windows.
     func pauseAllWebViews() {
         for (_, webService) in webServices {
             let webView = webService.webView
@@ -715,6 +1099,17 @@ class ServiceManager: NSObject, ObservableObject {
         }
     }
     
+    /// Resumes all WebViews when window regains focus.
+    ///
+    /// Called by:
+    /// - `OverlayController.restoreWindow()` when window becomes active
+    ///
+    /// Restoration steps:
+    /// 1. Restore JavaScript timer functions
+    /// 2. Show WebViews to enable rendering
+    /// 3. Force small scroll to trigger re-render
+    ///
+    /// WebViews become immediately interactive without reload.
     func resumeAllWebViews() {
         for (_, webService) in webServices {
             let webView = webService.webView
@@ -732,14 +1127,26 @@ class ServiceManager: NSObject, ObservableObject {
     }
 }
 
+/// Shared WKProcessPool extension for critical optimization.
+/// NEVER create new WKProcessPool instances - always use this shared one.
+/// Creating multiple process pools causes:
+/// - Duplicate GPU processes
+/// - Increased memory usage
+/// - WebView loading conflicts
 extension WKProcessPool {
     static let shared = WKProcessPool()
 }
 
 // MARK: - Global ServiceManager Tracking
+
+/// Extension for tracking all ServiceManager instances globally.
+/// Used to coordinate prompt execution across multiple windows.
 extension ServiceManager {
+    /// Array of weak references to all ServiceManager instances.
+    /// Automatically cleaned up when managers are deallocated.
     private static var allManagers: [WeakServiceManagerWrapper] = []
     
+    /// Wrapper to hold weak references and prevent retain cycles.
     private class WeakServiceManagerWrapper {
         weak var manager: ServiceManager?
         init(_ manager: ServiceManager) {
@@ -775,7 +1182,23 @@ extension ServiceManager {
 
 // MARK: - WKNavigationDelegate for ServiceManager
 
+/// Navigation delegate implementation for sequential service loading.
+///
+/// ServiceManager acts as the navigation delegate during initial loading,
+/// then hands off to BrowserViewController after each service loads.
+///
+/// Key responsibilities:
+/// - Track loading progress for sequential queue
+/// - Handle navigation errors and recovery
+/// - Determine when all services are loaded
+/// - Hand off delegate to BrowserViewController
 extension ServiceManager: WKNavigationDelegate {
+    /// Handles navigation failures after content has started loading.
+    ///
+    /// This method:
+    /// - Continues loading queue even if a service fails
+    /// - Updates loading state for UI
+    /// - Tracks failed services as "finished" for progress
     func webView(_ webView: WKWebView, didFail navigation: WKNavigation!, withError error: Error) {
         // Defensive check: Ensure we're not cleaning up
         guard !isCleaningUp else {
@@ -800,7 +1223,7 @@ extension ServiceManager: WKNavigationDelegate {
                     currentlyLoadingService = nil
                     
                     // Continue with the next service after a small delay
-                    DispatchQueue.main.asyncAfter(deadline: .now() + 0.5) { [weak self] in
+                    DispatchQueue.main.asyncAfter(deadline: .now() + ServiceTimings.serviceLoadingDelay) { [weak self] in
                         self?.loadNextServiceFromQueue()
                     }
                 }
@@ -822,6 +1245,13 @@ extension ServiceManager: WKNavigationDelegate {
         }
     }
     
+    /// Handles navigation failures before content starts loading.
+    ///
+    /// Special handling for:
+    /// - Error -999 (NSURLErrorCancelled): Usually harmless, ignored
+    /// - Other errors: Treated as failures, queue continues
+    ///
+    /// This is the most common failure point for WebView loads.
     func webView(_ webView: WKWebView, didFailProvisionalNavigation navigation: WKNavigation!, withError error: Error) {
         // Defensive check: Ensure we're not cleaning up
         guard !isCleaningUp else {
@@ -868,7 +1298,7 @@ extension ServiceManager: WKNavigationDelegate {
                     currentlyLoadingService = nil
                     
                     // Continue with the next service after a small delay
-                    DispatchQueue.main.asyncAfter(deadline: .now() + 0.5) { [weak self] in
+                    DispatchQueue.main.asyncAfter(deadline: .now() + ServiceTimings.serviceLoadingDelay) { [weak self] in
                         self?.loadNextServiceFromQueue()
                     }
                 }
@@ -898,6 +1328,10 @@ extension ServiceManager: WKNavigationDelegate {
         }
     }
     
+    /// Called when WebView starts receiving content.
+    ///
+    /// This method just forwards to BrowserViewController for UI updates.
+    /// The actual loading state is tracked in didStartProvisionalNavigation.
     func webView(_ webView: WKWebView, didCommit navigation: WKNavigation!) {
         // Forward to BrowserView's delegate method for UI updates
         for (_, webService) in webServices {
@@ -908,6 +1342,18 @@ extension ServiceManager: WKNavigationDelegate {
         }
     }
     
+    /// Called when WebView successfully completes loading.
+    ///
+    /// This is the key method for sequential loading:
+    /// 1. Updates loading state for the finished service
+    /// 2. Hands off navigation delegate to BrowserViewController
+    /// 3. Loads the next service in the queue
+    /// 4. Tracks overall loading progress
+    /// 5. Notifies when all services are loaded
+    ///
+    /// Special handling:
+    /// - Perplexity: Extra delay and focus management
+    /// - Query URLs (?q=): Not counted as initial load
     func webView(_ webView: WKWebView, didFinish navigation: WKNavigation!) {
         // Check if we're cleaning up
         if isCleaningUp {
@@ -937,7 +1383,7 @@ extension ServiceManager: WKNavigationDelegate {
                     }
                     
                     // Load the next service after a small delay
-                    DispatchQueue.main.asyncAfter(deadline: .now() + 0.5) { [weak self] in
+                    DispatchQueue.main.asyncAfter(deadline: .now() + ServiceTimings.serviceLoadingDelay) { [weak self] in
                         self?.loadNextServiceFromQueue()
                     }
                 }
@@ -974,8 +1420,8 @@ extension ServiceManager: WKNavigationDelegate {
                 WebViewLogger.shared.log("✅ Perplexity: Initial load complete, ready for queries", for: "perplexity", type: .info)
                 
                 // Return focus to main prompt bar after Perplexity loads
-                // Wait 2 seconds to ensure Perplexity's JavaScript has executed
-                DispatchQueue.main.asyncAfter(deadline: .now() + 2.0) { [weak self] in
+                // Wait for Perplexity's JavaScript to fully execute
+                DispatchQueue.main.asyncAfter(deadline: .now() + ServiceTimings.queryCheckDelay) { [weak self] in
                     print("🎯 Returning focus to main prompt bar after Perplexity load")
                     self?.focusInputPublisher.send()
                 }
@@ -1109,7 +1555,18 @@ extension ServiceManager: WKNavigationDelegate {
         }
     }
     
-    // Handle WebView process crashes
+    /// Handles WebView process crashes with automatic recovery.
+    ///
+    /// WebKit processes can crash due to:
+    /// - Memory pressure
+    /// - JavaScript errors
+    /// - GPU process issues
+    ///
+    /// Recovery process:
+    /// 1. Log the crash for debugging
+    /// 2. Update loading state to prevent hanging
+    /// 3. Wait for process cleanup
+    /// 4. Force reload the crashed service
     func webViewWebContentProcessDidTerminate(_ webView: WKWebView) {
         guard let serviceId = findServiceId(for: webView) else { return }
         
@@ -1119,8 +1576,8 @@ extension ServiceManager: WKNavigationDelegate {
         // Mark service as not loading to prevent hanging (thread-safe)
         updateLoadingState(for: serviceId, isLoading: false)
         
-        // Reload the service with a small delay to allow process cleanup
-        DispatchQueue.main.asyncAfter(deadline: .now() + 1.0) { [weak self] in
+        // Reload the service with a delay to allow process cleanup
+        DispatchQueue.main.asyncAfter(deadline: .now() + ServiceTimings.crashRecoveryDelay) { [weak self] in
             guard let self = self else { return }
             if let service = self.activeServices.first(where: { $0.id == serviceId }),
                let webService = self.webServices[serviceId] {

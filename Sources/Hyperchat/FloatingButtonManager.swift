@@ -1,18 +1,120 @@
+/// FloatingButtonManager.swift - Floating Button UI and Interaction Management
+///
+/// This file manages the persistent floating button that follows users across macOS spaces.
+/// The button provides quick access to Hyperchat from anywhere on the system.
+///
+/// Key responsibilities:
+/// - Creates and positions a 64x64px floating button window
+/// - Handles drag-and-drop repositioning with position persistence
+/// - Manages hover effects with animated gradient glow
+/// - Tracks mouse across multiple displays
+/// - Maintains visibility across space switches
+/// - Triggers prompt window on click
+///
+/// Related files:
+/// - `AppDelegate.swift`: Creates FloatingButtonManager and connects it to other controllers
+/// - `PromptWindowController.swift`: Shows when floating button is clicked
+/// - `OverlayController.swift`: May be shown after prompt submission
+/// - `NSScreen+Extensions.swift`: Provides screen utility methods
+///
+/// Architecture:
+/// - Uses NSPanel with .floating level for always-on-top behavior
+/// - Custom DraggableView handles both click and drag interactions
+/// - SwiftUI view provides animated gradient glow on hover
+/// - Timer-based screen tracking for multi-monitor support
+
 import Cocoa
 import SwiftUI
 import os.log
 
-// SwiftUI view for animated gradient glow
+// MARK: - Timing Constants
+
+/// Timing constants for floating button behavior.
+private enum FloatingButtonTimings {
+    /// Interval for checking if mouse moved to different screen
+    static let screenUpdateInterval: TimeInterval = 0.5
+    
+    /// Interval for ensuring button stays visible
+    static let visibilityCheckInterval: TimeInterval = 1.0
+    
+    /// Delay before verifying button visibility after creation
+    static let visibilityVerificationDelay: TimeInterval = 1.0
+    
+    /// Animation duration for glow fade in/out
+    static let glowFadeDuration: TimeInterval = 0.2
+    
+    /// Duration for one complete glow rotation
+    static let glowRotationDuration: TimeInterval = 3.0
+}
+
+/// Layout constants for floating button.
+private enum FloatingButtonLayout {
+    /// Total window size (includes padding)
+    static let windowSize: CGFloat = 64
+    
+    /// Icon size within the window
+    static let iconSize: CGFloat = 48
+    
+    /// Padding around the icon
+    static let iconPadding: CGFloat = 8
+    
+    /// Corner radius for icon view
+    static let iconCornerRadius: CGFloat = 10
+    
+    /// Corner radius for glow effect
+    static let glowCornerRadius: CGFloat = 20
+    
+    /// Line widths for glow layers
+    static let outerGlowWidth: CGFloat = 4.8
+    static let middleGlowWidth: CGFloat = 3.2
+    static let innerGlowWidth: CGFloat = 1.2
+    
+    /// Blur radii for glow layers
+    static let outerGlowBlur: CGFloat = 6
+    static let middleGlowBlur: CGFloat = 3
+    static let innerGlowBlur: CGFloat = 0.5
+    
+    /// Insets for glow layers (account for padding)
+    static let outerGlowInset: CGFloat = 10
+    static let middleGlowInset: CGFloat = 11
+    static let innerGlowInset: CGFloat = 12
+    
+    /// Minimum padding from screen edges
+    static let screenEdgePadding: CGFloat = 20
+    
+    /// Threshold for distinguishing click from drag
+    static let clickThreshold: CGFloat = 5.0
+}
+
+// MARK: - Floating Button Glow View
+
+/// SwiftUI view for animated gradient glow effect on hover.
+///
+/// Creates a three-layer animated gradient that rotates around the button.
+/// Each layer has different width and blur for depth effect.
+///
+/// Animation lifecycle:
+/// 1. Created with isVisible=false (no glow)
+/// 2. When isVisible becomes true, starts rotation animation
+/// 3. When isVisible becomes false, cancels animation and resets
+///
+/// Used by:
+/// - `DraggableView`: Updates visibility on mouse enter/exit
 struct FloatingButtonGlow: View {
+    /// Current rotation angle of the gradient (0-360 degrees)
     @State private var phase: CGFloat = 0
+    
+    /// Task handle for rotation animation (cancelled when not visible)
     @State private var animationTask: Task<Void, Never>?
+    
+    /// Whether the glow should be visible (controlled by hover state)
     let isVisible: Bool
     
     var body: some View {
         ZStack {
             // Outer glow layer
-            RoundedRectangle(cornerRadius: 20)
-                .inset(by: 10)  // Account for 8px padding + icon internal padding
+            RoundedRectangle(cornerRadius: FloatingButtonLayout.glowCornerRadius)
+                .inset(by: FloatingButtonLayout.outerGlowInset)  // Account for 8px padding + icon internal padding
                 .stroke(
                     AngularGradient(
                         gradient: Gradient(colors: [
@@ -26,14 +128,14 @@ struct FloatingButtonGlow: View {
                         startAngle: .degrees(phase),
                         endAngle: .degrees(phase + 360)
                     ),
-                    lineWidth: 4.8
+                    lineWidth: FloatingButtonLayout.outerGlowWidth
                 )
-                .blur(radius: 6)
+                .blur(radius: FloatingButtonLayout.outerGlowBlur)
                 .opacity(0.4)
             
             // Middle glow layer
-            RoundedRectangle(cornerRadius: 20)
-                .inset(by: 11)  // Account for 8px padding + icon internal padding
+            RoundedRectangle(cornerRadius: FloatingButtonLayout.glowCornerRadius)
+                .inset(by: FloatingButtonLayout.middleGlowInset)  // Account for 8px padding + icon internal padding
                 .stroke(
                     AngularGradient(
                         gradient: Gradient(colors: [
@@ -47,14 +149,14 @@ struct FloatingButtonGlow: View {
                         startAngle: .degrees(phase),
                         endAngle: .degrees(phase + 360)
                     ),
-                    lineWidth: 3.2
+                    lineWidth: FloatingButtonLayout.middleGlowWidth
                 )
-                .blur(radius: 3)
+                .blur(radius: FloatingButtonLayout.middleGlowBlur)
                 .opacity(0.6)
             
             // Inner sharp layer
-            RoundedRectangle(cornerRadius: 20)
-                .inset(by: 12)  // Account for 8px padding + icon internal padding
+            RoundedRectangle(cornerRadius: FloatingButtonLayout.glowCornerRadius)
+                .inset(by: FloatingButtonLayout.innerGlowInset)  // Account for 8px padding + icon internal padding
                 .stroke(
                     AngularGradient(
                         gradient: Gradient(colors: [
@@ -68,19 +170,19 @@ struct FloatingButtonGlow: View {
                         startAngle: .degrees(phase),
                         endAngle: .degrees(phase + 360)
                     ),
-                    lineWidth: 1.2
+                    lineWidth: FloatingButtonLayout.innerGlowWidth
                 )
-                .blur(radius: 0.5)
+                .blur(radius: FloatingButtonLayout.innerGlowBlur)
         }
         .opacity(isVisible ? 1 : 0)
         .background(Color.clear)
-        .animation(.easeInOut(duration: 0.2), value: isVisible)
+        .animation(.easeInOut(duration: FloatingButtonTimings.glowFadeDuration), value: isVisible)
         .allowsHitTesting(false)  // Allow mouse events to pass through to button
         .onChange(of: isVisible) { oldValue, newValue in
             if newValue {
                 // Start animation when becoming visible
                 animationTask = Task {
-                    withAnimation(.linear(duration: 3).repeatForever(autoreverses: false)) {
+                    withAnimation(.linear(duration: FloatingButtonTimings.glowRotationDuration).repeatForever(autoreverses: false)) {
                         phase = 360
                     }
                 }
@@ -97,7 +199,17 @@ struct FloatingButtonGlow: View {
     }
 }
 
-// Custom panel that can receive clicks but won't become key
+// MARK: - Floating Panel
+
+/// Custom NSPanel subclass that prevents the floating button from becoming key window.
+///
+/// This ensures the button never steals focus from other windows when clicked.
+/// The panel can still receive mouse events but won't disrupt the user's workflow.
+///
+/// Key behaviors:
+/// - canBecomeKey returns false (never becomes key window)
+/// - acceptsFirstResponder returns true (receives mouse events)
+/// - Overrides makeKey methods to prevent accidental key window status
 class FloatingPanel: NSPanel {
     override var canBecomeKey: Bool { false }
     override var canBecomeMain: Bool { false }
@@ -113,14 +225,44 @@ class FloatingPanel: NSPanel {
     }
 }
 
-// Custom view that can be dragged and clicked
+// MARK: - Draggable View
+
+/// Custom NSView that handles both click and drag interactions for the floating button.
+///
+/// Interaction model:
+/// - Click: Shows prompt window if mouse moves < 5 pixels
+/// - Drag: Moves button window and saves new position
+/// - Hover: Shows/hides animated glow effect
+///
+/// The view manages:
+/// - App icon display (48x48px with rounded corners)
+/// - SwiftUI glow overlay (animated on hover)
+/// - Mouse tracking for hover effects
+/// - Drag threshold detection
+///
+/// Callbacks:
+/// - dragCallback: Called during drag to save position
+/// - clickCallback: Called on click to show prompt window
 class DraggableView: NSView {
+    /// Initial mouse location on mouseDown (used to calculate drag distance)
     private var initialLocation: NSPoint?
+    
+    /// Callback invoked during drag to save button position
     private let dragCallback: () -> Void
+    
+    /// Callback invoked on click to show prompt window
     private let clickCallback: () -> Void
+    
+    /// Tracking area for mouse enter/exit events
     private var trackingArea: NSTrackingArea?
+    
+    /// SwiftUI hosting view for the animated glow effect
     private var glowHostingView: NSHostingView<FloatingButtonGlow>?
+    
+    /// Image view displaying the app icon
     private var iconView: NSImageView?
+    
+    /// Current hover state (triggers glow visibility)
     private var isHovering = false
     
     init(frame: NSRect, dragCallback: @escaping () -> Void, clickCallback: @escaping () -> Void) {
@@ -144,8 +286,8 @@ class DraggableView: NSView {
         layer?.backgroundColor = NSColor.clear.cgColor
         
         // Add icon as a child view
-        let iconSize: CGFloat = 48
-        let padding: CGFloat = 8
+        let iconSize = FloatingButtonLayout.iconSize
+        let padding = FloatingButtonLayout.iconPadding
         iconView = NSImageView(frame: NSRect(x: padding, y: padding, width: iconSize, height: iconSize))
         if let appIcon = NSImage(named: "AppIcon") {
             appIcon.size = NSSize(width: iconSize, height: iconSize)
@@ -153,7 +295,7 @@ class DraggableView: NSView {
         }
         iconView?.imageScaling = .scaleProportionallyUpOrDown
         iconView?.wantsLayer = true
-        iconView?.layer?.cornerRadius = 10
+        iconView?.layer?.cornerRadius = FloatingButtonLayout.iconCornerRadius
         iconView?.layer?.masksToBounds = true
         
         addSubview(iconView!)
@@ -207,8 +349,8 @@ class DraggableView: NSView {
             let dy = currentLocation.y - initialLocation.y
             let distance = sqrt(dx * dx + dy * dy)
             
-            // Consider it a click if the mouse moved less than 5 pixels
-            let clickThreshold: CGFloat = 5.0
+            // Consider it a click if the mouse moved less than threshold
+            let clickThreshold = FloatingButtonLayout.clickThreshold
             
             if distance < clickThreshold {
                 // This was a click, not a drag.
@@ -261,14 +403,55 @@ class DraggableView: NSView {
     }
 }
 
+// MARK: - Floating Button Manager
+
+/// Manages the floating button window lifecycle and interactions.
+///
+/// Created by:
+/// - `AppDelegate` during application startup
+///
+/// Manages:
+/// - Button window creation and positioning
+/// - Position persistence per screen configuration
+/// - Multi-monitor support with automatic relocation
+/// - Visibility maintenance across space switches
+/// - Click handling to show prompt window
+///
+/// Position persistence:
+/// - Saves position per screen configuration (not just screen ID)
+/// - Validates saved positions on restore
+/// - Falls back to default position if saved position invalid
+/// - Uses screen corner (bottom-left + 20px padding) as default
+///
+/// Multi-monitor behavior:
+/// - Follows mouse cursor to active screen
+/// - Maintains separate saved position per screen
+/// - Updates every 0.5 seconds via timer
 class FloatingButtonManager {
+    /// The floating button window (NSPanel subclass)
     private var buttonWindow: NSWindow?
+    
+    /// Reference to prompt window controller (set by AppDelegate)
+    /// Called by: floatingButtonClicked() to show prompt window
     var promptWindowController: PromptWindowController?
+    
+    /// Reference to overlay controller (set by AppDelegate)
+    /// Currently unused but available for future features
     var overlayController: OverlayController?
+    
+    /// Logger for debugging button behavior
     private let logger = Logger(subsystem: Bundle.main.bundleIdentifier ?? "com.transcendence.hyperchat", category: "FloatingButtonManager")
+    
+    /// Timer that checks if mouse moved to different screen
     private var screenUpdateTimer: Timer?
+    
+    /// Last screen the button was positioned on
     private var lastKnownScreen: NSScreen?
+    
+    /// UserDefaults key for storing button positions
     private let positionsKey = "HyperchatButtonPositions"
+    
+    /// Timer that ensures button stays visible
     private var visibilityTimer: Timer?
 
     deinit {
@@ -276,6 +459,23 @@ class FloatingButtonManager {
         visibilityTimer?.invalidate()
     }
 
+    /// Shows the floating button window.
+    ///
+    /// Called by:
+    /// - `AppDelegate.applicationDidFinishLaunching()` on startup
+    /// - `ensureFloatingButtonVisible()` to restore visibility
+    ///
+    /// Process:
+    /// 1. Checks for existing button (prevents duplicates)
+    /// 2. Creates 64x64px borderless panel window
+    /// 3. Sets up DraggableView with icon and glow
+    /// 4. Positions based on saved position or default
+    /// 5. Starts screen tracking and visibility timers
+    ///
+    /// Window configuration:
+    /// - Level: .floating (always on top)
+    /// - Collection behavior: .canJoinAllSpaces
+    /// - Hides on deactivate: false (stays visible)
     func showFloatingButton() {
         logger.log("👇 showFloatingButton called.")
         
@@ -289,7 +489,7 @@ class FloatingButtonManager {
             return
         }
         
-        let windowSize: CGFloat = 64  // Fixed window size
+        let windowSize = FloatingButtonLayout.windowSize
         let buttonFrame = NSRect(x: 0, y: 0, width: windowSize, height: windowSize)
 
         let window = FloatingPanel(
@@ -327,19 +527,19 @@ class FloatingButtonManager {
         visibilityTimer?.invalidate()
         
         // Start timer to follow mouse across screens
-        screenUpdateTimer = Timer.scheduledTimer(withTimeInterval: 0.5, repeats: true) { [weak self] _ in
+        screenUpdateTimer = Timer.scheduledTimer(withTimeInterval: FloatingButtonTimings.screenUpdateInterval, repeats: true) { [weak self] _ in
             self?.checkAndUpdateScreenIfNeeded()
         }
 
         // Start timer to ensure button stays visible
-        visibilityTimer = Timer.scheduledTimer(withTimeInterval: 1.0, repeats: true) { [weak self] _ in
+        visibilityTimer = Timer.scheduledTimer(withTimeInterval: FloatingButtonTimings.visibilityCheckInterval, repeats: true) { [weak self] _ in
             guard let self = self else { return }
             if let window = self.buttonWindow, !window.isVisible {
                 window.orderFront(nil)
             }
         }
 
-        DispatchQueue.main.asyncAfter(deadline: .now() + 1.0) {
+        DispatchQueue.main.asyncAfter(deadline: .now() + FloatingButtonTimings.visibilityVerificationDelay) {
             if let w = self.buttonWindow, w.isVisible {
                 self.logger.log("✅ SUCCESS: Floating button window is visible on screen.")
             } else {
@@ -348,10 +548,27 @@ class FloatingButtonManager {
         }
     }
 
+    /// Ensures the floating button is visible.
+    ///
+    /// Called by:
+    /// - `AppDelegate` when overlay hides (via notification)
+    /// - Visibility timer every 1.0 seconds
+    ///
+    /// Simply brings button window to front if it exists.
     func ensureFloatingButtonVisible() {
         buttonWindow?.orderFront(nil)
     }
     
+    /// Hides and destroys the floating button.
+    ///
+    /// Called by:
+    /// - Currently not called (button persists for app lifetime)
+    /// - Could be used for preferences to disable button
+    ///
+    /// Cleanup process:
+    /// 1. Invalidates screen tracking timer
+    /// 2. Invalidates visibility timer
+    /// 3. Closes and releases button window
     func hideFloatingButton() {
         // Clean up timers
         screenUpdateTimer?.invalidate()
@@ -364,6 +581,20 @@ class FloatingButtonManager {
         buttonWindow = nil
     }
 
+    /// Handles floating button click events.
+    ///
+    /// Called by:
+    /// - `DraggableView.mouseUp()` when click detected
+    ///
+    /// Behavior:
+    /// - If prompt window already visible: brings to front
+    /// - If prompt window hidden: shows on button's screen
+    /// - Never hides overlay (prevents app hanging)
+    ///
+    /// Screen selection priority:
+    /// 1. Screen containing the button
+    /// 2. Screen containing the mouse
+    /// 3. Main screen as fallback
     private func floatingButtonClicked() {
         // Don't hide overlay if it's visible - just show prompt window
         // This prevents the hanging issue
@@ -384,6 +615,16 @@ class FloatingButtonManager {
         }
     }
     
+    /// Checks if mouse moved to different screen and updates button position.
+    ///
+    /// Called by:
+    /// - Screen update timer every 0.5 seconds
+    ///
+    /// Updates button position when:
+    /// - Mouse moves to different screen
+    /// - Screen configuration changes
+    ///
+    /// This enables the "follow mouse" behavior across monitors.
     private func checkAndUpdateScreenIfNeeded() {
         guard let currentScreen = NSScreen.screens.first(where: { NSMouseInRect(NSEvent.mouseLocation, $0.frame, false) }) else { return }
         
@@ -394,6 +635,19 @@ class FloatingButtonManager {
         }
     }
     
+    /// Updates button position for current screen.
+    ///
+    /// Called by:
+    /// - `showFloatingButton()` on initial display
+    /// - `checkAndUpdateScreenIfNeeded()` when screen changes
+    ///
+    /// Position logic:
+    /// 1. Determines target screen (mouse location or main)
+    /// 2. Loads saved position for screen configuration
+    /// 3. Validates saved position is within bounds
+    /// 4. Falls back to default position if needed
+    ///
+    /// Default position: bottom-left + 20px padding
     private func updateButtonPosition() {
         guard let window = buttonWindow else { return }
         
@@ -422,6 +676,15 @@ class FloatingButtonManager {
         }
     }
     
+    /// Saves current button position for the current screen.
+    ///
+    /// Called by:
+    /// - `DraggableView.mouseDragged()` during drag operation
+    ///
+    /// Persistence:
+    /// - Saves to UserDefaults with screen identifier as key
+    /// - Position stored as dictionary with x,y coordinates
+    /// - Persists across app launches
     private func saveCurrentPosition() {
         guard let window = buttonWindow,
               let screen = window.screen ?? lastKnownScreen else { return }
@@ -431,6 +694,17 @@ class FloatingButtonManager {
         logger.log("Saved position for screen: x=\(position.x), y=\(position.y)")
     }
     
+    /// Creates unique identifier for a screen based on its geometry.
+    ///
+    /// Called by:
+    /// - `savePosition()` and `loadPosition()` for persistence key
+    ///
+    /// Format: "x,y,width,height" (all values as integers)
+    ///
+    /// Why geometry-based:
+    /// - Screen IDs can change between system restarts
+    /// - Geometry is more stable for position persistence
+    /// - Handles external monitor reconnection gracefully
     private func screenIdentifier(for screen: NSScreen) -> String {
         // Create a unique identifier for the screen based on its frame
         // This handles the case where screen IDs might change between launches
@@ -455,9 +729,24 @@ class FloatingButtonManager {
         return NSPoint(x: x, y: y)
     }
     
+    /// Validates and adjusts a saved position for screen bounds.
+    ///
+    /// Called by:
+    /// - `updateButtonPosition()` when restoring saved position
+    ///
+    /// Validation:
+    /// - Checks if position is completely outside screen
+    /// - Adjusts position to be within safe bounds
+    /// - Maintains 20px padding from screen edges
+    ///
+    /// - Parameters:
+    ///   - position: Saved position to validate
+    ///   - screen: Target screen for validation
+    ///   - windowSize: Size of button window
+    /// - Returns: Adjusted position or nil if completely invalid
     private func validatePosition(_ position: NSPoint, for screen: NSScreen, windowSize: NSSize) -> NSPoint? {
         let visibleFrame = screen.visibleFrame
-        let padding: CGFloat = 20
+        let padding = FloatingButtonLayout.screenEdgePadding
         
         // Check if position is within screen bounds with padding
         let minX = visibleFrame.minX + padding
@@ -488,8 +777,20 @@ class FloatingButtonManager {
         return adjustedPosition
     }
     
+    /// Returns default position for button on given screen.
+    ///
+    /// Called by:
+    /// - `updateButtonPosition()` when no saved position exists
+    ///
+    /// Default: Bottom-left corner + 20px padding
+    ///
+    /// This position was chosen to:
+    /// - Avoid dock area on bottom
+    /// - Avoid menu bar on top
+    /// - Be easily accessible
+    /// - Not obstruct content
     private func getDefaultPosition(for screen: NSScreen) -> NSPoint {
-        let padding: CGFloat = 20
+        let padding = FloatingButtonLayout.screenEdgePadding
         let xPos = screen.visibleFrame.minX + padding
         let yPos = screen.visibleFrame.minY + padding
         return NSPoint(x: xPos, y: yPos)

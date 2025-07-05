@@ -1,9 +1,55 @@
+/// OverlayController.swift - Window Management and Lifecycle
+///
+/// This file manages all Hyperchat windows including overlay mode and normal windows.
+/// It implements window hibernation for resource efficiency and handles proper WebView cleanup.
+///
+/// Key responsibilities:
+/// - Creates and manages both overlay (full-screen) and normal windows
+/// - Implements per-window ServiceManager isolation
+/// - Handles window hibernation to reduce resource usage
+/// - Manages proper WebView cleanup to prevent crashes
+/// - Coordinates window activation and focus management
+///
+/// Related files:
+/// - `ServiceManager.swift`: Created per-window for WebView isolation
+/// - `AppDelegate.swift`: Triggers window creation via notifications
+/// - `ContentView.swift`: SwiftUI content hosted in windows
+/// - `BrowserViewController.swift`: Manages individual WebViews
+/// - `WebViewFactory.swift`: Creates WebViews with proper configuration
+///
+/// Architecture:
+/// - Each window has its own ServiceManager instance
+/// - WebViews are never shared between windows
+/// - Window hibernation pauses inactive windows
+/// - Proper cleanup prevents WebKit crashes
+
 import Cocoa
 import SwiftUI
 import WebKit
 import Combine
 
 // MARK: - Loading Overlay View
+
+/// Timing constants for UI animations and transitions.
+private enum UITimings {
+    /// Delay before starting typewriter animation
+    static let typewriterStartDelay: TimeInterval = 0.5
+    
+    /// Delay between each character in typewriter effect
+    static let characterDelay: TimeInterval = 0.1
+    
+    /// Duration of loading overlay fade out
+    static let loadingFadeOutDuration: TimeInterval = 0.7
+    
+    /// Delay before removing loading overlay
+    static let loadingRemovalDelay: TimeInterval = 0.8
+    
+    /// Delay for WebView crash recovery
+    static let crashRecoveryDelay: TimeInterval = 0.1
+    
+    /// Delay for window activation to prevent WebView disruption
+    static let windowActivationDelay: TimeInterval = 0.1
+}
 
 extension Font {
     static func orbitronBold(size: CGFloat) -> Font {
@@ -12,13 +58,13 @@ extension Font {
     }
 }
 
+/// Animated text view that reveals characters one by one.
+/// Used for the "Hyperchat" branding on first window load.
 struct TypewriterText: View {
     let text: String
     let font: Font
     let tracking: CGFloat
     @State private var revealedCharacters = 0
-    
-    private let characterDelay: TimeInterval = 0.1
     
     var body: some View {
         Text(text)
@@ -49,8 +95,8 @@ struct TypewriterText: View {
         .onAppear {
             
             // Start typewriter effect after a short delay
-            DispatchQueue.main.asyncAfter(deadline: .now() + 0.5) {
-                Timer.scheduledTimer(withTimeInterval: characterDelay, repeats: true) { timer in
+            DispatchQueue.main.asyncAfter(deadline: .now() + UITimings.typewriterStartDelay) {
+                Timer.scheduledTimer(withTimeInterval: UITimings.characterDelay, repeats: true) { timer in
                     if revealedCharacters < text.count {
                         revealedCharacters += 1
                     } else {
@@ -118,8 +164,21 @@ struct LoadingOverlayView: View {
     }
 }
 
+/// Custom NSWindow subclass for Hyperchat windows.
+///
+/// This window:
+/// - Maintains weak reference to controller to prevent retain cycles
+/// - Implements proper cleanup in close() to prevent WebKit crashes
+/// - Handles keyboard shortcuts (Cmd+N for focus)
+/// - Can be moved by dragging anywhere on the window
+///
+/// CRITICAL: The close() method must clean up WebViews before calling super.close()
+/// to prevent crashes during AppKit's window deallocation.
 class OverlayWindow: NSWindow {
+    /// Weak reference to prevent retain cycles
     weak var overlayController: OverlayController?
+    
+    /// Unique identifier for debugging lifecycle
     private let instanceId = UUID().uuidString.prefix(8)
 
     override var canBecomeKey: Bool { true }
@@ -152,6 +211,15 @@ class OverlayWindow: NSWindow {
         }
     }
     
+    /// Handles window closure with proper WebView cleanup.
+    ///
+    /// CRITICAL cleanup sequence:
+    /// 1. Wrap everything in autoreleasepool for WebKit objects
+    /// 2. Clear weak reference to prevent double cleanup
+    /// 3. Call removeWindow() BEFORE super.close()
+    /// 4. Let AppKit handle the rest
+    ///
+    /// This order prevents crashes in objc_release during deallocation.
     override func close() {
         print("🛎 [\(Date().timeIntervalSince1970)] OverlayWindow.close() called for \(instanceId)")
         
@@ -180,26 +248,72 @@ class OverlayWindow: NSWindow {
     }
 }
 
+/// Central controller for all Hyperchat windows.
+///
+/// Manages window lifecycle, hibernation, and WebView isolation:
+/// - Each window gets its own ServiceManager instance
+/// - Inactive windows are hibernated to save resources
+/// - Proper cleanup prevents WebKit crashes
+/// - Supports both overlay (full-screen) and normal windows
+///
+/// Created by:
+/// - `AppDelegate` as a singleton instance
+///
+/// Creates:
+/// - `ServiceManager` instances per window
+/// - `BrowserViewController` instances per service
+/// - `ContentView` as SwiftUI content
+///
+/// Window types:
+/// - Overlay: Full-screen window with black background
+/// - Normal: Regular window with title bar
 class OverlayController: NSObject, NSWindowDelegate {
+    // MARK: - Properties
+    
+    /// All active windows managed by this controller
     private var windows: [OverlayWindow] = []
+    
+    /// Flag to prevent recursive hiding
     private var isHiding = false
+    
+    /// Unique identifier for debugging
     private let instanceId = UUID().uuidString.prefix(8)
     
-    // Per-window ServiceManager instances
+    // MARK: - Per-Window Instances
+    
+    /// ServiceManager instance for each window.
+    /// Key: NSWindow, Value: ServiceManager for that window
     private var windowServiceManagers: [NSWindow: ServiceManager] = [:]
     
-    // Per-window BrowserViewController instances
+    /// BrowserViewControllers for each window.
+    /// Key: NSWindow, Value: Array of BrowserViewControllers
     private var windowBrowserViewControllers: [NSWindow: [BrowserViewController]] = [:]
     
-    // Window hibernation support
+    // MARK: - Window Hibernation
+    
+    /// Snapshot views for hibernated windows.
+    /// Key: NSWindow, Value: NSImageView containing screenshot
     private var windowSnapshots: [NSWindow: NSImageView] = [:]
+    
+    /// Set of windows currently hibernated
     private var hibernatedWindows: Set<NSWindow> = []
     
-    // Loading overlay support
+    // MARK: - Loading Overlay
+    
+    /// Loading overlay views for each window.
+    /// Shows "Hyperchat" branding during initial load.
     private var loadingOverlayViews: [NSWindow: NSHostingView<LoadingOverlayView>] = [:]
+    
+    /// Opacity values for loading overlay fade animation
     private var loadingOverlayOpacities: [NSWindow: Double] = [:]
+    
+    /// Timers for loading overlay fade out
     private var loadingTimers: [NSWindow: Timer] = [:]
+    
+    /// Whether this is the first window being loaded (shows typewriter animation)
     private var isFirstWindowLoad = true
+    
+    /// Windows currently hiding their loading overlays
     private var hidingOverlays: Set<NSWindow> = []
     
     private var stackViewConstraints: [NSLayoutConstraint] = []
@@ -213,6 +327,14 @@ class OverlayController: NSObject, NSWindowDelegate {
         return windowServiceManagers[window]
     }
 
+    /// Initializes the overlay controller.
+    ///
+    /// Called by:
+    /// - `AppDelegate` during application startup
+    ///
+    /// Sets up:
+    /// - Window notifications for hibernation support
+    /// - Debug logging for lifecycle tracking
     override init() {
         super.init()
         let address = Unmanaged.passUnretained(self).toOpaque()
@@ -220,6 +342,14 @@ class OverlayController: NSObject, NSWindowDelegate {
         setupWindowNotifications()
     }
     
+    /// Cleans up resources when controller is deallocated.
+    ///
+    /// Cleanup includes:
+    /// - Invalidating all loading timers
+    /// - Removing notification observers
+    /// - Clearing all window references
+    ///
+    /// Note: Windows clean up their own WebViews in their close() method.
     deinit {
         print("🔴 [\(Date().timeIntervalSince1970)] OverlayController DEINIT \(instanceId) starting")
         
@@ -238,6 +368,13 @@ class OverlayController: NSObject, NSWindowDelegate {
         print("✅ [\(Date().timeIntervalSince1970)] OverlayController DEINIT \(instanceId) complete")
     }
     
+    /// Sets up window notifications for hibernation support.
+    ///
+    /// Observes:
+    /// - didBecomeKey: Restores hibernated windows
+    /// - didResignKey: Hibernates inactive windows
+    ///
+    /// This enables automatic resource management as users switch between windows.
     private func setupWindowNotifications() {
         NotificationCenter.default.addObserver(
             self,
@@ -256,12 +393,29 @@ class OverlayController: NSObject, NSWindowDelegate {
         // Note: allServicesDidLoad is now handled via Combine subscription in createNormalWindow
     }
 
-    // Public entry point when no prompt yet
+    // MARK: - Public API
+    
+    /// Shows a new window without a prompt.
+    ///
+    /// Called by:
+    /// - `AppDelegate` when floating button is clicked
+    /// - `AppDelegate` when global hotkey is pressed
     func showOverlay() {
         showOverlay(with: nil)
     }
 
-    // New unified API
+    /// Shows a new window with optional prompt execution.
+    ///
+    /// Called by:
+    /// - `showOverlay()` without prompt
+    /// - Direct API calls with prompt
+    ///
+    /// This method:
+    /// 1. Creates a new window in the current space
+    /// 2. Optionally executes a prompt after window loads
+    ///
+    /// Note: Despite the name "overlay", this creates normal windows.
+    /// The overlay mode (full-screen) is toggled with ESC key.
     func showOverlay(with prompt: String?) {
         // Always create a new window in the current space
         // This prevents switching to other spaces
@@ -269,12 +423,41 @@ class OverlayController: NSObject, NSWindowDelegate {
         
         if let p = prompt, let window = windows.last, 
            let windowServiceManager = windowServiceManagers[window] {
-            DispatchQueue.main.asyncAfter(deadline: .now() + 0.1) {
+            DispatchQueue.main.asyncAfter(deadline: .now() + UITimings.windowActivationDelay) {
                 windowServiceManager.executePrompt(p)
             }
         }
     }
     
+    // MARK: - Window Creation
+    
+    /// Window dimension constants.
+    private enum WindowDimensions {
+        /// Default width for new windows
+        static let defaultWidth: CGFloat = 1200
+        
+        /// Default height for new windows
+        static let defaultHeight: CGFloat = 800
+    }
+    
+    /// Creates a new normal (non-fullscreen) window.
+    ///
+    /// Called by:
+    /// - `showOverlay()` to create new windows
+    ///
+    /// This method:
+    /// 1. Creates dedicated ServiceManager for WebView isolation
+    /// 2. Sets up loading overlay subscription
+    /// 3. Creates window centered on current screen
+    /// 4. Configures window properties and delegates
+    /// 5. Creates SwiftUI content view
+    /// 6. Shows loading overlay until services load
+    ///
+    /// Each window gets its own:
+    /// - ServiceManager instance
+    /// - Set of WebViews
+    /// - BrowserViewControllers
+    /// - ContentView instance
     private func createNormalWindow() {
         // Create a dedicated ServiceManager for this window
         let windowServiceManager = ServiceManager()
@@ -304,13 +487,11 @@ class OverlayController: NSObject, NSWindowDelegate {
             return
         }
         
-        let windowWidth: CGFloat = 1200
-        let windowHeight: CGFloat = 800
         let windowRect = NSRect(
-            x: screen.frame.midX - windowWidth/2,
-            y: screen.frame.midY - windowHeight/2,
-            width: windowWidth,
-            height: windowHeight
+            x: screen.frame.midX - WindowDimensions.defaultWidth/2,
+            y: screen.frame.midY - WindowDimensions.defaultHeight/2,
+            width: WindowDimensions.defaultWidth,
+            height: WindowDimensions.defaultHeight
         )
         
         let window = OverlayWindow(
@@ -516,12 +697,41 @@ class OverlayController: NSObject, NSWindowDelegate {
         }
     }
     
+    /// Handles window losing key status.
+    ///
+    /// Note: Hibernation is NOT triggered here anymore.
+    /// Windows only hibernate when another Hyperchat window gains focus.
+    /// This prevents unwanted hibernation when:
+    /// - Prompt window appears
+    /// - User switches to other apps
+    /// - System dialogs appear
     @objc func windowDidResignKey(_ notification: Notification) {
         // Don't automatically hibernate when window loses focus
         // Hibernation now only happens when another OverlayWindow gains focus
         // This prevents hibernation when the prompt window appears or when switching to other apps
     }
     
+    // MARK: - Window Hibernation
+    
+    /// Hibernates a window to reduce resource usage.
+    ///
+    /// Called when:
+    /// - Another Hyperchat window gains focus
+    ///
+    /// Hibernation process:
+    /// 1. Capture screenshot of current window content
+    /// 2. Overlay screenshot on top of WebViews
+    /// 3. Pause JavaScript execution in all WebViews
+    /// 4. Hide WebViews to stop GPU rendering
+    ///
+    /// Benefits:
+    /// - Reduces CPU usage to near zero
+    /// - Frees GPU resources
+    /// - Maintains visual continuity
+    /// - Instant restoration when reactivated
+    ///
+    /// Implementation in:
+    /// - `ServiceManager.pauseAllWebViews()`
     private func hibernateWindow(_ window: NSWindow) {
         guard let serviceManager = windowServiceManagers[window],
               !hibernatedWindows.contains(window) else { return }
@@ -553,6 +763,21 @@ class OverlayController: NSObject, NSWindowDelegate {
         }
     }
     
+    /// Restores a hibernated window to active state.
+    ///
+    /// Called when:
+    /// - Window gains focus (becomes key)
+    ///
+    /// Restoration process:
+    /// 1. Remove screenshot overlay
+    /// 2. Restore JavaScript timer functions
+    /// 3. Show WebViews for GPU rendering
+    /// 4. Force small scroll to trigger re-render
+    ///
+    /// The window becomes immediately interactive without reload.
+    ///
+    /// Implementation in:
+    /// - `ServiceManager.resumeAllWebViews()`
     private func restoreWindow(_ window: NSWindow) {
         guard let serviceManager = windowServiceManagers[window],
               hibernatedWindows.contains(window) else { return }
@@ -572,6 +797,28 @@ class OverlayController: NSObject, NSWindowDelegate {
     
     // MARK: - Loading Overlay Management
     
+    /// Loading overlay timing constants.
+    private enum LoadingTimings {
+        /// Maximum duration to show loading overlay for first window
+        static let firstWindowMaxDuration: TimeInterval = 7.0
+        
+        /// Brief delay before hiding overlay for subsequent windows
+        static let subsequentWindowDelay: TimeInterval = 0.1
+    }
+    
+    /// Sets up the loading overlay for a window.
+    ///
+    /// Called by:
+    /// - `createNormalWindow()` after window creation
+    ///
+    /// The loading overlay:
+    /// - Shows "Hyperchat" branding during service loading
+    /// - Uses typewriter animation for first window
+    /// - Shows static text for subsequent windows
+    /// - Automatically hides when services load or timer expires
+    ///
+    /// First window: Up to 7 seconds with typewriter effect
+    /// Subsequent windows: Brief flash then fade out
     private func setupLoadingOverlay(for window: NSWindow, in containerView: NSView) {
         // Create SwiftUI wrapper for binding
         loadingOverlayOpacities[window] = 1.0
@@ -602,21 +849,31 @@ class OverlayController: NSObject, NSWindowDelegate {
         if isFirstWindowLoad {
             isFirstWindowLoad = false
             
-            // For first window: 7-second maximum timer
-            let timer = Timer.scheduledTimer(withTimeInterval: 7.0, repeats: false) { [weak self, weak window] _ in
+            // For first window: maximum duration timer
+            let timer = Timer.scheduledTimer(withTimeInterval: LoadingTimings.firstWindowMaxDuration, repeats: false) { [weak self, weak window] _ in
                 guard let self = self, let window = window else { return }
                 self.hideLoadingOverlay(for: window)
             }
             loadingTimers[window] = timer
         } else {
             // For subsequent windows: show briefly then start fading
-            DispatchQueue.main.asyncAfter(deadline: .now() + 0.1) { [weak self, weak window] in
+            DispatchQueue.main.asyncAfter(deadline: .now() + LoadingTimings.subsequentWindowDelay) { [weak self, weak window] in
                 guard let self = self, let window = window else { return }
                 self.hideLoadingOverlay(for: window)
             }
         }
     }
     
+    /// Hides the loading overlay with fade animation.
+    ///
+    /// Called by:
+    /// - `setupLoadingOverlay()` timer expiration
+    /// - ServiceManager when all services load
+    ///
+    /// Animation:
+    /// - 2 second fade out with easeOut curve
+    /// - 60 FPS timer-based animation
+    /// - Removes overlay after animation completes
     private func hideLoadingOverlay(for window: NSWindow) {
         // Check if already hiding this overlay
         guard !hidingOverlays.contains(window) else {
@@ -631,9 +888,9 @@ class OverlayController: NSObject, NSWindowDelegate {
         loadingTimers[window]?.invalidate()
         loadingTimers.removeValue(forKey: window)
         
-        // Animate opacity using Timer for smooth easeOut curve
-        let animationDuration: TimeInterval = 2.0
-        let frameRate: TimeInterval = 60.0 // 60 FPS
+        // Animation constants
+        let animationDuration: TimeInterval = UITimings.loadingFadeOutDuration * 2.86 // ~2.0 seconds
+        let frameRate: TimeInterval = 60.0 // 60 FPS for smooth animation
         let totalFrames = Int(animationDuration * frameRate)
         var currentFrame = 0
         

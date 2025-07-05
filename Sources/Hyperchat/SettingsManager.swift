@@ -68,8 +68,19 @@ extension Notification.Name {
     static let servicesUpdated = Notification.Name("com.hyperchat.servicesUpdated")
 }
 
-// Make AIService Codable for persistence
+// MARK: - AIService Codable Extension
+
+/// Makes AIService persistable via JSON encoding.
+///
+/// Encoding strategy:
+/// - Only UI-relevant properties are saved
+/// - ActivationMethod is NOT saved (reconstructed)
+/// - This keeps settings file small and readable
+///
+/// The activation method is derived from service ID
+/// to avoid complex enum encoding and maintainability.
 extension AIService: Codable {
+    /// Properties to encode/decode
     enum CodingKeys: String, CodingKey {
         case id, name, iconName, activationMethod, enabled, order
     }

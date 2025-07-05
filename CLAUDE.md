@@ -26,56 +26,163 @@ Don't make assumptions. If you need more info, you ask for it. You don't answer 
 
 You are a scrappy, god-tier startup CTO. You learned from the best - Paul Graham, Nikita Bier, John Carmack.
 
+## 📝 CRITICAL: LLM-First Documentation Philosophy
 
-## ⚠️ CRITICAL: WebView Loading Issues (MUST READ)
+### The New Reality: Your Next Developer is an AI
 
-### The Problem
-We've repeatedly encountered slow loading times for ChatGPT and Perplexity with NSURLErrorDomain -999 errors. This is a **recurring issue** that wastes significant time.
+Every comment you write is now part of the prompt for the next developer—who happens to be an AI. The goal is to provide the clearest possible context to get the best possible output. An LLM can't infer your intent from a hallway conversation; it only knows what's in the text.
 
-### Root Causes
-1. **Multiple WKProcessPool instances**: Each process pool creates separate WebContent processes
-2. **Duplicate URL loading**: Pre-warming loads URLs, then something else tries to load again
-3. **Navigation cancellations**: When a WebView starts loading and another load request comes in, the first gets cancelled (-999)
+### Core Documentation Rules
 
-### The Solution
-1. **ALWAYS use WebViewPoolManager** for creating WebViews
-2. **NEVER create new WKProcessPool() instances** - use the shared one
-3. **Pre-warmed WebViews should NOT be reloaded** when retrieved from pool
-4. **One navigation per WebView** - don't trigger multiple loads
+#### 1. Formal DocComments are Non-Negotiable
+Use Swift's formal documentation comments (`///`) for ALL functions and properties that aren't trivially simple. LLMs excel at parsing structured data, and formal docstrings ARE structured data.
 
-### Code Patterns to AVOID
+**Bad (for an LLM):**
 ```swift
-// ❌ BAD - Creates new process pool
-configuration.processPool = WKProcessPool()
-
-// ❌ BAD - Loading URL on already-loading WebView  
-if let url = webView.url {
-    webView.load(URLRequest(url: url))
+func executePrompt(_ prompt: String) {
+    // Execute the prompt
 }
-
-// ❌ BAD - Not checking if WebView is already loading
-webView.load(URLRequest(url: serviceURL))
 ```
 
-### Code Patterns to USE
+**Good (for an LLM):**
 ```swift
-// ✅ GOOD - Use shared process pool
-configuration.processPool = sharedProcessPool
-
-// ✅ GOOD - Check loading state before loading
-if !webView.isLoading {
-    webView.load(URLRequest(url: url))
-}
-
-// ✅ GOOD - Use WebViewPoolManager
-let browserView = WebViewPoolManager.shared.createBrowserView(for: service.id, in: window)
+/// Executes a prompt across all active AI services.
+///
+/// This method is called from:
+/// - `PromptWindowController.submitPrompt()` when user presses Enter
+/// - `AppDelegate.handlePromptSubmission()` via NotificationCenter
+/// - `OverlayController.executeSharedPrompt()` for window-specific execution
+///
+/// The execution flow continues to:
+/// - `URLParameterService.executePrompt()` for ChatGPT/Perplexity/Google
+/// - `ClaudeService.executePrompt()` for Claude's clipboard-paste method
+///
+/// - Parameter prompt: The user's text to send to AI services
+/// - Parameter replyToAll: If true, pastes into existing chats; if false, creates new chats
+func executePrompt(_ prompt: String, replyToAll: Bool = false) {
 ```
 
-### Debugging Tips
-- Look for "didFailProvisionalNavigation" with error -999 in logs
-- Check for multiple "didStartProvisionalNavigation" for same service
-- GPU process launch should be ~1 second, not 2+
-- Each service should load ONCE, not multiple times
+#### 2. Explicitly State Cross-File Connections
+An LLM has a limited context window. It might not see `PromptWindowController.swift` and `AppDelegate.swift` at the same time. Connect the dots explicitly in comments.
+
+**Before:**
+```swift
+private func loadDefaultPage(for service: AIService) {
+    // Load the service's home page
+}
+```
+
+**After (Better for an LLM):**
+```swift
+/// Loads the default home page for an AI service.
+///
+/// Called by:
+/// - `setupServices()` during initial ServiceManager creation
+/// - `loadNextServiceFromQueue()` for sequential service loading
+/// - `reloadAllServices()` when user clicks "New Chat" button
+///
+/// This triggers:
+/// - `webView(_:didStartProvisionalNavigation:)` in WKNavigationDelegate
+/// - `BrowserViewController.updateLoadingState()` for UI updates
+private func loadDefaultPage(for service: AIService) {
+```
+
+#### 3. Replace ALL Magic Numbers with Named Constants
+An LLM has no way to understand the significance of `3.0`. Give it a name and explanation.
+
+**Before:**
+```swift
+DispatchQueue.main.asyncAfter(deadline: .now() + 3.0) {
+    // Paste into Claude
+}
+```
+
+**After (Better for an LLM):**
+```swift
+private enum Delays {
+    /// Time to wait for Claude's page to fully load before pasting.
+    /// Claude's React app takes ~3 seconds to initialize all JavaScript handlers.
+    /// Shorter delays result in paste failures.
+    static let claudePageLoadDelay: TimeInterval = 3.0
+    
+    /// Minimal delay to prevent WebKit race conditions.
+    /// WebKit needs 10ms between certain operations to avoid crashes.
+    static let webKitSafetyDelay: TimeInterval = 0.01
+}
+
+DispatchQueue.main.asyncAfter(deadline: .now() + Delays.claudePageLoadDelay) {
+```
+
+#### 4. Document Complex State Management
+State variables need extensive documentation about their lifecycle and interactions.
+
+```swift
+/// Tracks whether this is the first prompt submission in the current session.
+/// 
+/// State transitions:
+/// - Starts as `true` when app launches or "New Chat" clicked
+/// - Set to `false` after first prompt execution
+/// - Reset to `true` by `resetThreadState()` or `reloadAllServices()`
+/// 
+/// Why this matters:
+/// - First submission: Always uses URL navigation (creates new chat threads)
+/// - Subsequent submissions: Uses reply-to-all mode (pastes into existing chats)
+/// 
+/// This flag is:
+/// - Shared globally across all ServiceManager instances via thread-safe queue
+/// - Synchronized with `replyToAll` UI toggle in ContentView
+private var isFirstSubmit: Bool
+```
+
+#### 5. Prioritize Clarity Over Cleverness
+Write simple, verbose code that's easy for an LLM to understand and modify.
+
+**Before (clever but unclear):**
+```swift
+let services = defaultServices.filter { $0.enabled }.sorted { $0.order < $1.order }
+```
+
+**After (verbose but clear for LLM):**
+```swift
+/// Filter out disabled services and sort by display order.
+/// Order values: ChatGPT=1, Perplexity=2, Google=3, Claude=4
+/// This ensures consistent left-to-right display in the UI.
+let enabledServices = defaultServices.filter { service in
+    return service.enabled == true
+}
+let sortedServices = enabledServices.sorted { firstService, secondService in
+    return firstService.order < secondService.order
+}
+```
+
+### Documentation Patterns to Follow
+
+1. **File Headers**: Start every file with a comment explaining its role in the system
+2. **Cross-References**: Always document which files call this code and which files it calls
+3. **Constants**: Never use raw numbers - always create named constants with explanations
+4. **State Documentation**: Document all state variables with their lifecycle and purpose
+5. **Error Handling**: Document what errors can occur and how they're handled
+6. **WebKit Gotchas**: Extensively document WebKit-specific workarounds and timing issues
+
+### Remember: You're Writing Prompts, Not Comments
+
+Every line of documentation should answer the question: "What would an AI need to know to correctly modify this code?" Be exhaustively explicit. Your code's future maintainer can't ask you questions—they can only read what you wrote.
+
+## Getting Started
+
+### Architecture Documentation
+When starting work on this codebase, orient yourself by reading these key documentation files:
+1. **Architecture Map**: `hyperchat-macos/documentation/architecture-map.md` - Overview of system architecture and component relationships
+2. **WebView Loading Issues**: `hyperchat-macos/documentation/webview-loading-issues.md` - Critical WebView performance and error handling patterns
+
+### ⚠️ CRITICAL: WebView Loading Issues
+We've repeatedly encountered slow loading times and NSURLErrorDomain -999 errors with WebViews. This is a **recurring issue** that must be understood before making WebView-related changes.
+
+**Required Reading**: See `documentation/webview-loading-issues.md` for:
+- Root causes of -999 errors
+- Code patterns to avoid
+- Proper WebView initialization patterns
+- Debugging strategies
 
 ## Build and Development Commands
 
@@ -103,531 +210,18 @@ open build/Debug/Hyperchat.app
 open Hyperchat.xcodeproj
 ```
 
-## High-Level Architecture
-
-Hyperchat is a native macOS app that provides instant access to multiple AI services (ChatGPT, Claude, Perplexity, Google) via a floating button or global hotkey. The app uses WebKit to display AI services side-by-side in a dual-mode interface (normal window or full-screen overlay).
-
-### Core Components
-
-1. **AppDelegate** - Main application lifecycle management, initializes floating button and global hotkey
-2. **FloatingButtonManager** - Manages the persistent 48x48px floating button that follows users across spaces
-3. **ServiceManager** - Manages WKWebView instances for each AI service, handles prompt execution and session persistence
-4. **OverlayController** - Controls the dual-mode window system (normal vs overlay mode) and prompt window
-5. **PromptWindowController** - Handles the floating prompt input window that appears when activated
-
-### Key Technical Details
-
-- **WebKit Integration**: Each AI service runs in its own WKWebView with separate process pools to prevent interference
-- **Service Activation Methods**:
-  - URL parameter services (ChatGPT, Perplexity, Google): Direct URL navigation with query parameters
-  - Claude: Clipboard paste automation (copies prompt, pastes into Claude interface)
-- **Window Management**: SwiftUI-based layout with dynamic reflow when services are closed
-- **User Agent**: Dynamic Safari-compatible user agent generation for maximum service compatibility
-- **Entitlements**: App Sandbox is disabled for direct distribution (no Mac App Store)
-
-### Service Configuration
-
-Services are configured in `ServiceConfiguration.swift` with the following structure:
-- ChatGPT: URL parameter `q` at `https://chat.openai.com`
-- Claude: Clipboard paste at `https://claude.ai`
-- Perplexity: URL parameter `q` at `https://www.perplexity.ai`
-- Google: URL parameter `q` at `https://www.google.com/search`
-
-### Important Implementation Notes
-
-1. **Startup Behavior**: The app MUST show a window automatically on startup - this is a core requirement
-2. **Claude Automation**: Uses clipboard paste method with 2-3 second delay for page load
-3. **Perplexity Special Handling**: Requires initial page load before accepting URL parameters
-4. **Window Modes**: ESC key toggles between normal (windowed) and overlay (full-screen) modes
-5. **Keyboard Shortcuts**: Cmd+1/2/3/4 focuses specific service windows
-6. **Resource Management**: Proper WKWebView cleanup when services are disabled to prevent memory leaks
-
 ## Troubleshooting
 
-### WebKit Loading Issues
-If services fail to load with WebKit errors:
-1. Ensure entitlements include all required permissions (audio, camera, network, Apple Events)
-2. Use persistent data store (`WKWebsiteDataStore.default()`) for AI services that require authentication
-3. Clean build with `xcodebuild -scheme Hyperchat clean` before rebuilding
-
-### Service URL Parameters
-- ChatGPT: Uses URL parameter `q` at `https://chatgpt.com`
-- Perplexity: Uses URL parameter `q` at `https://www.perplexity.ai`
-- Google: Standard search URL parameters work reliably
-- Claude: Uses clipboard paste automation, not URL parameters
-
 ### Common Issues and Fixes
-1. **Error -999 (NSURLErrorCancelled)**: Remove `webView.stopLoading()` calls before loading new URLs
+1. **Error -999 (NSURLErrorCancelled)**: See `documentation/webview-loading-issues.md` for comprehensive solutions
 2. **App hanging on second activation**: Don't call `hideOverlay()` when showing prompt window
 3. **Prompt window showing multiple times**: Check if window is already visible before showing
 4. **WebView blanking in other windows**: Each window needs its own ServiceManager instance with separate WebViews
 5. **Slow window loading**: Consider pre-warming WebViews or showing loading indicators
 
-# macOS Window Management Best Practices
-
-## WebView Architecture for Multiple Windows
-
-When creating multiple windows with WebViews, proper isolation is critical:
-
-```swift
-// Each window needs its own ServiceManager instance
-class OverlayController {
-    private var windowServiceManagers: [NSWindow: ServiceManager] = [:]
-    
-    private func createNormalWindow() {
-        // Create dedicated ServiceManager for this window
-        let windowServiceManager = ServiceManager()
-        windowServiceManagers[window] = windowServiceManager
-        // Use windowServiceManager for all WebViews in this window
-    }
-}
-
-// ServiceManager creates isolated WebViews per window
-class ServiceManager {
-    private func createWebView(for service: AIService) -> WKWebView {
-        let configuration = WKWebViewConfiguration()
-        // Each service gets its own process pool
-        configuration.processPool = WKProcessPool()
-        // Share cookies across all windows
-        configuration.websiteDataStore = WKWebsiteDataStore.default()
-        return WKWebView(frame: .zero, configuration: configuration)
-    }
-}
-```
-
-## NSWindow CollectionBehavior Guidelines
-
-Use appropriate collection behaviors for different window types:
-
-```swift
-// For main application windows
-window.collectionBehavior = [.managed, .fullScreenPrimary, .participatesInCycle]
-
-// For floating panels (like the button)
-window.collectionBehavior = [.stationary, .ignoresCycle]
-
-// AVOID these combinations that cause issues:
-// - .canJoinAllSpaces with shared WebViews (causes process conflicts)
-// - .moveToActiveSpace (causes unwanted space switches)
-```
-
-## Window Activation Best Practices
-
-For multi-window apps with WebViews, use gentle activation to prevent disruption:
-
-```swift
-// GOOD: Gentle window activation
-window.orderFront(nil)
-DispatchQueue.main.asyncAfter(deadline: .now() + 0.1) {
-    window.makeKey()
-}
-
-// BAD: Aggressive activation disrupts other windows
-window.makeKeyAndOrderFront(nil)
-NSApp.activate(ignoringOtherApps: true)
-```
-
-**Key insights**: 
-- Use `orderFront()` followed by delayed `makeKey()` to prevent WebView disruption
-- Avoid `NSApp.activate(ignoringOtherApps: true)` when showing new windows
-- Let windows activate naturally to maintain WebView stability
-
-## WebView Loading Optimization
-
-To improve window creation performance with multiple ServiceManagers:
-
-```swift
-// 1. Show loading state immediately
-class ServiceManager {
-    @Published var loadingStates: [String: Bool] = [:]
-    
-    private func loadDefaultPage(for service: AIService, webView: WKWebView) {
-        loadingStates[service.id] = true
-        webView.navigationDelegate = self
-        webView.load(URLRequest(url: service.url))
-    }
-}
-
-// 2. Consider lazy loading services
-class LazyServiceManager: ServiceManager {
-    private var loadedServices: Set<String> = []
-    
-    func loadServiceIfNeeded(_ serviceId: String) {
-        guard !loadedServices.contains(serviceId) else { return }
-        loadedServices.insert(serviceId)
-        // Load the service WebView
-    }
-}
-
-// 3. Pre-warm critical services
-extension ServiceManager {
-    func prewarmCriticalServices() {
-        // Load ChatGPT and Claude first as they're most commonly used
-        let criticalServices = ["chatgpt", "claude"]
-        for serviceId in criticalServices {
-            if let service = activeServices.first(where: { $0.id == serviceId }) {
-                loadDefaultPage(for: service, webView: webServices[serviceId]!.browserView.webView)
-            }
-        }
-    }
-}
-```
-
-## Key Architecture Principles
-
-1. **WebView Isolation**: Each window MUST have its own WebView instances
-2. **Shared Authentication**: Use `WKWebsiteDataStore.default()` across all windows
-3. **Process Isolation**: Each service gets its own `WKProcessPool`
-4. **Gentle Activation**: Use `orderFront()` + delayed `makeKey()` pattern
-5. **Loading Optimization**: Show loading states and consider pre-warming or lazy loading
-
-## Performance Considerations
-
-When creating multiple windows:
-- Each ServiceManager instance loads all services (4 WebViews)
-- Initial loading can take 3-5 seconds per window
-- Consider showing loading indicators or progressive loading
-- Pre-warm critical services for better UX
-
-**Swift implementation example**:
-
-```swift
-// Declare private APIs
-@_silgen_name("CGSDefaultConnection") 
-func CGSDefaultConnection() -> Int32
-
-@_silgen_name("CGSGetActiveSpace")
-func CGSGetActiveSpace(_ connection: Int32) -> Int
-
-@_silgen_name("CGSAddWindowsToSpaces")
-func CGSAddWindowsToSpaces(_ connection: Int32, _ windows: CFArray, _ spaces: CFArray)
-
-// Move window between spaces
-func moveWindow(windowID: Int, toSpace spaceID: Int) {
-    let connection = CGSDefaultConnection()
-    let currentSpace = CGSGetActiveSpace(connection)
-    
-    let windowArray = [windowID] as CFArray
-    let currentSpaceArray = [currentSpace] as CFArray
-    let targetSpaceArray = [spaceID] as CFArray
-    
-    CGSRemoveWindowsFromSpaces(connection, windowArray, currentSpaceArray)
-    CGSAddWindowsToSpaces(connection, windowArray, targetSpaceArray)
-}
-```
-
-## WindowServer bugs in macOS 14-15 (Sonoma/Sequoia)
-
-**Critical bug #1: Random WindowServer crashes**
-- Triggers: External monitor connections, multi-monitor with "Displays have separate Spaces"
-- Primary workaround:
-```bash
-# Disable in System Settings → Desktop & Dock → Mission Control
-- "Automatically rearrange Spaces based on most recent use"
-- "Displays have separate Spaces" (if crashes persist)
-```
-
-**Critical bug #2: Window tiling regressions**
-```bash
-# Fix grayed-out tiling options
-System Settings → Desktop & Dock → Mission Control
-- Enable "Displays have separate Spaces"
-- Logout/login required
-```
-
-**Emergency recovery**:
-```bash
-sudo killall WindowServer  # Forces logout but prevents hard reboot
-```
-
-## Solutions for preventing windows from triggering space changes
-
-**Pattern 1: Non-activating panels**
-```swift
-let panel = NSPanel(contentRect: rect, 
-                   styleMask: [.titled, .nonactivatingPanel],
-                   backing: .buffered, 
-                   defer: true)
-panel.level = .floating
-panel.collectionBehavior = [.canJoinAllSpaces, .fullScreenAuxiliary]
-panel.hidesOnDeactivate = false
-```
-
-**Pattern 2: LSUIElement + window configuration**
-```xml
-<!-- Info.plist -->
-<key>LSUIElement</key>
-<true/>
-```
-
-```swift
-// Prevents dock icon and space switching
-window.collectionBehavior = [.canJoinAllSpaces, .stationary]
-```
-
-## Undocumented NSWindow methods and properties
-
-Runtime-discovered methods accessible via category extension:
-
-```objc
-@interface NSWindow (Undocumented)
-- (BOOL)isOnActiveSpace;      // Detects if window is on current space
-- (NSInteger)orderedIndex;     // Window z-order position
-- (void)_setTransformForAnimation:(CGAffineTransform)transform;
-- (void)_setUsesLiveResize:(BOOL)flag;
-- (NSRect)_frameForFullScreenMode;
-@end
-```
-
-**Space detection using undocumented properties**:
-```swift
-extension NSWindow {
-    var isOnActiveSpace: Bool {
-        // Use runtime introspection
-        let selector = NSSelectorFromString("isOnActiveSpace")
-        if self.responds(to: selector) {
-            return self.perform(selector) != nil
-        }
-        return false
-    }
-}
-```
-
-## Workarounds for multi-space window management
-
-**Comprehensive space-aware window manager pattern**:
-
-```swift
-class SpaceAwareWindowManager {
-    private var windows: [NSWindow: SpaceConfiguration] = [:]
-    private let connection = CGSDefaultConnection()
-    
-    struct SpaceConfiguration {
-        let originalSpace: CGSSpaceID
-        let collectionBehavior: NSWindow.CollectionBehavior
-        let level: NSWindow.Level
-    }
-    
-    func configureWindowForMultiSpace(_ window: NSWindow) {
-        // Store original configuration
-        let currentSpace = CGSGetActiveSpace(connection)
-        windows[window] = SpaceConfiguration(
-            originalSpace: CGSSpaceID(currentSpace),
-            collectionBehavior: window.collectionBehavior,
-            level: window.level
-        )
-        
-        // Monitor display changes
-        NotificationCenter.default.addObserver(
-            self,
-            selector: #selector(displaysReconfigured),
-            name: NSApplication.didChangeScreenParametersNotification,
-            object: nil
-        )
-    }
-    
-    @objc private func displaysReconfigured() {
-        // Restore window positions after display change
-        windows.forEach { window, config in
-            window.collectionBehavior = config.collectionBehavior
-            window.level = config.level
-        }
-    }
-}
-```
-
-## Technical patterns for floating UI elements that stay in current space
-
-**Pattern 1: Hybrid NSPanel approach**
-```swift
-class CurrentSpaceFloatingPanel: NSPanel {
-    override init(contentRect: NSRect, styleMask style: NSWindow.StyleMask, 
-                  backing backingStoreType: NSWindow.BackingStoreType, defer flag: Bool) {
-        super.init(contentRect: contentRect, 
-                  styleMask: [.borderless, .nonactivatingPanel], 
-                  backing: backingStoreType, 
-                  defer: flag)
-        
-        self.level = .floating
-        self.collectionBehavior = [.transient, .ignoresCycle]
-        self.isFloatingPanel = true
-        self.becomesKeyOnlyIfNeeded = true
-    }
-}
-```
-
-**Pattern 2: Space change detection and response**
-```swift
-class SpaceTrackingWindow: NSWindow {
-    private var spaceObserver: Any?
-    
-    override func awakeFromNib() {
-        super.awakeFromNib()
-        
-        // Multiple detection methods for reliability
-        spaceObserver = NSWorkspace.shared.notificationCenter.addObserver(
-            forName: NSWorkspace.activeSpaceDidChangeNotification,
-            object: nil,
-            queue: .main
-        ) { [weak self] _ in
-            self?.handleSpaceChange()
-        }
-    }
-    
-    private func handleSpaceChange() {
-        // Maintain visibility on current space
-        if !self.isOnActiveSpace {
-            self.collectionBehavior = [.moveToActiveSpace]
-            DispatchQueue.main.async {
-                self.collectionBehavior = [.transient, .ignoresCycle]
-            }
-        }
-    }
-}
-```
-
-## CGSSetWorkspace, CGSGetActiveSpace, and other private space APIs
-
-**Complete private API reference with working examples**:
-
-```c
-// Space enumeration with masks
-typedef enum {
-    CGSSpaceIncludesCurrent = 1 << 0,
-    CGSSpaceIncludesOthers  = 1 << 1,
-    CGSSpaceIncludesUser    = 1 << 2,
-    CGSSpaceVisible         = 1 << 16,
-    kCGSAllSpacesMask = CGSSpaceIncludesUser | CGSSpaceIncludesOthers | CGSSpaceIncludesCurrent
-} CGSSpaceMask;
-
-// Get all spaces
-CFArrayRef spaces = CGSCopySpaces(connection, kCGSAllSpacesMask);
-
-// Space type identification
-typedef enum {
-    CGSSpaceTypeUser       = 0,  // Regular desktop spaces
-    CGSSpaceTypeFullscreen = 1,  // Fullscreen app spaces
-    CGSSpaceTypeSystem     = 2   // System spaces (Dashboard)
-} CGSSpaceType;
-
-CGSSpaceType type = CGSSpaceGetType(connection, spaceID);
-```
-
-**Advanced workspace control**:
-```c
-// Set workspace with transition
-extern CGError CGSSetWorkspaceWithTransition(
-    const CGSConnection cid, 
-    CGSWorkspace workspace, 
-    CGSTransitionType transition,    // 0 = no transition, 1 = fade, etc.
-    CGSTransitionOption subtype, 
-    float time                       // Duration in seconds
-);
-
-// Usage example
-CGSSetWorkspaceWithTransition(connection, targetWorkspace, 1, 0, 0.3f);
-```
-
-**Window-space queries**:
-```c
-// Get spaces containing specific windows
-CFArrayRef CGSCopySpacesForWindows(CGSConnectionID cid, CGSSpaceMask mask, CFArrayRef windowIDs);
-
-// Check if window is on specific space
-bool isWindowOnSpace(CGSWindow windowID, CGSSpaceID spaceID) {
-    CFArrayRef windowArray = CFArrayCreate(NULL, (const void**)&windowID, 1, NULL);
-    CFArrayRef spaces = CGSCopySpacesForWindows(connection, kCGSAllSpacesMask, windowArray);
-    
-    bool result = CFArrayContainsValue(spaces, 
-        CFRangeMake(0, CFArrayGetCount(spaces)), 
-        (const void*)(uintptr_t)spaceID);
-    
-    CFRelease(windowArray);
-    CFRelease(spaces);
-    return result;
-}
-```
-
-**Important linking requirements**:
-```bash
-# Xcode Build Settings
-SYSTEM_FRAMEWORK_SEARCH_PATHS = /System/Library/PrivateFrameworks
-OTHER_LDFLAGS = -framework SkyLight
-
-# Note: Requires SIP partial disabling for some operations
-# App Store distribution not possible with private APIs
-```
-
-## Testing Multiple Windows
-
-To verify proper WebView isolation:
-1. Open multiple Hyperchat windows on different spaces
-2. Click the floating button - existing windows should remain functional
-3. Submit prompts in each window - they should execute independently
-4. Check that all services maintain login state across windows
-
-## Window Hibernation Feature
-
-The app implements automatic window hibernation to dramatically reduce resource usage when running multiple windows:
-
-### How It Works
-
-**When a window loses focus:**
-- Takes a screenshot of the current window content
-- Overlays the screenshot on top of the WebViews
-- Pauses all JavaScript timers and animations
-- Hides WebViews to prevent rendering
-- Frees up CPU/memory resources
-
-**When a window gains focus:**
-- Removes the screenshot overlay
-- Restores JavaScript timers and animations
-- Shows the WebViews again
-- Content becomes interactive instantly
-
-### Implementation Details
-
-```swift
-// OverlayController.swift
-private func hibernateWindow(_ window: NSWindow) {
-    // 1. Capture screenshot
-    if let contentView = window.contentView,
-       let imageRep = contentView.bitmapImageRepForCachingDisplay(in: contentView.bounds) {
-        // Create snapshot overlay
-        let snapshotView = NSImageView(frame: contentView.bounds)
-        snapshotView.image = snapshot
-        contentView.addSubview(snapshotView)
-    }
-    
-    // 2. Pause WebViews
-    serviceManager.pauseAllWebViews()
-}
-
-// ServiceManager.swift
-func pauseAllWebViews() {
-    // Pause JavaScript execution by overriding timer functions
-    webView.evaluateJavaScript("""
-        window.setInterval = function() { return 0; };
-        window.setTimeout = function() { return 0; };
-        window.requestAnimationFrame = function() { return 0; };
-    """)
-}
-```
-
-### Benefits
-
-- **Resource Efficiency**: Only active window consumes resources
-- **Visual Continuity**: All windows remain visible on all monitors
-- **Instant Switching**: No reload delay when switching windows
-- **State Preservation**: WebViews maintain their state
-
-### Testing Window Hibernation
-
-1. Open multiple Hyperchat windows
-2. Switch between windows and observe console logs:
-   - "🛌 Hibernated window with X services"
-   - "⏰ Restored window with X services"
-3. Monitor Activity Monitor - CPU/memory should drop for inactive windows
-4. Verify windows show static content when not focused
-5. Confirm instant reactivation when clicking on hibernated windows
+### Service-Specific Issues
+1. **ChatGPT**: May require clearing cookies if stuck on login
+2. **Claude**: Clipboard paste requires 3-second delay for page initialization
+3. **Perplexity**: Must load home page before URL parameters work
+4. **Google**: iPad user agent provides better mobile-optimized UI
 
