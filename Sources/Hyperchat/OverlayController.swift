@@ -1,6 +1,7 @@
 import Cocoa
 import SwiftUI
 import WebKit
+import Combine
 
 // MARK: - Loading Overlay View
 
@@ -141,7 +142,11 @@ class OverlayWindow: NSWindow {
 
     override func keyDown(with event: NSEvent) {
         if event.keyCode == 45 && event.modifierFlags.contains(.command) { // Cmd+N
-            NotificationCenter.default.post(name: .focusUnifiedInput, object: nil)
+            // Focus input through the window's ServiceManager
+            if let controller = overlayController,
+               let serviceManager = controller.windowServiceManagers[self] {
+                serviceManager.focusInputPublisher.send()
+            }
         } else {
             super.keyDown(with: event)
         }
@@ -199,6 +204,9 @@ class OverlayController: NSObject, NSWindowDelegate {
     
     private var stackViewConstraints: [NSLayoutConstraint] = []
     private var inputBarHostingView: NSHostingView<UnifiedInputBar>?
+    
+    // Combine subscriptions
+    private var cancellables: Set<AnyCancellable> = []
 
     override init() {
         super.init()
@@ -240,13 +248,7 @@ class OverlayController: NSObject, NSWindowDelegate {
             object: nil
         )
         
-        // Listen for all services loaded notification
-        NotificationCenter.default.addObserver(
-            self,
-            selector: #selector(allServicesDidLoad(_:)),
-            name: .allServicesDidLoad,
-            object: nil
-        )
+        // Note: allServicesDidLoad is now handled via Combine subscription in createNormalWindow
     }
 
     // Public entry point when no prompt yet
@@ -271,6 +273,21 @@ class OverlayController: NSObject, NSWindowDelegate {
     private func createNormalWindow() {
         // Create a dedicated ServiceManager for this window
         let windowServiceManager = ServiceManager()
+        
+        // Subscribe to areAllServicesLoaded publisher
+        windowServiceManager.$areAllServicesLoaded
+            .sink { [weak self, weak windowServiceManager] isLoaded in
+                guard isLoaded, let self = self, let serviceManager = windowServiceManager else { return }
+                
+                // Find the window for this ServiceManager
+                for (window, manager) in self.windowServiceManagers {
+                    if manager === serviceManager {
+                        self.hideLoadingOverlay(for: window)
+                        break
+                    }
+                }
+            }
+            .store(in: &cancellables)
         
         // Debug logging for new window creation
         if LoggingSettings.shared.debugPrompts {
@@ -357,7 +374,7 @@ class OverlayController: NSObject, NSWindowDelegate {
         // Focus the input field after all web views have loaded
         // This delay allows web views to do their initial setup
         DispatchQueue.main.asyncAfter(deadline: .now() + 5) {
-            NotificationCenter.default.post(name: .focusUnifiedInput, object: nil)
+            windowServiceManager.focusInputPublisher.send()
         }
     }
     
@@ -659,18 +676,6 @@ class OverlayController: NSObject, NSWindowDelegate {
         loadingTimers[window] = animationTimer
     }
     
-    @objc private func allServicesDidLoad(_ notification: Notification) {
-        // Find which window's ServiceManager sent this notification
-        guard let serviceManager = notification.object as? ServiceManager else { return }
-        
-        for (window, windowServiceManager) in windowServiceManagers {
-            if windowServiceManager === serviceManager {
-                // Hide loading overlay for this window
-                hideLoadingOverlay(for: window)
-                break
-            }
-        }
-    }
     
     // MARK: - NSWindowDelegate
     
@@ -740,8 +745,6 @@ class OverlayController: NSObject, NSWindowDelegate {
 
 extension Notification.Name {
     static let overlayDidHide = Notification.Name("overlayDidHide")
-    static let focusUnifiedInput = Notification.Name("focusUnifiedInput")
-    static let allServicesDidLoad = Notification.Name("allServicesDidLoad")
 }
 
 struct UnifiedInputBar: View {
@@ -918,7 +921,7 @@ struct UnifiedInputBar: View {
             .padding(.vertical, 12)
             .frame(height: 94)
         }
-        .onReceive(NotificationCenter.default.publisher(for: .focusUnifiedInput)) { _ in
+        .onReceive(serviceManager.focusInputPublisher) { _ in
             isInputFocused = true
         }
     }
