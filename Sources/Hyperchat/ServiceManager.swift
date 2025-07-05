@@ -654,6 +654,9 @@ class ServiceManager: NSObject, ObservableObject {
     var webServices: [String: WebService] = [:]
     private let processPool = WKProcessPool.shared  // Critical optimization
     
+    // Track BrowserViewControllers for delegate handoff
+    var browserViewControllers: [String: BrowserViewController] = [:]
+    
     
     // Thread-safe shared prompt execution state across all ServiceManager instances
     private static let globalStateQueue = DispatchQueue(label: "com.hyperchat.servicemanager.globalstate")
@@ -1284,6 +1287,11 @@ extension ServiceManager: WKNavigationDelegate {
                     print("✅ Service \(serviceId) finished loading - proceeding to next service")
                     currentlyLoadingService = nil
                     
+                    // Hand off navigation delegate to BrowserViewController if available
+                    if let browserViewController = browserViewControllers[serviceId] {
+                        browserViewController.takeOverNavigationDelegate()
+                    }
+                    
                     // Load the next service after a small delay
                     DispatchQueue.main.asyncAfter(deadline: .now() + 0.5) { [weak self] in
                         self?.loadNextServiceFromQueue()
@@ -1294,6 +1302,12 @@ extension ServiceManager: WKNavigationDelegate {
                 if !urlString.contains("?q=") && !hasNotifiedAllServicesLoaded {
                     loadedServicesCount += 1
                     print("📊 Service loaded: \(serviceId) (\(loadedServicesCount)/\(activeServices.count))")
+                    
+                    // If this wasn't the currently loading service, still hand off delegate
+                    // This handles cases where services load out of order or were pre-loaded
+                    if serviceId != currentlyLoadingService, let browserViewController = browserViewControllers[serviceId] {
+                        browserViewController.takeOverNavigationDelegate()
+                    }
                     
                     // Check if all services have loaded
                     if loadedServicesCount >= activeServices.count && serviceLoadingQueue.isEmpty && currentlyLoadingService == nil {
