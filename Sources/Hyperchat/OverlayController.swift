@@ -144,7 +144,7 @@ class OverlayWindow: NSWindow {
         if event.keyCode == 45 && event.modifierFlags.contains(.command) { // Cmd+N
             // Focus input through the window's ServiceManager
             if let controller = overlayController,
-               let serviceManager = controller.windowServiceManagers[self] {
+               let serviceManager = controller.serviceManager(for: self) {
                 serviceManager.focusInputPublisher.send()
             }
         } else {
@@ -207,6 +207,11 @@ class OverlayController: NSObject, NSWindowDelegate {
     
     // Combine subscriptions
     private var cancellables: Set<AnyCancellable> = []
+    
+    // Public accessor for window's ServiceManager
+    func serviceManager(for window: NSWindow) -> ServiceManager? {
+        return windowServiceManagers[window]
+    }
 
     override init() {
         super.init()

@@ -1,6 +1,7 @@
 import Foundation
 import WebKit
 import SwiftUI
+import Combine
 
 // MARK: - Service Configuration
 
@@ -316,7 +317,7 @@ class ServiceManager: NSObject, ObservableObject {
     private let processPool = WKProcessPool.shared  // Critical optimization
     
     // Track BrowserViewControllers for delegate handoff
-    var browserViewControllers: [String: BrowserViewController] = []
+    var browserViewControllers: [String: BrowserViewController] = [:]
     
     
     // Thread-safe shared prompt execution state across all ServiceManager instances
@@ -564,8 +565,8 @@ class ServiceManager: NSObject, ObservableObject {
         }
         
         // Refocus the prompt input field after a delay to ensure paste operations complete
-        DispatchQueue.main.asyncAfter(deadline: .now() + 1.5) {
-            focusInputPublisher.send()
+        DispatchQueue.main.asyncAfter(deadline: .now() + 1.5) { [weak self] in
+            self?.focusInputPublisher.send()
         }
     }
     
@@ -974,9 +975,9 @@ extension ServiceManager: WKNavigationDelegate {
                 
                 // Return focus to main prompt bar after Perplexity loads
                 // Wait 2 seconds to ensure Perplexity's JavaScript has executed
-                DispatchQueue.main.asyncAfter(deadline: .now() + 2.0) {
+                DispatchQueue.main.asyncAfter(deadline: .now() + 2.0) { [weak self] in
                     print("🎯 Returning focus to main prompt bar after Perplexity load")
-                    focusInputPublisher.send()
+                    self?.focusInputPublisher.send()
                 }
             }
             

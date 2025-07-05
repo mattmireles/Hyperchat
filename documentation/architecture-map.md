@@ -2,7 +2,7 @@
 
 **High-Level Overview**
 
-Hyperchat is a native macOS application that provides a multi-service interface to various AIs. The user can summon a prompt window via a floating button, enter a query, and see the results across multiple services simultaneously in a unified overlay window. The architecture is event-driven, using NSNotificationCenter for communication between loosely coupled components.
+Hyperchat is a native macOS application that provides a multi-service interface to various AIs. The user can summon a prompt window via a floating button, enter a query, and see the results across multiple services simultaneously in a unified overlay window. The architecture is event-driven, using a combination of NSNotificationCenter for cross-module communication and Combine publishers for direct state updates between related components.
 
 **Core Components & Interaction Flow**
 
@@ -41,9 +41,10 @@ Here is the step-by-step flow of a typical user interaction:
 - **Job:** Core orchestration unit that manages AI services and executes prompts. Refactored to focus solely on service management (reduced from 1600+ to under 900 lines).
 - **Interaction:**
 - **Service Setup**: Uses WebViewFactory to create WKWebViews, manages sequential loading of services
+- **State Updates**: Publishes loading state via Combine (`@Published var areAllServicesLoaded`) and input focus events via `focusInputPublisher`
 - **Executes Prompt**: It iterates through its list of active services and tells each one to execute the prompt. The method of execution depends on the service type:
 - **URLParameterService (Google, Perplexity, etc.)**: Constructs a URL with the prompt as a query parameter (e.g., google.com/search?q=...) and tells the corresponding WKWebView to load it.
-- **ClaudeService (and "Reply to All" mode)**: Navigates to the service's base URL and injects JavaScript to find the chat input, paste the prompt, and programmatically click the "submit" button.
+- **ClaudeService (and "Reply to All" mode)**: Navigates to the service's base URL and uses JavaScriptProvider to inject scripts that find the chat input, paste the prompt, and programmatically click the "submit" button.
 - **Delegate Handoff**: After initial load, hands navigation control to BrowserViewController
 
 **6. WebViewFactory (The Builder)**
@@ -74,17 +75,29 @@ Here is the step-by-step flow of a typical user interaction:
 - **ButtonState**: Observable state model for toolbar buttons
 - **GradientToolbarButton**: SwiftUI component for animated toolbar buttons
 
+**10. JavaScriptProvider (The Script Library)**
+
+- **Job:** Centralized repository for all JavaScript code used throughout the application
+- **Interaction:**
+- **Script Generation**: Provides static methods that return JavaScript strings for various operations
+- **Clean Separation**: Isolates 300+ lines of JavaScript from ServiceManager into organized, reusable methods
+- **Key Scripts**: Paste automation, Claude-specific interactions, window hibernation pause/resume
+
 **Key Architectural Patterns**
 
-- **Notification-Based Communication**: Components are loosely coupled. Instead of direct calls, they communicate by posting and observing notifications (e.g., .showOverlay). This makes the system easier to modify.
+- **Hybrid Communication Model**: 
+  - **NSNotificationCenter**: Used for cross-module events where loose coupling is beneficial (e.g., .showOverlay, .overlayDidHide)
+  - **Combine Publishers**: Used for direct state updates between tightly related components (e.g., ServiceManager to OverlayController loading states)
 - **Dedicated ServiceManager per Window**: Each OverlayWindow gets its own ServiceManager. This is a critical design choice for stability, isolating the web environments from each other and preventing crashes in one window from affecting others.
 - **Shared WKProcessPool**: While each window has its own ServiceManager, all WKWebViews share a single WKProcessPool. This is a key memory optimization that significantly reduces the app's overall footprint.
 - **Factory Pattern**: WebViewFactory centralizes all WKWebView configuration, ensuring consistency and easier maintenance.
 - **MVC Separation**: BrowserViewController (controller) handles browser logic while BrowserView (view) handles pure UI layout.
 - **Delegate Handoff**: ServiceManager manages initial load with sequential queue, then hands navigation control to BrowserViewController for ongoing interaction.
+- **JavaScript Isolation**: All JavaScript code is centralized in JavaScriptProvider, making it easier to maintain and test complex browser automation scripts.
 
 **Core Technologies & Practices**
 
+- **State Management**: Uses Apple's Combine framework for reactive state updates and publisher-subscriber patterns alongside traditional NotificationCenter for cross-module events.
 - **Dependency Management**: The project uses Swift Package Manager (SPM) to manage third-party libraries like Sparkle and KeyboardShortcuts.
 - **Automated Testing**: A suite of unit and UI tests runs automatically via GitHub Actions to ensure stability. The testing strategy is detailed in `Testing.md`.
 - **Automated Deployment**: The release process is fully automated via the `./deploy-hyperchat.sh` script, which handles signing, notarization, and DMG creation.
