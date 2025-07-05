@@ -4,10 +4,6 @@
 
 Hyperchat is a native macOS application that provides a multi-service interface to various AIs. The user can summon a prompt window via a floating button, enter a query, and see the results across multiple services simultaneously in a unified overlay window. The architecture is event-driven, using NSNotificationCenter for communication between loosely coupled components.
 
-**Recent Refactoring (July 2025)**
-
-The codebase underwent a significant refactoring to break down the ServiceManager god object (previously 1600+ lines) into focused, single-responsibility components. This improved maintainability, testability, and follows proper MVC patterns.
-
 **Core Components & Interaction Flow**
 
 Here is the step-by-step flow of a typical user interaction:
