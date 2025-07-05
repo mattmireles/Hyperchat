@@ -374,6 +374,9 @@ class OverlayController: NSObject, NSWindowDelegate {
                 let controller = BrowserViewController(webView: webView, service: service, isFirstService: isFirstService)
                 browserViewControllers.append(controller)
                 browserViews.append(controller.view)
+                
+                // Register the controller with ServiceManager for delegate handoff
+                windowServiceManager.browserViewControllers[service.id] = controller
             }
         }
         

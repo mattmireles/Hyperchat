@@ -24,8 +24,8 @@ class BrowserViewController: NSViewController {
         
         super.init(nibName: nil, bundle: nil)
         
-        // Claim ownership of navigation delegate immediately
-        webView.navigationDelegate = self
+        // Don't claim navigation delegate here - ServiceManager needs it for initial load
+        // We'll take over after the initial page load completes
         
         let wvAddress = Unmanaged.passUnretained(webView).toOpaque()
         let retainCount = CFGetRetainCount(webView)
@@ -43,6 +43,11 @@ class BrowserViewController: NSViewController {
     
     deinit {
         print("🔴 [\(Date().timeIntervalSince1970)] BrowserViewController DEINIT \(instanceId) for \(service.name)")
+    }
+    
+    func takeOverNavigationDelegate() {
+        webView.navigationDelegate = self
+        print("🎯 [\(Date().timeIntervalSince1970)] BrowserViewController \(instanceId) took over navigation delegate for \(service.name)")
     }
     
     override func loadView() {

@@ -10,8 +10,7 @@
 		3EE13B9B2C4F6B2900A8A61E /* AppDelegate.swift in Sources */ = {isa = PBXBuildFile; fileRef = 3EE13B8E2C4F6B2900A8A61E /* AppDelegate.swift */; };
 		3EE13B9C2C4F6B2900A8A61E /* Assets.xcassets in Resources */ = {isa = PBXBuildFile; fileRef = 3EE13B932C4F6B2900A8A61E /* Assets.xcassets */; };
 		3EE13B9D2C4F6B2900A8A61E /* FloatingButtonManager.swift in Sources */ = {isa = PBXBuildFile; fileRef = 3EE13B8F2C4F6B2900A8A61E /* FloatingButtonManager.swift */; };
-		3EE13B9E2C4F6B2900A8A61E /* HyperchatApp.swift in Sources */ = {isa = PBXBuildFile; fileRef = 3EE13B902C4F6B2900A8A61E /* HyperchatApp.swift */; };
-		3EE13B9F2C4F6B2900A8A61E /* MainMenu.xib in Resources */ = {isa = PBXBuildFile; fileRef = 3EE13B942C4F6B2900A8A61E /* MainMenu.xib */; };
+		3EE13B9F2C4F6B2900A8A61E /* Sources/Hyperchat/MainMenu.xib in Resources */ = {isa = PBXBuildFile; fileRef = 3EE13B942C4F6B2900A8A61E /* Sources/Hyperchat/MainMenu.xib */; };
 		3EE13BA92C4F6B2900A8A61E /* OverlayController.swift in Sources */ = {isa = PBXBuildFile; fileRef = 3EE13BA32C4F6B2900A8A61E /* OverlayController.swift */; };
 		3EE13BAA2C4F6B2900A8A61E /* PromptWindowController.swift in Sources */ = {isa = PBXBuildFile; fileRef = 3EE13BA42C4F6B2900A8A61E /* PromptWindowController.swift */; };
 		3EE13BAB2C4F6B2900A8A61E /* ServiceManager.swift in Sources */ = {isa = PBXBuildFile; fileRef = 3EE13BA52C4F6B2900A8A61E /* ServiceManager.swift */; };
@@ -19,7 +18,16 @@
 		3EE13BAD2C4F6B2900A8A61E /* NSScreen+Extensions.swift in Sources */ = {isa = PBXBuildFile; fileRef = 3EE13BA72C4F6B2900A8A61E /* NSScreen+Extensions.swift */; };
 		3EE13BAE2C4F6B2900A8A61E /* ServiceConfiguration.swift in Sources */ = {isa = PBXBuildFile; fileRef = 3EE13BA82C4F6B2900A8A61E /* ServiceConfiguration.swift */; };
 		3EE13BB22C4F6B2900A8A61E /* Orbitron-Bold.ttf in Resources */ = {isa = PBXBuildFile; fileRef = 3EE13BB32C4F6B2900A8A61E /* Orbitron-Bold.ttf */; };
+		3EE13BB42C4F6B2900A8A61E /* SettingsManager.swift in Sources */ = {isa = PBXBuildFile; fileRef = 3EE13BB52C4F6B2900A8A61E /* SettingsManager.swift */; };
+		3EE13BB62C4F6B2900A8A61E /* SettingsWindowController.swift in Sources */ = {isa = PBXBuildFile; fileRef = 3EE13BB72C4F6B2900A8A61E /* SettingsWindowController.swift */; };
 		BE8135E42E01E24D0059C681 /* Sparkle in Frameworks */ = {isa = PBXBuildFile; productRef = BE8135E32E01E24D0059C681 /* Sparkle */; };
+		BEB355BD2E18A3F7000164A8 /* HyperchatApp.swift in Sources */ = {isa = PBXBuildFile; fileRef = BEB355BC2E18A3F7000164A8 /* HyperchatApp.swift */; };
+		BEB355C32E18A6F4000164A8 /* ButtonState.swift in Sources */ = {isa = PBXBuildFile; fileRef = BEB355C12E18A6F4000164A8 /* ButtonState.swift */; };
+		BEB355C42E18A6F4000164A8 /* GradientToolbarButton.swift in Sources */ = {isa = PBXBuildFile; fileRef = BEB355C22E18A6F4000164A8 /* GradientToolbarButton.swift */; };
+		BEB355C52E18A6F4000164A8 /* BrowserView.swift in Sources */ = {isa = PBXBuildFile; fileRef = BEB355C02E18A6F4000164A8 /* BrowserView.swift */; };
+		BEC2A99D2E18A24500785B53 /* CrashDebugger.swift in Sources */ = {isa = PBXBuildFile; fileRef = BEC2A99A2E18A24500785B53 /* CrashDebugger.swift */; };
+		BEC2A99F2E18A24500785B53 /* BrowserViewController.swift in Sources */ = {isa = PBXBuildFile; fileRef = BEC2A9992E18A24500785B53 /* BrowserViewController.swift */; };
+		BEC2A9A02E18A24500785B53 /* WebViewFactory.swift in Sources */ = {isa = PBXBuildFile; fileRef = BEC2A99C2E18A24500785B53 /* WebViewFactory.swift */; };
 		BEC467CB2E16481D007B45D0 /* ServiceConfigurationTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = BEC467972E164215007B45D0 /* ServiceConfigurationTests.swift */; };
 		BEC467CC2E16481D007B45D0 /* AIServiceTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = BEC467952E164215007B45D0 /* AIServiceTests.swift */; };
 		BEC467CD2E16481D007B45D0 /* WebViewMocks.swift in Sources */ = {isa = PBXBuildFile; fileRef = BEC467992E164215007B45D0 /* WebViewMocks.swift */; };
@@ -29,8 +37,6 @@
 		BEC467D12E16483D007B45D0 /* HyperchatUITests.swift in Sources */ = {isa = PBXBuildFile; fileRef = BEC4679B2E164215007B45D0 /* HyperchatUITests.swift */; };
 		BEE13BAF2C4F6B2900A8A61E /* WebViewLogger.swift in Sources */ = {isa = PBXBuildFile; fileRef = BEE13BA92C4F6B2900A8A61E /* WebViewLogger.swift */; };
 		BEE13BB02C4F6B2900A8A61E /* AutoInstaller.swift in Sources */ = {isa = PBXBuildFile; fileRef = BEE13BB12C4F6B2900A8A61E /* AutoInstaller.swift */; };
-		3EE13BB42C4F6B2900A8A61E /* SettingsManager.swift in Sources */ = {isa = PBXBuildFile; fileRef = 3EE13BB52C4F6B2900A8A61E /* SettingsManager.swift */; };
-		3EE13BB62C4F6B2900A8A61E /* SettingsWindowController.swift in Sources */ = {isa = PBXBuildFile; fileRef = 3EE13BB72C4F6B2900A8A61E /* SettingsWindowController.swift */; };
 /* End PBXBuildFile section */
 
 /* Begin PBXContainerItemProxy section */
@@ -54,11 +60,9 @@
 		3EE13B8B2C4F6B2900A8A61E /* Hyperchat.app */ = {isa = PBXFileReference; explicitFileType = wrapper.application; includeInIndex = 0; path = Hyperchat.app; sourceTree = BUILT_PRODUCTS_DIR; };
 		3EE13B8E2C4F6B2900A8A61E /* AppDelegate.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = AppDelegate.swift; sourceTree = "<group>"; };
 		3EE13B8F2C4F6B2900A8A61E /* FloatingButtonManager.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = FloatingButtonManager.swift; sourceTree = "<group>"; };
-		3EE13B902C4F6B2900A8A61E /* HyperchatApp.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = HyperchatApp.swift; sourceTree = "<group>"; };
-		3EE13B912C4F6B2900A8A61E /* Hyperchat.entitlements */ = {isa = PBXFileReference; lastKnownFileType = text.plist.entitlements; path = Hyperchat.entitlements; sourceTree = "<group>"; };
 		3EE13B922C4F6B2900A8A61E /* Info.plist */ = {isa = PBXFileReference; lastKnownFileType = text.plist.xml; path = Info.plist; sourceTree = "<group>"; };
 		3EE13B932C4F6B2900A8A61E /* Assets.xcassets */ = {isa = PBXFileReference; lastKnownFileType = folder.assetcatalog; path = Assets.xcassets; sourceTree = "<group>"; };
-		3EE13B942C4F6B2900A8A61E /* MainMenu.xib */ = {isa = PBXFileReference; lastKnownFileType = file.xib; path = "Sources/Hyperchat/MainMenu.xib"; sourceTree = SOURCE_ROOT; };
+		3EE13B942C4F6B2900A8A61E /* Sources/Hyperchat/MainMenu.xib */ = {isa = PBXFileReference; lastKnownFileType = file.xib; path = Sources/Hyperchat/MainMenu.xib; sourceTree = SOURCE_ROOT; };
 		3EE13BA32C4F6B2900A8A61E /* OverlayController.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = OverlayController.swift; sourceTree = "<group>"; };
 		3EE13BA42C4F6B2900A8A61E /* PromptWindowController.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = PromptWindowController.swift; sourceTree = "<group>"; };
 		3EE13BA52C4F6B2900A8A61E /* ServiceManager.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ServiceManager.swift; sourceTree = "<group>"; };
@@ -66,6 +70,15 @@
 		3EE13BA72C4F6B2900A8A61E /* NSScreen+Extensions.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = "NSScreen+Extensions.swift"; sourceTree = "<group>"; };
 		3EE13BA82C4F6B2900A8A61E /* ServiceConfiguration.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ServiceConfiguration.swift; sourceTree = "<group>"; };
 		3EE13BB32C4F6B2900A8A61E /* Orbitron-Bold.ttf */ = {isa = PBXFileReference; lastKnownFileType = file; path = "Orbitron-Bold.ttf"; sourceTree = "<group>"; };
+		3EE13BB52C4F6B2900A8A61E /* SettingsManager.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = SettingsManager.swift; sourceTree = "<group>"; };
+		3EE13BB72C4F6B2900A8A61E /* SettingsWindowController.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = SettingsWindowController.swift; sourceTree = "<group>"; };
+		BEB355BC2E18A3F7000164A8 /* HyperchatApp.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = HyperchatApp.swift; sourceTree = "<group>"; };
+		BEB355C02E18A6F4000164A8 /* BrowserView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = BrowserView.swift; sourceTree = "<group>"; };
+		BEB355C12E18A6F4000164A8 /* ButtonState.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ButtonState.swift; sourceTree = "<group>"; };
+		BEB355C22E18A6F4000164A8 /* GradientToolbarButton.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = GradientToolbarButton.swift; sourceTree = "<group>"; };
+		BEC2A9992E18A24500785B53 /* BrowserViewController.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = BrowserViewController.swift; sourceTree = "<group>"; };
+		BEC2A99A2E18A24500785B53 /* CrashDebugger.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = CrashDebugger.swift; sourceTree = "<group>"; };
+		BEC2A99C2E18A24500785B53 /* WebViewFactory.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = WebViewFactory.swift; sourceTree = "<group>"; };
 		BEC467952E164215007B45D0 /* AIServiceTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = AIServiceTests.swift; sourceTree = "<group>"; };
 		BEC467962E164215007B45D0 /* Info.plist */ = {isa = PBXFileReference; lastKnownFileType = text.plist.xml; path = Info.plist; sourceTree = "<group>"; };
 		BEC467972E164215007B45D0 /* ServiceConfigurationTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ServiceConfigurationTests.swift; sourceTree = "<group>"; };
@@ -77,8 +90,6 @@
 		BEC467C02E164462007B45D0 /* HyperchatUITests.xctest */ = {isa = PBXFileReference; explicitFileType = wrapper.cfbundle; includeInIndex = 0; path = HyperchatUITests.xctest; sourceTree = BUILT_PRODUCTS_DIR; };
 		BEE13BA92C4F6B2900A8A61E /* WebViewLogger.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = WebViewLogger.swift; sourceTree = "<group>"; };
 		BEE13BB12C4F6B2900A8A61E /* AutoInstaller.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = AutoInstaller.swift; sourceTree = "<group>"; };
-		3EE13BB52C4F6B2900A8A61E /* SettingsManager.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = SettingsManager.swift; sourceTree = "<group>"; };
-		3EE13BB72C4F6B2900A8A61E /* SettingsWindowController.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = SettingsWindowController.swift; sourceTree = "<group>"; };
 /* End PBXFileReference section */
 
 /* Begin PBXFrameworksBuildPhase section */
@@ -110,7 +121,7 @@
 		3EE13B862C4F6B2900A8A61E = {
 			isa = PBXGroup;
 			children = (
-				3EE13B8D2C4F6B2900A8A61E /* . */,
+				3EE13B8D2C4F6B2900A8A61E /* Sources/Hyperchat */,
 				BEC4679A2E164215007B45D0 /* HyperchatTests */,
 				BEC4679D2E164215007B45D0 /* HyperchatUITests */,
 				3EE13B8C2C4F6B2900A8A61E /* Products */,
@@ -127,16 +138,21 @@
 			name = Products;
 			sourceTree = "<group>";
 		};
-		3EE13B8D2C4F6B2900A8A61E /* . */ = {
+		3EE13B8D2C4F6B2900A8A61E /* Sources/Hyperchat */ = {
 			isa = PBXGroup;
 			children = (
+				BEB355C02E18A6F4000164A8 /* BrowserView.swift */,
+				BEB355C12E18A6F4000164A8 /* ButtonState.swift */,
+				BEB355C22E18A6F4000164A8 /* GradientToolbarButton.swift */,
+				BEB355BC2E18A3F7000164A8 /* HyperchatApp.swift */,
+				BEC2A9992E18A24500785B53 /* BrowserViewController.swift */,
+				BEC2A99A2E18A24500785B53 /* CrashDebugger.swift */,
+				BEC2A99C2E18A24500785B53 /* WebViewFactory.swift */,
 				3EE13B8E2C4F6B2900A8A61E /* AppDelegate.swift */,
 				3EE13B8F2C4F6B2900A8A61E /* FloatingButtonManager.swift */,
-				3EE13B902C4F6B2900A8A61E /* HyperchatApp.swift */,
-				3EE13B912C4F6B2900A8A61E /* Hyperchat.entitlements */,
 				3EE13B922C4F6B2900A8A61E /* Info.plist */,
 				3EE13B932C4F6B2900A8A61E /* Assets.xcassets */,
-				3EE13B942C4F6B2900A8A61E /* MainMenu.xib */,
+				3EE13B942C4F6B2900A8A61E /* Sources/Hyperchat/MainMenu.xib */,
 				3EE13BA32C4F6B2900A8A61E /* OverlayController.swift */,
 				3EE13BA42C4F6B2900A8A61E /* PromptWindowController.swift */,
 				3EE13BA52C4F6B2900A8A61E /* ServiceManager.swift */,
@@ -284,7 +300,7 @@
 			isa = PBXResourcesBuildPhase;
 			buildActionMask = 2147483647;
 			files = (
-				3EE13B9F2C4F6B2900A8A61E /* MainMenu.xib in Resources */,
+				3EE13B9F2C4F6B2900A8A61E /* Sources/Hyperchat/MainMenu.xib in Resources */,
 				3EE13B9C2C4F6B2900A8A61E /* Assets.xcassets in Resources */,
 				3EE13BB22C4F6B2900A8A61E /* Orbitron-Bold.ttf in Resources */,
 			);
@@ -313,8 +329,10 @@
 			isa = PBXSourcesBuildPhase;
 			buildActionMask = 2147483647;
 			files = (
-				3EE13B9E2C4F6B2900A8A61E /* HyperchatApp.swift in Sources */,
 				3EE13B9B2C4F6B2900A8A61E /* AppDelegate.swift in Sources */,
+				BEB355C32E18A6F4000164A8 /* ButtonState.swift in Sources */,
+				BEB355C42E18A6F4000164A8 /* GradientToolbarButton.swift in Sources */,
+				BEB355C52E18A6F4000164A8 /* BrowserView.swift in Sources */,
 				3EE13B9D2C4F6B2900A8A61E /* FloatingButtonManager.swift in Sources */,
 				3EE13BA92C4F6B2900A8A61E /* OverlayController.swift in Sources */,
 				3EE13BAA2C4F6B2900A8A61E /* PromptWindowController.swift in Sources */,
@@ -324,6 +342,10 @@
 				3EE13BAE2C4F6B2900A8A61E /* ServiceConfiguration.swift in Sources */,
 				BEE13BAF2C4F6B2900A8A61E /* WebViewLogger.swift in Sources */,
 				BEE13BB02C4F6B2900A8A61E /* AutoInstaller.swift in Sources */,
+				BEC2A99D2E18A24500785B53 /* CrashDebugger.swift in Sources */,
+				BEB355BD2E18A3F7000164A8 /* HyperchatApp.swift in Sources */,
+				BEC2A99F2E18A24500785B53 /* BrowserViewController.swift in Sources */,
+				BEC2A9A02E18A24500785B53 /* WebViewFactory.swift in Sources */,
 				3EE13BB42C4F6B2900A8A61E /* SettingsManager.swift in Sources */,
 				3EE13BB62C4F6B2900A8A61E /* SettingsWindowController.swift in Sources */,
 			);
