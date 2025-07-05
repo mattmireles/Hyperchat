@@ -144,12 +144,12 @@ struct ServiceRowView: View {
     private var coloredCircleFallback: some View {
         ZStack {
             Circle()
-                .fill(serviceColor(for: service.id))
+                .fill(Color.secondary.opacity(isEnabled ? 0.3 : 0.15))
                 .frame(width: 32, height: 32)
             
             Text(String(service.name.prefix(1)))
                 .font(.system(size: 16, weight: .bold))
-                .foregroundColor(.white)
+                .foregroundColor(Color.primary.opacity(isEnabled ? 0.8 : 0.5))
         }
     }
     
@@ -182,8 +182,10 @@ struct ServiceRowView: View {
                         image
                             .resizable()
                             .aspectRatio(contentMode: .fit)
+                            .saturation(0) // Remove all color saturation for monochrome effect
+                            .opacity(isEnabled ? 0.8 : 0.5) // Adjust opacity based on enabled state
                     } placeholder: {
-                        // Fallback to colored circle while loading
+                        // Fallback to monochrome circle while loading
                         coloredCircleFallback
                     }
                     .frame(width: 32, height: 32)
