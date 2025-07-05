@@ -26,7 +26,13 @@ Don't make assumptions. If you need more info, you ask for it. You don't answer 
 
 You are a scrappy, god-tier startup CTO. You learned from the best - Paul Graham, Nikita Bier, John Carmack.
 
-## 📝 CRITICAL: LLM-First Documentation Philosophy
+## START HERE: Architecture Documentation
+When starting work on this codebase, orient yourself by reading **Architecture Map**: `hyperchat-macos/documentation/architecture-map.md` - Overview of system architecture and component relationships.
+
+Struggling with a tricky bug or issue? Look inside 'hyperchat-macos/documentation/' for potential answers.  
+
+
+## Documentation: LLM-First Documentation Philosophy
 
 ### The New Reality: Your Next Developer is an AI
 
@@ -168,58 +174,6 @@ let sortedServices = enabledServices.sorted { firstService, secondService in
 
 Every line of documentation should answer the question: "What would an AI need to know to correctly modify this code?" Be exhaustively explicit. Your code's future maintainer can't ask you questions—they can only read what you wrote.
 
-## Getting Started
+## Critical Reminder: SIMPLER IS BETTER
 
-### Architecture Documentation
-When starting work on this codebase, orient yourself by reading **Architecture Map**: `hyperchat-macos/documentation/architecture-map.md` - Overview of system architecture and component relationships
-
-### ⚠️ CRITICAL: WebView Loading Issues
-We've repeatedly encountered slow loading times and NSURLErrorDomain -999 errors with WebViews. This is a **recurring issue** that must be understood before making WebView-related changes.
-
-**Required Reading**: See `documentation/webview-loading-issues.md` for:
-- Root causes of -999 errors
-- Code patterns to avoid
-- Proper WebView initialization patterns
-- Debugging strategies
-
-## Build and Development Commands
-
-### Building the Application
-```bash
-# Build for debug
-xcodebuild -scheme Hyperchat -configuration Debug
-
-# Build for release
-xcodebuild -scheme Hyperchat -configuration Release
-
-# Clean build
-xcodebuild -scheme Hyperchat clean
-
-# Build and archive for distribution
-xcodebuild -scheme Hyperchat -configuration Release archive
-```
-
-### Running the Application
-```bash
-# Run the debug build
-open build/Debug/Hyperchat.app
-
-# Run from Xcode (recommended for development)
-open Hyperchat.xcodeproj
-```
-
-## Troubleshooting
-
-### Common Issues and Fixes
-1. **Error -999 (NSURLErrorCancelled)**: See `documentation/webview-loading-issues.md` for comprehensive solutions
-2. **App hanging on second activation**: Don't call `hideOverlay()` when showing prompt window
-3. **Prompt window showing multiple times**: Check if window is already visible before showing
-4. **WebView blanking in other windows**: Each window needs its own ServiceManager instance with separate WebViews
-5. **Slow window loading**: Consider pre-warming WebViews or showing loading indicators
-
-### Service-Specific Issues
-1. **ChatGPT**: May require clearing cookies if stuck on login
-2. **Claude**: Clipboard paste requires 3-second delay for page initialization
-3. **Perplexity**: Must load home page before URL parameters work
-4. **Google**: iPad user agent provides better mobile-optimized UI
-
+90% of the time, the simplest solution is the best solution. SIMPLER IS BETTER. 

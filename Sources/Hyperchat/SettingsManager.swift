@@ -47,6 +47,17 @@ class SettingsManager {
         saveServices(orderedServices)
     }
     
+    func updateServiceFavicon(serviceId: String, faviconURL: URL?) {
+        var services = getServices()
+        if let index = services.firstIndex(where: { $0.id == serviceId }) {
+            services[index].faviconURL = faviconURL
+            saveServices(services)
+            
+            // Post favicon-specific notification - don't trigger full UI reload
+            NotificationCenter.default.post(name: .faviconUpdated, object: serviceId)
+        }
+    }
+    
     // MARK: - Floating Button
     
     var isFloatingButtonEnabled: Bool {
@@ -66,6 +77,8 @@ class SettingsManager {
 extension Notification.Name {
     static let floatingButtonToggled = Notification.Name("com.hyperchat.floatingButtonToggled")
     static let servicesUpdated = Notification.Name("com.hyperchat.servicesUpdated")
+    static let reloadOverlayUI = Notification.Name("com.hyperchat.reloadOverlayUI")
+    static let faviconUpdated = Notification.Name("com.hyperchat.faviconUpdated")
 }
 
 // MARK: - AIService Codable Extension
@@ -82,7 +95,7 @@ extension Notification.Name {
 extension AIService: Codable {
     /// Properties to encode/decode
     enum CodingKeys: String, CodingKey {
-        case id, name, iconName, activationMethod, enabled, order
+        case id, name, iconName, activationMethod, enabled, order, faviconURL
     }
     
     init(from decoder: Decoder) throws {
@@ -92,6 +105,7 @@ extension AIService: Codable {
         iconName = try container.decode(String.self, forKey: .iconName)
         enabled = try container.decode(Bool.self, forKey: .enabled)
         order = try container.decode(Int.self, forKey: .order)
+        faviconURL = try container.decodeIfPresent(URL.self, forKey: .faviconURL)
         
         // For activation method, use the actual configurations from ServiceConfigurations
         switch id {
@@ -116,6 +130,7 @@ extension AIService: Codable {
         try container.encode(iconName, forKey: .iconName)
         try container.encode(enabled, forKey: .enabled)
         try container.encode(order, forKey: .order)
+        try container.encodeIfPresent(faviconURL, forKey: .faviconURL)
         // Don't encode activationMethod as it's derived from id
     }
 }

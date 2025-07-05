@@ -1,6 +1,6 @@
 # WebView Loading Issues - Critical Documentation
 
-## ⚠️ CRITICAL: WebView Loading Issues (MUST READ)
+## WebView Loading Issues
 
 This document covers critical WebView loading issues that have repeatedly caused problems in the Hyperchat codebase. These issues primarily manifest as slow loading times and NSURLErrorDomain -999 errors.
 
