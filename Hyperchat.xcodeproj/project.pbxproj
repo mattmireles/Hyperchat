@@ -28,6 +28,7 @@
 		BEC2A99D2E18A24500785B53 /* CrashDebugger.swift in Sources */ = {isa = PBXBuildFile; fileRef = BEC2A99A2E18A24500785B53 /* CrashDebugger.swift */; };
 		BEC2A99F2E18A24500785B53 /* BrowserViewController.swift in Sources */ = {isa = PBXBuildFile; fileRef = BEC2A9992E18A24500785B53 /* BrowserViewController.swift */; };
 		BEC2A9A02E18A24500785B53 /* WebViewFactory.swift in Sources */ = {isa = PBXBuildFile; fileRef = BEC2A99C2E18A24500785B53 /* WebViewFactory.swift */; };
+		BEC2A9A32E18A24500785B53 /* JavaScriptProvider.swift in Sources */ = {isa = PBXBuildFile; fileRef = BEC2A99E2E18A24500785B53 /* JavaScriptProvider.swift */; };
 		BEC467CB2E16481D007B45D0 /* ServiceConfigurationTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = BEC467972E164215007B45D0 /* ServiceConfigurationTests.swift */; };
 		BEC467CC2E16481D007B45D0 /* AIServiceTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = BEC467952E164215007B45D0 /* AIServiceTests.swift */; };
 		BEC467CD2E16481D007B45D0 /* WebViewMocks.swift in Sources */ = {isa = PBXBuildFile; fileRef = BEC467992E164215007B45D0 /* WebViewMocks.swift */; };
@@ -79,6 +80,7 @@
 		BEC2A9992E18A24500785B53 /* BrowserViewController.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = BrowserViewController.swift; sourceTree = "<group>"; };
 		BEC2A99A2E18A24500785B53 /* CrashDebugger.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = CrashDebugger.swift; sourceTree = "<group>"; };
 		BEC2A99C2E18A24500785B53 /* WebViewFactory.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = WebViewFactory.swift; sourceTree = "<group>"; };
+		BEC2A99E2E18A24500785B53 /* JavaScriptProvider.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = JavaScriptProvider.swift; sourceTree = "<group>"; };
 		BEC467952E164215007B45D0 /* AIServiceTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = AIServiceTests.swift; sourceTree = "<group>"; };
 		BEC467962E164215007B45D0 /* Info.plist */ = {isa = PBXFileReference; lastKnownFileType = text.plist.xml; path = Info.plist; sourceTree = "<group>"; };
 		BEC467972E164215007B45D0 /* ServiceConfigurationTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ServiceConfigurationTests.swift; sourceTree = "<group>"; };
@@ -148,6 +150,7 @@
 				BEC2A9992E18A24500785B53 /* BrowserViewController.swift */,
 				BEC2A99A2E18A24500785B53 /* CrashDebugger.swift */,
 				BEC2A99C2E18A24500785B53 /* WebViewFactory.swift */,
+				BEC2A99E2E18A24500785B53 /* JavaScriptProvider.swift */,
 				3EE13B8E2C4F6B2900A8A61E /* AppDelegate.swift */,
 				3EE13B8F2C4F6B2900A8A61E /* FloatingButtonManager.swift */,
 				3EE13B922C4F6B2900A8A61E /* Info.plist */,
@@ -346,6 +349,7 @@
 				BEB355BD2E18A3F7000164A8 /* HyperchatApp.swift in Sources */,
 				BEC2A99F2E18A24500785B53 /* BrowserViewController.swift in Sources */,
 				BEC2A9A02E18A24500785B53 /* WebViewFactory.swift in Sources */,
+				BEC2A9A32E18A24500785B53 /* JavaScriptProvider.swift in Sources */,
 				3EE13BB42C4F6B2900A8A61E /* SettingsManager.swift in Sources */,
 				3EE13BB62C4F6B2900A8A61E /* SettingsWindowController.swift in Sources */,
 			);

@@ -161,256 +161,8 @@ class URLParameterService: WebService {
         
         // Execute JavaScript to find and paste into text field
         DispatchQueue.main.asyncAfter(deadline: .now() + 1.0) {
-            self.webView.evaluateJavaScript("""
-                (function() {
-                    const promptText = `\(prompt.replacingOccurrences(of: "`", with: "\\`"))`;
-                    console.log('PASTE: Starting with prompt:', promptText.substring(0, 50));
-                    
-                    // Enhanced service-specific selectors with latest ChatGPT selectors
-                    const selectors = [
-                        // ChatGPT - latest selectors (2024/2025)
-                        'textarea[data-testid="textbox"]',
-                        'div[contenteditable="true"][data-testid="textbox"]',
-                        'textarea[placeholder*="Message ChatGPT"]',
-                        'textarea[placeholder*="Send a message"]',
-                        'div[contenteditable="true"][data-id="root"]',
-                        '#prompt-textarea',
-                        'textarea[data-id="root"]',
-                        'div[contenteditable="true"][role="textbox"]',
-                        
-                        // Perplexity - comprehensive selectors
-                        'textarea[placeholder*="Ask anything"]',
-                        'textarea[placeholder*="Ask follow-up"]',
-                        'textarea[placeholder*="Ask"]',
-                        'textarea[aria-label*="Ask"]',
-                        'div[contenteditable="true"][aria-label*="Ask"]',
-                        
-                        // Google Search - all variations
-                        'input[name="q"]',
-                        'textarea[name="q"]',
-                        'input[title="Search"]',
-                        'input[aria-label*="Search"]',
-                        'input[role="combobox"]',
-                        'input[type="search"]',
-                        
-                        // General fallbacks with better filtering
-                        'textarea:not([readonly]):not([disabled]):not([style*="display: none"]):not([style*="visibility: hidden"])',
-                        'input[type="text"]:not([readonly]):not([disabled]):not([style*="display: none"]):not([style*="visibility: hidden"])',
-                        'div[contenteditable="true"]:not([style*="display: none"]):not([style*="visibility: hidden"])'
-                    ];
-                    
-                    let input = null;
-                    let inputType = 'unknown';
-                    
-                    // Find the first visible and interactable input
-                    for (const selector of selectors) {
-                        const elements = document.querySelectorAll(selector);
-                        for (const el of elements) {
-                            const rect = el.getBoundingClientRect();
-                            const style = window.getComputedStyle(el);
-                            
-                            if (rect.width > 0 && rect.height > 0 && 
-                                style.display !== 'none' && 
-                                style.visibility !== 'hidden' &&
-                                !el.disabled && !el.readOnly) {
-                                input = el;
-                                inputType = el.tagName.toLowerCase();
-                                break;
-                            }
-                        }
-                        if (input) break;
-                    }
-                    
-                    if (input) {
-                        try {
-                            // For Perplexity, be extra careful to avoid sidebar expansion
-                            const isPerplexity = window.location.hostname.includes('perplexity');
-                            
-                            // For Perplexity, skip focus to avoid sidebar expansion
-                            if (!isPerplexity) {
-                                input.focus();
-                            }
-                            
-                            // Wait for any focus effects to settle
-                            setTimeout(() => {
-                                try {
-                                    // Direct text insertion instead of clipboard paste
-                                    if (inputType === 'div') {
-                                        // For contenteditable divs
-                                        input.textContent = promptText;
-                                        input.innerHTML = promptText; // Fallback
-                                    } else {
-                                        // For input/textarea elements
-                                        input.value = promptText;
-                                    }
-                                    
-                                    console.log('DIRECT SET: Set text to', promptText.substring(0, 50));
-                                    
-                                    // Fire comprehensive events to notify frameworks
-                                    // For Perplexity, skip focus/blur events that might trigger UI changes
-                                    const events = isPerplexity ? [
-                                        new Event('input', { bubbles: true, cancelable: true }),
-                                        new Event('change', { bubbles: true, cancelable: true })
-                                    ] : [
-                                        new Event('input', { bubbles: true, cancelable: true }),
-                                        new Event('change', { bubbles: true, cancelable: true }),
-                                        new Event('keyup', { bubbles: true, cancelable: true }),
-                                        new Event('blur', { bubbles: true, cancelable: true }),
-                                        new Event('focus', { bubbles: true, cancelable: true })
-                                    ];
-                                    
-                                    events.forEach(event => {
-                                        try {
-                                            input.dispatchEvent(event);
-                                        } catch (e) {
-                                            console.log('Event error:', e);
-                                        }
-                                    });
-                                    
-                                    // React-specific events
-                                    if (input._valueTracker) {
-                                        input._valueTracker.setValue('');
-                                    }
-                                    
-                                    const reactInputEvent = new Event('input', { bubbles: true });
-                                    reactInputEvent.simulated = true;
-                                    input.dispatchEvent(reactInputEvent);
-                                    
-                                    // Auto-submit after a short delay - PRIMARY METHOD: Click submit button
-                                    setTimeout(() => {
-                                        try {
-                                            // Service-specific submit button selectors
-                                            const submitSelectors = {
-                                                chatgpt: [
-                                                    'button[data-testid="send-button"]',
-                                                    'button[data-testid="fruitjuice-send-button"]', 
-                                                    'button#composer-submit-button',
-                                                    'button[aria-label="Send message"]',
-                                                    'button[aria-label="Send prompt"]'
-                                                ],
-                                                perplexity: [
-                                                    'button[aria-label="Submit"]',
-                                                    'button[aria-label="Submit Search"]',
-                                                    'button[type="submit"]',
-                                                    'button.bg-super',
-                                                    'button:has(svg[data-icon="arrow-right"])'
-                                                ],
-                                                google: [
-                                                    'button[aria-label="Search"]',
-                                                    'button[type="submit"]',
-                                                    'input[type="submit"]'
-                                                ],
-                                                default: [
-                                                    'button[type="submit"]',
-                                                    'button[aria-label*="Send"]',
-                                                    'button[aria-label*="Submit"]',
-                                                    'button:has(svg)',
-                                                    'input[type="submit"]'
-                                                ]
-                                            };
-                                            
-                                            // Determine which selectors to use based on the current site
-                                            const hostname = window.location.hostname;
-                                            let selectors = submitSelectors.default;
-                                            
-                                            if (hostname.includes('chatgpt.com') || hostname.includes('chat.openai.com')) {
-                                                selectors = submitSelectors.chatgpt;
-                                            } else if (hostname.includes('perplexity.ai')) {
-                                                selectors = submitSelectors.perplexity;
-                                            } else if (hostname.includes('google.com')) {
-                                                selectors = submitSelectors.google;
-                                            }
-                                            
-                                            // Try to find and click the submit button
-                                            let buttonClicked = false;
-                                            for (const selector of selectors) {
-                                                const submitBtn = document.querySelector(selector);
-                                                if (submitBtn && !submitBtn.disabled) {
-                                                    // For some sites, we might need to ensure the button is visible
-                                                    const rect = submitBtn.getBoundingClientRect();
-                                                    if (rect.width > 0 && rect.height > 0) {
-                                                        submitBtn.click();
-                                                        console.log('AUTO-SUBMIT: Clicked submit button with selector:', selector);
-                                                        buttonClicked = true;
-                                                        break;
-                                                    }
-                                                }
-                                            }
-                                            
-                                            // FALLBACK: If button click didn't work, try Enter key as backup
-                                            if (!buttonClicked) {
-                                                console.log('AUTO-SUBMIT: No submit button found, trying Enter key fallback');
-                                                
-                                                const keydownEvent = new KeyboardEvent('keydown', {
-                                                    key: 'Enter',
-                                                    code: 'Enter',
-                                                    keyCode: 13,
-                                                    which: 13,
-                                                    bubbles: true,
-                                                    cancelable: true,
-                                                    composed: true
-                                                });
-                                                
-                                                const keyupEvent = new KeyboardEvent('keyup', {
-                                                    key: 'Enter',
-                                                    code: 'Enter',
-                                                    keyCode: 13,
-                                                    which: 13,
-                                                    bubbles: true,
-                                                    cancelable: true,
-                                                    composed: true
-                                                });
-                                                
-                                                input.dispatchEvent(keydownEvent);
-                                                setTimeout(() => {
-                                                    input.dispatchEvent(keyupEvent);
-                                                }, 10);
-                                            }
-                                            
-                                        } catch (e) {
-                                            console.log('AUTO-SUBMIT ERROR:', e);
-                                        }
-                                    }, 300);
-                                    
-                                } catch (e) {
-                                    console.log('DIRECT SET ERROR:', e);
-                                }
-                            }, 200);
-                            
-                            console.log('SUCCESS: Found input', inputType, input.placeholder || input.getAttribute('aria-label') || 'no-label');
-                            return 'SUCCESS: Found ' + inputType;
-                        } catch (e) {
-                            console.log('ERROR setting up paste:', e);
-                            return 'ERROR: ' + e.message;
-                        }
-                    } else {
-                        console.log('ERROR: No suitable input found');
-                        // Enhanced debugging
-                        const allInputs = document.querySelectorAll('input, textarea, div[contenteditable]');
-                        console.log('DEBUG: Found', allInputs.length, 'total input elements');
-                        
-                        // Log details about each input element for debugging
-                        allInputs.forEach((el, i) => {
-                            const rect = el.getBoundingClientRect();
-                            const style = window.getComputedStyle(el);
-                            console.log('INPUT', i, ':', {
-                                tagName: el.tagName,
-                                type: el.type || 'N/A',
-                                placeholder: el.placeholder || 'N/A',
-                                'aria-label': el.getAttribute('aria-label') || 'N/A',
-                                'data-id': el.getAttribute('data-id') || 'N/A',
-                                visible: rect.width > 0 && rect.height > 0,
-                                display: style.display,
-                                visibility: style.visibility,
-                                disabled: el.disabled,
-                                readonly: el.readOnly
-                            });
-                        });
-                        
-                        return 'ERROR: No input found (' + allInputs.length + ' total inputs)';
-                    }
-                })();
-            """) { result, error in
+            let script = JavaScriptProvider.pasteAndSubmitScript(prompt: prompt, for: self.service)
+            self.webView.evaluateJavaScript(script) { result, error in
                 if let error = error {
                     print("PASTE ERROR \(self.service.name): \(error)")
                 } else {
@@ -545,101 +297,8 @@ class ClaudeService: WebService {
         }
         
         DispatchQueue.main.asyncAfter(deadline: .now() + 3.0) {
-            self.webView.evaluateJavaScript("""
-                // Try multiple common selectors for chat input fields
-                const selectors = [
-                    'textarea[placeholder*="message"]',
-                    'textarea[placeholder*="Message"]', 
-                    'textarea[data-id="root"]',
-                    'textarea#prompt-textarea',
-                    'div[contenteditable="true"]',
-                    'textarea',
-                    'input[type="text"]'
-                ];
-                
-                let input = null;
-                for (const selector of selectors) {
-                    input = document.querySelector(selector);
-                    if (input) {
-                        console.log('Found input with selector:', selector);
-                        break;
-                    }
-                }
-                
-                if (input) {
-                    input.focus();
-                    
-                    // Small delay to ensure focus
-                    setTimeout(() => {
-                        document.execCommand('paste');
-                        
-                        // Another delay before submitting - PRIMARY METHOD: Click submit button
-                        setTimeout(() => {
-                            try {
-                                // Claude-specific submit button selectors
-                                const submitSelectors = [
-                                    'button[aria-label="Send Message"]',
-                                    'button[aria-label="Send"]',
-                                    'button[data-testid="send-button"]',
-                                    'button[type="submit"]',
-                                    'button:has(svg[viewBox="0 0 32 32"])', // Claude's send icon
-                                    'button.text-text-200:has(svg)',
-                                    'div[role="button"][aria-label="Send Message"]'
-                                ];
-                                
-                                let buttonClicked = false;
-                                for (const selector of submitSelectors) {
-                                    const submitBtn = document.querySelector(selector);
-                                    if (submitBtn && !submitBtn.disabled) {
-                                        // Ensure button is visible
-                                        const rect = submitBtn.getBoundingClientRect();
-                                        if (rect.width > 0 && rect.height > 0) {
-                                            submitBtn.click();
-                                            console.log('CLAUDE AUTO-SUBMIT: Clicked submit button with selector:', selector);
-                                            buttonClicked = true;
-                                            break;
-                                        }
-                                    }
-                                }
-                                
-                                // FALLBACK: If button click didn't work, try Enter key
-                                if (!buttonClicked) {
-                                    console.log('CLAUDE AUTO-SUBMIT: No submit button found, trying Enter key fallback');
-                                    
-                                    const keydownEvent = new KeyboardEvent('keydown', {
-                                        key: 'Enter',
-                                        code: 'Enter',
-                                        keyCode: 13,
-                                        which: 13,
-                                        bubbles: true,
-                                        cancelable: true,
-                                        composed: true
-                                    });
-                                    
-                                    const keyupEvent = new KeyboardEvent('keyup', {
-                                        key: 'Enter',
-                                        code: 'Enter',
-                                        keyCode: 13,
-                                        which: 13,
-                                        bubbles: true,
-                                        cancelable: true,
-                                        composed: true
-                                    });
-                                    
-                                    input.dispatchEvent(keydownEvent);
-                                    setTimeout(() => {
-                                        input.dispatchEvent(keyupEvent);
-                                    }, 10);
-                                }
-                            } catch (e) {
-                                console.log('CLAUDE AUTO-SUBMIT ERROR:', e);
-                            }
-                        }, 200);
-                    }, 100);
-                } else {
-                    console.log('No suitable input field found');
-                }
-            """)
+            let script = JavaScriptProvider.claudePasteScript(prompt: prompt)
+            self.webView.evaluateJavaScript(script)
         }
     }
 }
@@ -651,11 +310,13 @@ class ServiceManager: NSObject, ObservableObject {
     @Published var sharedPrompt: String = ""
     @Published var replyToAll: Bool = true
     @Published var loadingStates: [String: Bool] = [:]  // Track loading state per service (for UI only)
+    @Published var areAllServicesLoaded: Bool = false  // Replaces allServicesDidLoad notification
+    let focusInputPublisher = PassthroughSubject<Void, Never>()  // Replaces focusUnifiedInput notification
     var webServices: [String: WebService] = [:]
     private let processPool = WKProcessPool.shared  // Critical optimization
     
     // Track BrowserViewControllers for delegate handoff
-    var browserViewControllers: [String: BrowserViewController] = [:]
+    var browserViewControllers: [String: BrowserViewController] = []
     
     
     // Thread-safe shared prompt execution state across all ServiceManager instances
@@ -904,7 +565,7 @@ class ServiceManager: NSObject, ObservableObject {
         
         // Refocus the prompt input field after a delay to ensure paste operations complete
         DispatchQueue.main.asyncAfter(deadline: .now() + 1.5) {
-            NotificationCenter.default.post(name: .focusUnifiedInput, object: nil)
+            focusInputPublisher.send()
         }
     }
     
@@ -1040,19 +701,8 @@ class ServiceManager: NSObject, ObservableObject {
             let webView = webService.webView
             
             // Pause execution by injecting JavaScript
-            webView.evaluateJavaScript("""
-                // Pause all timers and animations
-                if (typeof window._hibernateState === 'undefined') {
-                    window._hibernateState = {
-                        setInterval: window.setInterval,
-                        setTimeout: window.setTimeout,
-                        requestAnimationFrame: window.requestAnimationFrame
-                    };
-                    window.setInterval = function() { return 0; };
-                    window.setTimeout = function() { return 0; };
-                    window.requestAnimationFrame = function() { return 0; };
-                }
-            """)
+            let pauseScript = JavaScriptProvider.hibernationPauseScript()
+            webView.evaluateJavaScript(pauseScript)
             
             // Stop any ongoing loads
             if webView.isLoading {
@@ -1069,15 +719,8 @@ class ServiceManager: NSObject, ObservableObject {
             let webView = webService.webView
             
             // Resume execution by restoring JavaScript functions
-            webView.evaluateJavaScript("""
-                // Restore all timers and animations
-                if (typeof window._hibernateState !== 'undefined') {
-                    window.setInterval = window._hibernateState.setInterval;
-                    window.setTimeout = window._hibernateState.setTimeout;
-                    window.requestAnimationFrame = window._hibernateState.requestAnimationFrame;
-                    delete window._hibernateState;
-                }
-            """)
+            let resumeScript = JavaScriptProvider.hibernationResumeScript()
+            webView.evaluateJavaScript(resumeScript)
             
             // Show the WebView
             webView.isHidden = false
@@ -1170,7 +813,7 @@ extension ServiceManager: WKNavigationDelegate {
                     if loadedServicesCount >= activeServices.count && serviceLoadingQueue.isEmpty && currentlyLoadingService == nil {
                         hasNotifiedAllServicesLoaded = true
                         print("🎉 All services have finished (some may have failed)!")
-                        NotificationCenter.default.post(name: .allServicesDidLoad, object: self)
+                        areAllServicesLoaded = true
                     }
                 }
                 break
@@ -1246,7 +889,7 @@ extension ServiceManager: WKNavigationDelegate {
                     if loadedServicesCount >= activeServices.count && serviceLoadingQueue.isEmpty && currentlyLoadingService == nil {
                         hasNotifiedAllServicesLoaded = true
                         print("🎉 All services have finished (some may have failed)!")
-                        NotificationCenter.default.post(name: .allServicesDidLoad, object: self)
+                        areAllServicesLoaded = true
                     }
                 }
                 break
@@ -1313,7 +956,7 @@ extension ServiceManager: WKNavigationDelegate {
                     if loadedServicesCount >= activeServices.count && serviceLoadingQueue.isEmpty && currentlyLoadingService == nil {
                         hasNotifiedAllServicesLoaded = true
                         print("🎉 All services have finished loading!")
-                        NotificationCenter.default.post(name: .allServicesDidLoad, object: self)
+                        areAllServicesLoaded = true
                     }
                 }
                 break
@@ -1333,7 +976,7 @@ extension ServiceManager: WKNavigationDelegate {
                 // Wait 2 seconds to ensure Perplexity's JavaScript has executed
                 DispatchQueue.main.asyncAfter(deadline: .now() + 2.0) {
                     print("🎯 Returning focus to main prompt bar after Perplexity load")
-                    NotificationCenter.default.post(name: .focusUnifiedInput, object: nil)
+                    focusInputPublisher.send()
                 }
             }
             
