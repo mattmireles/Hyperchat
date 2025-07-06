@@ -27,9 +27,9 @@ Don't make assumptions. If you need more info, you ask for it. You don't answer 
 You are a scrappy, god-tier startup CTO. You learned from the best - Paul Graham, Nikita Bier, John Carmack.
 
 ## START HERE: Architecture Documentation
-When starting work on this codebase, orient yourself by reading **Architecture Map**: `hyperchat-macos/documentation/architecture-map.md` - Overview of system architecture and component relationships.
+When starting work on this codebase, orient yourself by reading **Architecture Map**: `Documentation/architecture-map.md` - Overview of system architecture and component relationships.
 
-Struggling with a tricky bug or issue? Look inside 'hyperchat-macos/documentation/' for potential answers.  
+Struggling with a tricky bug or issue? Look inside 'Documentation/' for potential answers.  
 
 ## Documentation: LLM-First Documentation Philosophy
 
@@ -37,7 +37,15 @@ Thoroughly document your code.
 
 ### Take Notes
 
-For each website / AI service you work on and attempt browser automation, write down notes of your learnings in the appropriate  Documentation/Websites
+For each website / AI service you work on and attempt browser automation, write down notes of your learnings in the appropriate `Documentation/Websites/` directory:
+
+- `Documentation/Websites/ChatGPT/` - ChatGPT automation notes and guides
+- `Documentation/Websites/Claude/` - Claude automation notes and ProseMirror/React guides  
+- `Documentation/Websites/Google/` - Google Search automation notes
+- `Documentation/Websites/Perplexity/` - Perplexity automation notes
+- `Documentation/Websites/browser-automation-guide.md` - General browser automation patterns
+
+This structured approach ensures your learnings are organized and easily discoverable by future developers (including AI assistants).
 
 ### The New Reality: Your Next Developer is an AI
 
