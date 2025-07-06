@@ -1064,6 +1064,10 @@ class ServiceManager: NSObject, ObservableObject {
     /// - `PromptWindowController.submitPrompt()` via notification
     /// - `AppDelegate.handlePromptSubmission()` via notification
     ///
+    /// Execution strategy to prevent clipboard race conditions:
+    /// - URL parameter services (ChatGPT, Perplexity, Google): Execute in parallel
+    /// - Clipboard services (Claude): Execute sequentially with completion handlers
+    ///
     /// Execution modes:
     /// - New Chat (replyToAll=false): Navigate to service URL with query parameter
     /// - Reply to All (replyToAll=true): Paste prompt into existing chat sessions
@@ -1080,12 +1084,31 @@ class ServiceManager: NSObject, ObservableObject {
             WebViewLogger.shared.log("🔄 executePrompt called - replyToAll: \(replyToAll), services: \(activeServices.map { $0.id }.joined(separator: ", "))", for: "system", type: .info)
         }
         
-        // Execute prompt on all services
-        for service in activeServices {
+        // Categorize services by execution method to prevent clipboard conflicts
+        let urlParameterServices = activeServices.filter { service in
+            switch service.activationMethod {
+            case .urlParameter:
+                return true
+            case .clipboardPaste:
+                return false
+            }
+        }
+        
+        let clipboardServices = activeServices.filter { service in
+            switch service.activationMethod {
+            case .urlParameter:
+                return false
+            case .clipboardPaste:
+                return true
+            }
+        }
+        
+        // Execute URL parameter services in parallel (no clipboard conflicts)
+        for service in urlParameterServices {
             if let webService = webServices[service.id] {
-                print("🎯 Executing prompt on service: \(service.name) (id: \(service.id))")
+                print("🎯 Executing prompt on URL service: \(service.name) (id: \(service.id))")
                 if replyToAll {
-                    // Reply to All mode: immediate execution with clipboard paste
+                    // Reply to All mode: immediate execution
                     webService.executePrompt(prompt, replyToAll: true)
                 } else {
                     // New Chat mode: use URL navigation with minimal delay
@@ -1094,13 +1117,63 @@ class ServiceManager: NSObject, ObservableObject {
                     }
                 }
             } else {
-                print("⚠️ No webService found for: \(service.name) (id: \(service.id))")
+                print("⚠️ No webService found for URL service: \(service.name) (id: \(service.id))")
             }
         }
+        
+        // Execute clipboard services sequentially to prevent race conditions
+        executeClipboardServicesSequentially(clipboardServices, prompt: prompt, replyToAll: replyToAll, currentIndex: 0)
         
         // Refocus the prompt input field after a delay to ensure paste operations complete
         DispatchQueue.main.asyncAfter(deadline: .now() + ServiceTimings.promptRefocusDelay) { [weak self] in
             self?.focusInputPublisher.send()
+        }
+    }
+    
+    /// Executes clipboard services one by one to prevent clipboard race conditions.
+    ///
+    /// This method ensures that each clipboard-based service (like Claude) completes
+    /// its clipboard operation before the next service begins. This prevents the
+    /// clipboard from being overwritten by multiple services executing in parallel.
+    ///
+    /// - Parameters:
+    ///   - services: Array of clipboard-based services to execute
+    ///   - prompt: The user's text to send to AI services
+    ///   - replyToAll: If true, pastes into existing chats; if false, creates new chats
+    ///   - currentIndex: Current index in the services array (for recursion)
+    private func executeClipboardServicesSequentially(_ services: [AIService], prompt: String, replyToAll: Bool, currentIndex: Int) {
+        // Base case: all services have been executed
+        guard currentIndex < services.count else {
+            return
+        }
+        
+        let service = services[currentIndex]
+        
+        if let webService = webServices[service.id] {
+            print("🎯 Executing prompt on clipboard service: \(service.name) (id: \(service.id))")
+            
+            // Execute current service
+            if replyToAll {
+                // Reply to All mode: immediate execution with clipboard paste
+                webService.executePrompt(prompt, replyToAll: true)
+            } else {
+                // New Chat mode: use URL navigation with minimal delay
+                DispatchQueue.main.asyncAfter(deadline: .now() + ServiceTimings.webKitSafetyDelay) {
+                    webService.executePrompt(prompt, replyToAll: false)
+                }
+            }
+            
+            // Wait for clipboard operation to complete before next service
+            // Use claudePasteDelay as it's the longest clipboard operation delay
+            DispatchQueue.main.asyncAfter(deadline: .now() + ServiceTimings.claudePasteDelay + 0.5) {
+                // Execute next service recursively
+                self.executeClipboardServicesSequentially(services, prompt: prompt, replyToAll: replyToAll, currentIndex: currentIndex + 1)
+            }
+            
+        } else {
+            print("⚠️ No webService found for clipboard service: \(service.name) (id: \(service.id))")
+            // Skip to next service if current one is not found
+            executeClipboardServicesSequentially(services, prompt: prompt, replyToAll: replyToAll, currentIndex: currentIndex + 1)
         }
     }
     
