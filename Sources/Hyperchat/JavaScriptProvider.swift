@@ -420,12 +420,14 @@ struct JavaScriptProvider {
             };
             
             try {
-                // Input field selectors for Claude
+                // Input field selectors for Claude - Updated for current Claude.ai HTML structure
                 const selectors = [
-                    'div[contenteditable="true"].ProseMirror',
-                    'div.ProseMirror[contenteditable="true"]',
-                    'div[contenteditable="true"][data-placeholder]',
-                    'div[contenteditable="true"]'
+                    'div[aria-label="Write your prompt to Claude"].ProseMirror',  // Most specific - current Claude structure
+                    'div.ProseMirror[contenteditable="true"][role="textbox"]',    // Structural match with role
+                    'div[contenteditable="true"].ProseMirror.break-words',        // Class combination match
+                    'div[contenteditable="true"][aria-label*="Claude"]',          // Aria label fallback
+                    'div[contenteditable="true"][role="textbox"]',                // Role-based fallback
+                    'div[contenteditable="true"]'                                 // Last resort
                 ];
                 
                 let input = null;
@@ -443,27 +445,124 @@ struct JavaScriptProvider {
                 if (!input) {
                     report.errorMessage = 'No input field found';
                     console.error('[Claude] No input field found');
-                    return JSON.stringify(report);
+                    return false;
                 }
                 
                 console.log('[Claude] Found input field:', input);
+                
+                // Focus the editor first
                 input.focus();
                 
-                // Clear existing content and set new prompt
-                input.innerHTML = '';
-                const textNode = document.createTextNode(`\(escapedPrompt)`);
-                input.appendChild(textNode);
-                
-                // Set cursor to end
-                const range = document.createRange();
+                // Clear existing content using selection
                 const selection = window.getSelection();
+                const range = document.createRange();
                 range.selectNodeContents(input);
-                range.collapse(false);
                 selection.removeAllRanges();
                 selection.addRange(range);
-
-                // Fire input event to let React know something changed
-                input.dispatchEvent(new Event('input', { bubbles: true, cancelable: true }));
+                
+                // ProseMirror/Tiptap-compatible text insertion
+                try {
+                    console.log('[Claude] Attempting ProseMirror-compatible text insertion...');
+                    
+                    // Method 1: Try to access Tiptap/ProseMirror instance
+                    let tiptapSuccess = false;
+                    try {
+                        // Look for Tiptap editor instance on the element or its parent
+                        let editorElement = input;
+                        let tiptapEditor = null;
+                        
+                        // Search up the DOM tree for the editor instance
+                        while (editorElement && !tiptapEditor) {
+                            if (editorElement.__tiptapEditor) {
+                                tiptapEditor = editorElement.__tiptapEditor;
+                                break;
+                            }
+                            if (editorElement._editor) {
+                                tiptapEditor = editorElement._editor;
+                                break;
+                            }
+                            editorElement = editorElement.parentElement;
+                        }
+                        
+                        // If we found a Tiptap editor, use its API
+                        if (tiptapEditor && tiptapEditor.commands) {
+                            tiptapEditor.commands.clearContent();
+                            tiptapEditor.commands.insertContent(`\(escapedPrompt)`);
+                            tiptapSuccess = true;
+                            console.log('[Claude] Text inserted via Tiptap API');
+                        }
+                    } catch (tiptapError) {
+                        console.log('[Claude] Tiptap API not accessible:', tiptapError);
+                    }
+                    
+                    // Method 2: Simulate realistic typing for ProseMirror if Tiptap API not available
+                    if (!tiptapSuccess) {
+                        console.log('[Claude] Using simulated typing approach...');
+                        
+                        // Clear existing content first
+                        input.focus();
+                        
+                        // Select all existing content
+                        const selectAllEvent = new KeyboardEvent('keydown', {
+                            key: 'a',
+                            code: 'KeyA',
+                            keyCode: 65,
+                            ctrlKey: true,
+                            metaKey: true, // For macOS
+                            bubbles: true,
+                            cancelable: true
+                        });
+                        input.dispatchEvent(selectAllEvent);
+                        
+                        // Use composition events to simulate natural typing
+                        input.dispatchEvent(new CompositionEvent('compositionstart', { 
+                            bubbles: true, 
+                            cancelable: true 
+                        }));
+                        
+                        // Insert all text at once using composition events
+                        const text = `\(escapedPrompt)`;
+                        
+                        // Dispatch composition update with full text
+                        input.dispatchEvent(new CompositionEvent('compositionupdate', { 
+                            data: text, 
+                            bubbles: true, 
+                            cancelable: true 
+                        }));
+                        
+                        // Insert text using execCommand (more compatible with editors)
+                        document.execCommand('insertText', false, text);
+                        
+                        // End composition
+                        input.dispatchEvent(new CompositionEvent('compositionend', { 
+                            data: text, 
+                            bubbles: true, 
+                            cancelable: true 
+                        }));
+                        
+                        console.log('[Claude] Text inserted via simulated typing');
+                    }
+                    
+                    // Fire additional events that React/ProseMirror expects
+                    input.dispatchEvent(new Event('input', { bubbles: true, cancelable: true }));
+                    input.dispatchEvent(new Event('change', { bubbles: true, cancelable: true }));
+                    
+                    // Trigger React state updates
+                    const reactEvent = new Event('input', { bubbles: true });
+                    reactEvent.simulated = true;
+                    input.dispatchEvent(reactEvent);
+                    
+                    // Blur and refocus to trigger validation
+                    input.blur();
+                    // Use synchronous delay instead of await
+                    setTimeout(() => {
+                        input.focus();
+                    }, 50);
+                    
+                } catch (insertError) {
+                    console.log('[Claude] Text insertion failed:', insertError);
+                    report.errorMessage = `Text insertion failed: ${insertError.toString()}`;
+                }
                 
                 // Verify text was inserted
                 const insertedText = input.textContent || input.innerText;
@@ -474,21 +573,39 @@ struct JavaScriptProvider {
                     console.log('[Claude] Text may not have been inserted correctly');
                 }
 
-                console.log('[Claude] Attempting Enter key simulation...');
+                // Allow time for React/ProseMirror state to update
+                setTimeout(() => {
+                    console.log('[Claude] Starting submission attempt after state update delay...');
                 
-                // Define submit button selectors first
+                // Updated submit button selectors for modern Claude UI
                 const submitSelectors = [
+                    // Modern Radix UI button patterns (based on analysis)
+                    'button[data-state]:has(svg)',  // Radix buttons have data-state attributes
+                    'button[aria-label]:has(svg):not([aria-label*="menu"]):not([aria-label*="sidebar"])',  // Avoid menu buttons
+                    
+                    // Traditional Claude patterns  
+                    'button[aria-label*="Send message"]',
                     'button[aria-label*="Send"]',
-                    'button[aria-label*="Submit"]',
                     'button[data-testid="send-button"]',
-                    'button:has(svg[data-icon="arrow-up"])',
-                    'button svg',
-                    'button:has(svg)',
-                    'div[role="button"][aria-label*="Send"]',
-                    'div[role="button"]:has(svg)'
+                    
+                    // Icon-based targeting (more reliable than text)
+                    'button:has(svg[viewBox*="24"]):has(path[d*="M"])',  // SVG with path (send icon)
+                    'button:has(svg):not([disabled])',  // Any enabled button with SVG
+                    
+                    // Form and structural selectors
+                    'button[type="submit"]',
+                    'form button:last-child:not([disabled])',
+                    
+                    // Radix role-based fallbacks
+                    '[role="button"][data-state]:has(svg)',
+                    '[role="button"]:not([aria-label*="menu"]):not([aria-label*="sidebar"]):has(svg)',
+                    
+                    // Generic fallbacks (last resort)
+                    'button:not([disabled]):has(svg)',
+                    'button:not([disabled])[aria-label*="Send"]'
                 ];
                 
-                // Simulate Enter key - removed unsupported sourceCapabilities
+                // Simulate Enter key
                 const enterEvent = new KeyboardEvent('keydown', {
                     key: 'Enter',
                     code: 'Enter',
@@ -505,28 +622,66 @@ struct JavaScriptProvider {
                 report.enterDispatched = dispatched;
                 console.log('[Claude] Enter key event dispatched:', dispatched);
                 
-                // Look for submit button
+                // Look for submit button with proper element handling
                 let submitButton = null;
                 for (const selector of submitSelectors) {
-                    const button = document.querySelector(selector);
-                    if (button) {
-                        const rect = button.getBoundingClientRect();
-                        if (rect.width > 0 && rect.height > 0 && !button.disabled) {
-                            report.submitButtonFound = true;
-                            report.submitButtonSelector = selector;
-                            submitButton = button;
-                            console.log('[Claude] Found submit button with selector:', selector);
-                            break;
+                    let element = document.querySelector(selector);
+                    if (element) {
+                        // If we found an SVG, get its parent button
+                        if (element.tagName === 'SVG' || element.tagName === 'svg') {
+                            element = element.closest('button') || element.parentElement;
+                        }
+                        
+                        // Ensure we have a clickable button element
+                        if (element && (element.tagName === 'BUTTON' || element.getAttribute('role') === 'button')) {
+                            const rect = element.getBoundingClientRect();
+                            const inputRect = input.getBoundingClientRect();
+                            
+                            // Check if button is visible, enabled, and positioned near the input field
+                            // This helps avoid sidebar buttons that might be far from the input
+                            const isNearInput = Math.abs(rect.bottom - inputRect.bottom) < 100; // Within 100px vertically
+                            const isRightOfInput = rect.left >= inputRect.right - 50; // At or to the right of input
+                            
+                            if (rect.width > 0 && rect.height > 0 && !element.disabled && (isNearInput || isRightOfInput)) {
+                                report.submitButtonFound = true;
+                                report.submitButtonSelector = selector;
+                                submitButton = element;
+                                console.log('[Claude] Found submit button with selector:', selector, 'element:', element.tagName, 'near input:', isNearInput, 'right of input:', isRightOfInput);
+                                break;
+                            } else {
+                                console.log('[Claude] Skipping button - not positioned correctly relative to input:', selector);
+                            }
                         }
                     }
                 }
                 
-                // If Enter didn't work, try clicking submit button
-                if (!dispatched && submitButton) {
-                    console.log('[Claude] Enter key failed, clicking submit button as fallback...');
-                    submitButton.click();
-                    report.submitButtonClicked = true;
+                // Try clicking submit button
+                if (submitButton) {
+                    console.log('[Claude] Attempting to click submit button...');
+                    try {
+                        // Try multiple click methods for reliability
+                        submitButton.focus();
+                        submitButton.click();
+                        
+                        // Fallback: dispatch click event manually
+                        const clickEvent = new MouseEvent('click', {
+                            bubbles: true,
+                            cancelable: true,
+                            view: window
+                        });
+                        submitButton.dispatchEvent(clickEvent);
+                        
+                        report.submitButtonClicked = true;
+                        console.log('[Claude] Submit button clicked successfully');
+                    } catch (clickError) {
+                        console.error('[Claude] Submit button click failed:', clickError);
+                        report.errorMessage = `Submit click failed: ${clickError.toString()}`;
+                    }
+                } else {
+                    console.log('[Claude] No submit button found, relying on Enter key');
                 }
+                
+                }, 200); // End setTimeout - wait 200ms for React state to update
                 
             } catch (error) {
                 report.errorMessage = error.toString();
@@ -534,6 +689,7 @@ struct JavaScriptProvider {
             }
             
             console.log('[Claude] Diagnostic report:', report);
+            // Return diagnostic report as JSON string for Swift parser
             return JSON.stringify(report);
         })();
         """
