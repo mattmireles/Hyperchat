@@ -1,0 +1,1 @@
+// This contains notes for all attempts, learnings, and Google-specific challenges when trying to automate interactions with Google.com in the browser. 
