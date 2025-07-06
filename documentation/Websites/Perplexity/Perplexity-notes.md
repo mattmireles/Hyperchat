@@ -1,0 +1,1 @@
+// This contains notes for all attempts, learnings, and Perplexity-specific challenges when trying to automate interactions with Perplexity.ai in the browser. 

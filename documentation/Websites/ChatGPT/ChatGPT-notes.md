@@ -1,0 +1,1 @@
+// This contains notes for all attempts, learnings, and ChatGPT-specific challenges when trying to automate interactions with ChatGPT.com in the browser. 

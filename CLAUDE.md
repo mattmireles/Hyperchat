@@ -31,8 +31,13 @@ When starting work on this codebase, orient yourself by reading **Architecture M
 
 Struggling with a tricky bug or issue? Look inside 'hyperchat-macos/documentation/' for potential answers.  
 
-
 ## Documentation: LLM-First Documentation Philosophy
+
+Thoroughly document your code. 
+
+### Take Notes
+
+For each website / AI service you work on and attempt browser automation, write down notes of your learnings in the appropriate  Documentation/Websites
 
 ### The New Reality: Your Next Developer is an AI
 
