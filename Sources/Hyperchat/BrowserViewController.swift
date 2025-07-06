@@ -54,12 +54,17 @@ private enum BrowserTimings {
 /// - ServiceManager needs delegate during initial load for state tracking
 /// - After load completes, this controller takes over for navigation tracking
 /// - This prevents race conditions during startup
-class BrowserViewController: NSViewController {
+class BrowserViewController: NSViewController, ObservableObject {
     /// The WKWebView instance for this service (created by WebViewFactory)
     private let webView: WKWebView
     
     /// The AI service configuration (ChatGPT, Claude, etc.)
     private let service: AIService
+    
+    /// Public accessor for the service name (for debugging and logging)
+    public var serviceName: String {
+        return service.name
+    }
     
     /// SwiftUI view that provides the browser UI layout
     private let browserView: BrowserView
@@ -81,6 +86,20 @@ class BrowserViewController: NSViewController {
     /// Controls whether WebView can capture focus
     /// Prevents unwanted text selection during initial page load
     private var allowFocusCapture = false
+    
+    /// Published property indicating whether this webview's content has focus.
+    ///
+    /// This tracks JavaScript focus state within the webview (e.g., cursor in text inputs).
+    /// Used by UI components to show/hide focus indicator borders.
+    ///
+    /// Updated by:
+    /// - JavaScript focus/blur event listeners in the webview
+    /// - `evaluateWebViewFocusState()` periodic checks
+    /// - `becomeFirstResponder()` when webview gains native focus
+    @Published public private(set) var hasWebViewFocus: Bool = false
+    
+    /// Timer for periodic focus state checking
+    private var focusCheckTimer: Timer?
     
     /// Unique identifier for debugging lifecycle (first 8 chars of UUID)
     private let instanceId = UUID().uuidString.prefix(8)
@@ -105,6 +124,11 @@ class BrowserViewController: NSViewController {
         DispatchQueue.main.asyncAfter(deadline: .now() + BrowserTimings.focusCaptureDelay) {
             self.allowFocusCapture = true
         }
+        
+        // Set up focus detection after initial load delay
+        DispatchQueue.main.asyncAfter(deadline: .now() + BrowserTimings.focusCaptureDelay + 1.0) {
+            self.setupFocusDetection()
+        }
     }
     
     required init?(coder: NSCoder) {
@@ -112,6 +136,8 @@ class BrowserViewController: NSViewController {
     }
     
     deinit {
+        focusCheckTimer?.invalidate()
+        focusCheckTimer = nil
         print("🔴 [\(Date().timeIntervalSince1970)] BrowserViewController DEINIT \(instanceId) for \(service.name)")
     }
     
@@ -312,6 +338,101 @@ class BrowserViewController: NSViewController {
         
         return cleanedURL
     }
+    
+    // MARK: - WebView Focus Detection
+    
+    /// Sets up JavaScript-based focus detection within the webview.
+    ///
+    /// Called after initial page load delay to avoid interfering with page setup.
+    /// Injects focus/blur event listeners and starts periodic focus checking.
+    ///
+    /// Focus detection methods:
+    /// 1. JavaScript event listeners for real-time focus/blur detection
+    /// 2. Periodic polling as backup for missed events
+    /// 3. Integration with native responder chain events
+    private func setupFocusDetection() {
+        // Inject JavaScript to detect focus state changes
+        let focusScript = """
+            (function() {
+                function updateFocusState() {
+                    const hasFocus = document.hasFocus() && 
+                                   (document.activeElement && 
+                                    document.activeElement !== document.body &&
+                                    document.activeElement.tagName !== 'HTML');
+                    window.webkit.messageHandlers.focusHandler.postMessage({
+                        type: 'focusChange',
+                        hasFocus: hasFocus,
+                        activeElement: document.activeElement ? document.activeElement.tagName : 'none'
+                    });
+                }
+                
+                // Set up event listeners for focus changes
+                window.addEventListener('focus', updateFocusState, true);
+                window.addEventListener('blur', updateFocusState, true);
+                document.addEventListener('focusin', updateFocusState, true);
+                document.addEventListener('focusout', updateFocusState, true);
+                
+                // Initial state check
+                updateFocusState();
+            })();
+            """
+        
+        let userScript = WKUserScript(source: focusScript, injectionTime: .atDocumentEnd, forMainFrameOnly: false)
+        webView.configuration.userContentController.addUserScript(userScript)
+        
+        // Add message handler for focus state updates
+        webView.configuration.userContentController.add(self, name: "focusHandler")
+        
+        // Start periodic focus checking as backup
+        startPeriodicFocusChecking()
+    }
+    
+    /// Starts periodic checking of webview focus state.
+    ///
+    /// Runs every 500ms as a backup to JavaScript event listeners.
+    /// This ensures focus state stays accurate even if events are missed.
+    private func startPeriodicFocusChecking() {
+        focusCheckTimer = Timer.scheduledTimer(withTimeInterval: 0.5, repeats: true) { [weak self] _ in
+            self?.evaluateWebViewFocusState()
+        }
+    }
+    
+    /// Evaluates the current focus state within the webview using JavaScript.
+    ///
+    /// Called periodically and on demand to ensure focus state accuracy.
+    /// Updates `hasWebViewFocus` property based on document.hasFocus() and activeElement.
+    private func evaluateWebViewFocusState() {
+        let focusScript = """
+            (function() {
+                const hasFocus = document.hasFocus() && 
+                               (document.activeElement && 
+                                document.activeElement !== document.body &&
+                                document.activeElement.tagName !== 'HTML');
+                return {
+                    hasFocus: hasFocus,
+                    activeElement: document.activeElement ? document.activeElement.tagName : 'none'
+                };
+            })();
+            """
+        
+        webView.evaluateJavaScript(focusScript) { [weak self] result, error in
+            guard let self = self else { return }
+            
+            if error != nil {
+                // Silent failure - focus checking is not critical
+                return
+            }
+            
+            if let resultDict = result as? [String: Any],
+               let hasFocus = resultDict["hasFocus"] as? Bool {
+                DispatchQueue.main.async {
+                    if self.hasWebViewFocus != hasFocus {
+                        self.hasWebViewFocus = hasFocus
+                    }
+                }
+            }
+        }
+    }
 }
 
 // MARK: - Responder Chain Handling
@@ -340,7 +461,14 @@ extension BrowserViewController {
         // This prevents WebView from stealing focus during page loads
         if allowFocusCapture && (NSApp.currentEvent?.type == .leftMouseDown || 
                                   NSApp.currentEvent?.type == .rightMouseDown) {
-            return webView.becomeFirstResponder()
+            let didBecome = webView.becomeFirstResponder()
+            if didBecome {
+                // Update focus state when webview gains native focus
+                DispatchQueue.main.asyncAfter(deadline: .now() + 0.1) {
+                    self.evaluateWebViewFocusState()
+                }
+            }
+            return didBecome
         }
         return false
     }
@@ -490,5 +618,44 @@ extension BrowserViewController: WKNavigationDelegate {
     func webView(_ webView: WKWebView, decidePolicyFor navigationResponse: WKNavigationResponse, decisionHandler: @escaping (WKNavigationResponsePolicy) -> Void) {
         WebViewLogger.shared.logNavigationResponse(navigationResponse.response, service: service.name)
         decisionHandler(.allow)
+    }
+}
+
+// MARK: - Focus Message Handler
+
+/// Handles JavaScript messages for focus state updates.
+///
+/// Receives messages from injected JavaScript that monitors focus/blur events
+/// within the webview content. This provides real-time focus state tracking
+/// for showing/hiding focus indicator borders.
+extension BrowserViewController: WKScriptMessageHandler {
+    /// Processes focus state messages from JavaScript.
+    ///
+    /// Message format:
+    /// ```javascript
+    /// {
+    ///   type: 'focusChange',
+    ///   hasFocus: boolean,
+    ///   activeElement: string
+    /// }
+    /// ```
+    ///
+    /// Updates `hasWebViewFocus` property which triggers UI updates for focus indicators.
+    func userContentController(_ userContentController: WKUserContentController, didReceive message: WKScriptMessage) {
+        guard message.name == "focusHandler",
+              let messageBody = message.body as? [String: Any],
+              let messageType = messageBody["type"] as? String,
+              messageType == "focusChange",
+              let hasFocus = messageBody["hasFocus"] as? Bool else {
+            return
+        }
+        
+        DispatchQueue.main.async { [weak self] in
+            guard let self = self else { return }
+            if self.hasWebViewFocus != hasFocus {
+                print("📱 WebView focus changed for \(self.service.name): \(hasFocus)")
+                self.hasWebViewFocus = hasFocus
+            }
+        }
     }
 }

@@ -2,6 +2,7 @@ import AppKit
 import WebKit
 import SwiftUI
 
+
 class BrowserView: NSView {
     let webView: WKWebView
     let urlField: NSTextField
@@ -19,6 +20,7 @@ class BrowserView: NSView {
     var reloadButtonView: NSHostingView<GradientToolbarButton>!
     var copyButtonView: NSHostingView<GradientToolbarButton>!
     
+    
     init(webView: WKWebView, isFirstService: Bool = false) {
         self.webView = webView
         self.isFirstService = isFirstService
@@ -32,10 +34,8 @@ class BrowserView: NSView {
         
         super.init(frame: .zero)
         
-        // Add visual styling
-        self.wantsLayer = true
-        self.layer?.cornerRadius = 8
-        self.layer?.masksToBounds = true
+        // BrowserView is now a plain content container - no visual styling
+        // Visual appearance is handled by parent browserContainer in OverlayController
         
         setupLayout()
     }
@@ -136,4 +136,5 @@ class BrowserView: NSView {
             ])
         }
     }
+    
 }
