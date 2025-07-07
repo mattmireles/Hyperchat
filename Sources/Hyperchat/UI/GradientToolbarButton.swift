@@ -76,9 +76,12 @@ struct GradientToolbarButton: View {
                 ZStack {
                     if state.isEnabled && isHovering {
                         LinearGradient(
-                            gradient: Gradient(colors: [
-                                Color(red: 0.0, green: 0.6, blue: 1.0),  // Blue
-                                Color(red: 1.0, green: 0.0, blue: 0.8)   // Pink/Magenta
+                            gradient: Gradient(stops: [
+                                .init(color: Color(red: 1.0, green: 0.0, blue: 0.8), location: 0.0),        // Pink
+                                .init(color: Color(red: 1.0, green: 0.0, blue: 0.8), location: 0.4),        // Pink
+                                .init(color: Color(red: 0.6, green: 0.2, blue: 0.8), location: 0.6),        // Purple
+                                .init(color: Color(red: 0.0, green: 0.6, blue: 1.0), location: 0.85),       // Blue
+                                .init(color: Color(red: 0.0, green: 0.6, blue: 1.0), location: 1.0)         // Blue
                             ]),
                             startPoint: .bottomLeading,
                             endPoint: .topTrailing
