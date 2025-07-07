@@ -450,8 +450,8 @@ class OverlayController: NSObject, NSWindowDelegate, ObservableObject {
             object: nil
         )
         
-        // Set initial app focus state
-        isAppFocused = NSApp.isActive
+        // Note: isAppFocused starts as false and will be set when app becomes active
+        // This prevents crash on macOS 15.1 where NSApp.isActive isn't ready during init
         
         // Note: allServicesDidLoad is now handled via Combine subscription in createNormalWindow
     }
