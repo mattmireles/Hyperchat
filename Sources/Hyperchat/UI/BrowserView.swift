@@ -137,15 +137,4 @@ class BrowserView: NSView {
         }
     }
     
-    /// Override intrinsicContentSize to provide reasonable height hint for NSStackView.
-    ///
-    /// Without this, WKWebView reports {0,0} until content loads, causing BrowserView
-    /// to calculate minimal height. NSStackView then allocates ~12px height, 
-    /// resulting in collapsed WebViews.
-    ///
-    /// This provides a reasonable height hint while letting NSStackView handle final sizing.
-    override var intrinsicContentSize: NSSize {
-        NSSize(width: NSView.noIntrinsicMetric, height: 400)
-    }
-    
 }

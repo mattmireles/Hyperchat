@@ -659,6 +659,12 @@ class OverlayController: NSObject, NSWindowDelegate, ObservableObject {
         browserStackView.translatesAutoresizingMaskIntoConstraints = false
         browserStackView.identifier = NSUserInterfaceItemIdentifier("browserStackView")
         
+        // Create explicit height constraints: each BrowserView.height == browserStackView.height
+        // This is the missing piece - horizontal stack views don't propagate height automatically
+        for browserView in browserViews {
+            browserView.heightAnchor.constraint(equalTo: browserStackView.heightAnchor).isActive = true
+        }
+        
         // Create the UnifiedInputBar SwiftUI view with window-specific ServiceManager
         let inputBar = UnifiedInputBar(serviceManager: windowServiceManager, overlayController: self)
         let inputBarHostingView = NSHostingView(rootView: inputBar)
