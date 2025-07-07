@@ -1,49 +1,45 @@
-/// ClaudeLoginAlertController.swift - Claude Login Alert Window
+/// ClaudeLoginAlertController.swift - Claude Setup Info Window
 ///
-/// This file contains a simple alert-style window for Claude login that appears
-/// when users try to enable Claude from the AI Services menu.
+/// This file contains a simple informational window that appears when users
+/// enable Claude from the AI Services menu.
 ///
 /// Key responsibilities:
-/// - Display chromeless window styled like settings window
-/// - Show special instructions for Claude login
-/// - Provide WebView for Claude login
-/// - Enable Claude service after successful login
-/// - Allow user to close/cancel at any time
+/// - Display simple informational message about Claude
+/// - Styled like settings window for consistency
+/// - Allow user to close at any time
 ///
 /// Related files:
 /// - `AppDelegate.swift`: Shows this window when Claude is enabled
 /// - `SettingsWindowController.swift`: Uses similar window styling
-/// - `ClaudeLoginView.swift`: The old onboarding version (kept for reference)
 ///
 /// Usage:
 /// - Shown when user clicks to enable Claude in AI Services menu
-/// - Always shown (no login status checking)
-/// - Closes after successful login or user cancellation
+/// - Simple informational popup - Claude works like other services
+/// - User can close immediately and use Claude in main window
 
 import Cocoa
 import SwiftUI
-import WebKit
 
-/// Window controller for the Claude login alert.
+/// Window controller for the Claude setup info window.
 ///
 /// Created by:
 /// - `AppDelegate.toggleAIService()` when user enables Claude
 ///
 /// Creates:
-/// - Chromeless modal window styled like settings
-/// - SwiftUI-based ClaudeLoginAlertView as content
-/// - Proper window styling and behavior
+/// - Simple window styled like settings
+/// - SwiftUI-based informational content
+/// - Standard window behavior
 ///
 /// Window behavior:
 /// - Floating level to appear above other windows
 /// - Centered on screen
-/// - Closes automatically when user completes or cancels
+/// - User can close when ready
 class ClaudeLoginAlertController: NSWindowController {
     
-    /// Initialize the Claude login alert window
+    /// Initialize the Claude setup info window
     init() {
         let window = NSWindow(
-            contentRect: NSRect(x: 0, y: 0, width: 600, height: 400),
+            contentRect: NSRect(x: 0, y: 0, width: 400, height: 200),
             styleMask: [.titled, .closable, .fullSizeContentView],
             backing: .buffered,
             defer: false
@@ -72,7 +68,7 @@ class ClaudeLoginAlertController: NSWindowController {
         window.level = .floating
         window.standardWindowButton(.zoomButton)?.isHidden = true
         window.standardWindowButton(.closeButton)?.isHidden = false
-        window.standardWindowButton(.miniaturizeButton)?.isHidden = true
+        window.standardWindowButton(.miniaturizeButton)?.isHidden = false
         
         // Make it modal-like (appears above other windows)
         window.level = .modalPanel
@@ -85,29 +81,22 @@ class ClaudeLoginAlertController: NSWindowController {
     private func setupContent() {
         guard let window = window else { return }
         
-        // Create the SwiftUI view with callback to handle completion
-        let claudeLoginView = ClaudeLoginAlertView(
-            onComplete: { [weak self] in
-                self?.handleLoginComplete()
-            },
-            onCancel: { [weak self] in
-                self?.handleLoginCancel()
-            }
-        )
+        // Create simple informational SwiftUI view
+        let claudeInfoView = ClaudeInfoView()
         
         // Create container view to hold both background and content
-        let containerView = NSView(frame: NSRect(x: 0, y: 0, width: 600, height: 400))
+        let containerView = NSView(frame: NSRect(x: 0, y: 0, width: 400, height: 200))
         containerView.autoresizingMask = [.width, .height]
         
         // Add visual effect background to match settings window
-        let backgroundEffectView = NSVisualEffectView(frame: NSRect(x: 0, y: 0, width: 600, height: 400))
+        let backgroundEffectView = NSVisualEffectView(frame: NSRect(x: 0, y: 0, width: 400, height: 200))
         backgroundEffectView.material = .hudWindow
         backgroundEffectView.blendingMode = .behindWindow
         backgroundEffectView.state = .active
         backgroundEffectView.autoresizingMask = [.width, .height]
         
         // Create hosting view for SwiftUI content
-        let hostingView = NSHostingView(rootView: claudeLoginView)
+        let hostingView = NSHostingView(rootView: claudeInfoView)
         
         containerView.addSubview(backgroundEffectView)
         containerView.addSubview(hostingView)
@@ -124,37 +113,6 @@ class ClaudeLoginAlertController: NSWindowController {
         window.contentView = containerView
     }
     
-    /// Handle successful login completion
-    private func handleLoginComplete() {
-        print("✅ Claude login completed successfully")
-        
-        // Enable Claude service
-        enableClaudeService()
-        
-        // Close the window
-        close()
-    }
-    
-    /// Enable Claude service after successful login
-    private func enableClaudeService() {
-        var services = SettingsManager.shared.getServices()
-        if let index = services.firstIndex(where: { $0.id == "claude" }) {
-            services[index].enabled = true
-            SettingsManager.shared.saveServices(services)
-            print("✅ Claude service enabled after successful login")
-            
-            // Post notification to update ServiceManager
-            NotificationCenter.default.post(name: .servicesUpdated, object: nil)
-        }
-    }
-    
-    /// Handle cancellation of login
-    private func handleLoginCancel() {
-        print("❌ Claude login cancelled by user")
-        
-        // Just close the window - don't enable Claude
-        close()
-    }
     
     /// Override showWindow to ensure proper display
     override func showWindow(_ sender: Any?) {
@@ -176,4 +134,31 @@ class ClaudeLoginAlertController: NSWindowController {
 
 extension Notification.Name {
     static let claudeLoginAlertClosed = Notification.Name("claudeLoginAlertClosed")
+}
+
+// MARK: - Claude Info View
+
+/// Simple informational SwiftUI view for Claude setup.
+///
+/// Displays basic information that Claude works like other services
+/// and the user can log in normally in the main window.
+struct ClaudeInfoView: View {
+    var body: some View {
+        VStack(spacing: 16) {
+            // Title
+            Text("Special Instructions: Claude Login")
+                .font(.title2)
+                .fontWeight(.bold)
+                .foregroundColor(.primary)
+            
+            // Info message
+            Text("When you login to Claude using your email, it will send you a confirmation email. DO NOT CLICK THE LINK IN THE EMAIL. Instead, right-click on the button the email, select \"Copy URL\" and paste the URL into the URL bar above the Claude window. \n It's a little wonky. Sorry about that.")
+                .font(.system(size: 14))
+                .foregroundColor(.secondary)
+                .multilineTextAlignment(.center)
+                .lineLimit(nil)
+                .fixedSize(horizontal: false, vertical: true)
+        }
+        .padding(20)
+    }
 }

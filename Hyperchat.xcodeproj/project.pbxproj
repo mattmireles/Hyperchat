@@ -20,8 +20,6 @@
 		3EE13BB42C4F6B2900A8A61E /* SettingsManager.swift in Sources */ = {isa = PBXBuildFile; fileRef = 3EE13BB52C4F6B2900A8A61E /* SettingsManager.swift */; };
 		3EE13BB62C4F6B2900A8A61E /* SettingsWindowController.swift in Sources */ = {isa = PBXBuildFile; fileRef = 3EE13BB72C4F6B2900A8A61E /* SettingsWindowController.swift */; };
 		BE8135E42E01E24D0059C681 /* Sparkle in Frameworks */ = {isa = PBXBuildFile; productRef = BE8135E32E01E24D0059C681 /* Sparkle */; };
-		BEA4CA3B2E1BA89E00F810E4 /* ClaudeLoginView.swift in Sources */ = {isa = PBXBuildFile; fileRef = BEA4CA332E1BA89E00F810E4 /* ClaudeLoginView.swift */; };
-		BEA4CA402E1BB07D00F810E4 /* ClaudeLoginAlertView.swift in Sources */ = {isa = PBXBuildFile; fileRef = BEA4CA3F2E1BB07D00F810E4 /* ClaudeLoginAlertView.swift */; };
 		BEA4CA412E1BB07D00F810E4 /* ClaudeLoginAlertController.swift in Sources */ = {isa = PBXBuildFile; fileRef = BEA4CA3E2E1BB07D00F810E4 /* ClaudeLoginAlertController.swift */; };
 		BEB355BD2E18A3F7000164A8 /* HyperchatApp.swift in Sources */ = {isa = PBXBuildFile; fileRef = BEB355BC2E18A3F7000164A8 /* HyperchatApp.swift */; };
 		BEB355C32E18A6F4000164A8 /* UI/ButtonState.swift in Sources */ = {isa = PBXBuildFile; fileRef = BEB355C12E18A6F4000164A8 /* UI/ButtonState.swift */; };
@@ -75,9 +73,7 @@
 		3EE13BB32C4F6B2900A8A61E /* Orbitron-Bold.ttf */ = {isa = PBXFileReference; lastKnownFileType = file; path = "Orbitron-Bold.ttf"; sourceTree = "<group>"; };
 		3EE13BB52C4F6B2900A8A61E /* SettingsManager.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = SettingsManager.swift; sourceTree = "<group>"; };
 		3EE13BB72C4F6B2900A8A61E /* SettingsWindowController.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = SettingsWindowController.swift; sourceTree = "<group>"; };
-		BEA4CA332E1BA89E00F810E4 /* ClaudeLoginView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ClaudeLoginView.swift; sourceTree = "<group>"; };
 		BEA4CA3E2E1BB07D00F810E4 /* ClaudeLoginAlertController.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ClaudeLoginAlertController.swift; sourceTree = "<group>"; };
-		BEA4CA3F2E1BB07D00F810E4 /* ClaudeLoginAlertView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ClaudeLoginAlertView.swift; sourceTree = "<group>"; };
 		BEB355BC2E18A3F7000164A8 /* HyperchatApp.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = HyperchatApp.swift; sourceTree = "<group>"; };
 		BEB355C02E18A6F4000164A8 /* UI/BrowserView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = UI/BrowserView.swift; sourceTree = "<group>"; };
 		BEB355C12E18A6F4000164A8 /* UI/ButtonState.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = UI/ButtonState.swift; sourceTree = "<group>"; };
@@ -150,8 +146,6 @@
 			isa = PBXGroup;
 			children = (
 				BEA4CA3E2E1BB07D00F810E4 /* ClaudeLoginAlertController.swift */,
-				BEA4CA3F2E1BB07D00F810E4 /* ClaudeLoginAlertView.swift */,
-				BEA4CA332E1BA89E00F810E4 /* ClaudeLoginView.swift */,
 				BEB355C02E18A6F4000164A8 /* UI/BrowserView.swift */,
 				BEB355C12E18A6F4000164A8 /* UI/ButtonState.swift */,
 				BEB355C22E18A6F4000164A8 /* UI/GradientToolbarButton.swift */,
@@ -340,11 +334,9 @@
 			isa = PBXSourcesBuildPhase;
 			buildActionMask = 2147483647;
 			files = (
-				BEA4CA3B2E1BA89E00F810E4 /* ClaudeLoginView.swift in Sources */,
 				3EE13B9B2C4F6B2900A8A61E /* AppDelegate.swift in Sources */,
 				BEB355C32E18A6F4000164A8 /* UI/ButtonState.swift in Sources */,
 				BEB355C42E18A6F4000164A8 /* UI/GradientToolbarButton.swift in Sources */,
-				BEA4CA402E1BB07D00F810E4 /* ClaudeLoginAlertView.swift in Sources */,
 				BEA4CA412E1BB07D00F810E4 /* ClaudeLoginAlertController.swift in Sources */,
 				BEB355C52E18A6F4000164A8 /* UI/BrowserView.swift in Sources */,
 				3EE13B9D2C4F6B2900A8A61E /* FloatingButtonManager.swift in Sources */,

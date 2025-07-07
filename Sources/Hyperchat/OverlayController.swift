@@ -1358,9 +1358,8 @@ struct UnifiedInputBar: View {
     /// This method uses the same mechanism as the menu bar Settings action,
     /// ensuring consistent behavior across the application.
     private func openSettings() {
-        if let appDelegate = NSApp.delegate as? AppDelegate {
-            appDelegate.showSettings(nil)
-        }
+        // Simulate Cmd+, keyboard shortcut (same pathway as menu bar)
+        NSApp.sendAction(#selector(AppDelegate.showSettings(_:)), to: nil, from: nil)
     }
     
     var body: some View {
@@ -1379,7 +1378,7 @@ struct UnifiedInputBar: View {
                         .scaleEffect(isHyperchatIconHovering ? 1.05 : 1.0)
                 }
                 .buttonStyle(.plain)
-                .help("Open Settings")
+                .help("Open Hyperchat Settings")
                 .onHover { hovering in
                     withAnimation(.easeInOut(duration: 0.2)) {
                         isHyperchatIconHovering = hovering
@@ -1514,6 +1513,7 @@ struct UnifiedInputBar: View {
                     }
                     .frame(width: 62, height: 62)
                     .shadow(color: Color.black.opacity(0.1), radius: 2, x: 0, y: 1)
+                    .scaleEffect(isRefreshHovering ? 1.05 : 1.0)
                 }
                 .buttonStyle(.plain)
                 .help("Start New Chat Thread")
