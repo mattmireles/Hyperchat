@@ -398,7 +398,7 @@ class BrowserViewController: NSViewController, ObservableObject {
         let focusIndicator = FocusIndicatorView(
             focusState: focusState,
             cornerRadius: 8,
-            lineWidth: 2
+            lineWidth: 4
         )
         
         // Create click-through hosting view

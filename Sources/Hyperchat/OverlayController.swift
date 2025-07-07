@@ -1420,7 +1420,7 @@ struct UnifiedInputBar: View {
                     InputFocusIndicatorView(
                         isVisible: isInputFocused && overlayController.isAppFocused,
                         cornerRadius: 10,
-                        lineWidth: 2
+                        lineWidth: 4
                     )
                 )
                 .frame(maxWidth: .infinity)
