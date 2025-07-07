@@ -416,11 +416,11 @@ struct AnimatedGradientBorder: View {
                 .stroke(
                     AngularGradient(
                         gradient: Gradient(colors: [
-                            Color(red: 1.0, green: 0.0, blue: 0.8),      // Pink/Magenta
+                            Color(red: 1.0, green: 0.0, blue: 0.8),      // Pink
+                            Color(red: 0.6, green: 0.2, blue: 0.8),      // Purple
                             Color(red: 0.0, green: 0.6, blue: 1.0),      // Blue
-                            Color(red: 1.0, green: 0.0, blue: 0.8),      // Pink/Magenta (repeat for seamless loop)
-                            Color(red: 0.0, green: 0.6, blue: 1.0),      // Blue 
-                            Color(red: 1.0, green: 0.0, blue: 0.8)      // Pink/Magenta (final)
+                            Color(red: 0.6, green: 0.2, blue: 0.8),      // Purple
+                            Color(red: 1.0, green: 0.0, blue: 0.8)       // Pink (seamless loop)
                         ]),
                         center: .center,
                         startAngle: .degrees(phase),
@@ -436,11 +436,11 @@ struct AnimatedGradientBorder: View {
                 .stroke(
                     AngularGradient(
                         gradient: Gradient(colors: [
-                            Color(red: 1.0, green: 0.0, blue: 0.8),      // Pink/Magenta
+                            Color(red: 1.0, green: 0.0, blue: 0.8),      // Pink
+                            Color(red: 0.6, green: 0.2, blue: 0.8),      // Purple
                             Color(red: 0.0, green: 0.6, blue: 1.0),      // Blue
-                            Color(red: 1.0, green: 0.0, blue: 0.8),      // Pink/Magenta (repeat for seamless loop)
-                            Color(red: 0.0, green: 0.6, blue: 1.0),      // Blue 
-                            Color(red: 1.0, green: 0.0, blue: 0.8)      // Pink/Magenta (final)
+                            Color(red: 0.6, green: 0.2, blue: 0.8),      // Purple
+                            Color(red: 1.0, green: 0.0, blue: 0.8)       // Pink (seamless loop)
                         ]),
                         center: .center,
                         startAngle: .degrees(phase),
@@ -456,11 +456,11 @@ struct AnimatedGradientBorder: View {
                 .stroke(
                     AngularGradient(
                         gradient: Gradient(colors: [
-                            Color(red: 1.0, green: 0.0, blue: 0.8),      // Pink/Magenta
+                            Color(red: 1.0, green: 0.0, blue: 0.8),      // Pink
+                            Color(red: 0.6, green: 0.2, blue: 0.8),      // Purple
                             Color(red: 0.0, green: 0.6, blue: 1.0),      // Blue
-                            Color(red: 1.0, green: 0.0, blue: 0.8),      // Pink/Magenta (repeat for seamless loop)
-                            Color(red: 0.0, green: 0.6, blue: 1.0),      // Blue 
-                            Color(red: 1.0, green: 0.0, blue: 0.8)      // Pink/Magenta (final)
+                            Color(red: 0.6, green: 0.2, blue: 0.8),      // Purple
+                            Color(red: 1.0, green: 0.0, blue: 0.8)       // Pink (seamless loop)
                         ]),
                         center: .center,
                         startAngle: .degrees(phase),
