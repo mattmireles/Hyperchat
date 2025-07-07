@@ -380,7 +380,7 @@ class SettingsWindowController: NSWindowController {
         window.titleVisibility = .hidden
         window.backgroundColor = NSColor.clear
         window.isMovableByWindowBackground = true
-        window.level = .floating
+        window.level = .normal
         window.standardWindowButton(.zoomButton)?.isHidden = true
         window.standardWindowButton(.closeButton)?.isHidden = false
         window.standardWindowButton(.miniaturizeButton)?.isHidden = false

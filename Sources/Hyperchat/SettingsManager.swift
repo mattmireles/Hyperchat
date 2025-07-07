@@ -17,16 +17,41 @@ class SettingsManager {
         // Try to load saved services
         if let savedData = userDefaults.data(forKey: servicesKey),
            let savedServices = try? JSONDecoder().decode([AIService].self, from: savedData) {
+            
+            // Log what we loaded from UserDefaults
+            let sortedServices = savedServices.sorted { $0.order < $1.order }
+            print("📖 SettingsManager.getServices() - Loaded from UserDefaults:")
+            for service in sortedServices {
+                print("   \(service.name): \(service.enabled ? "✅ enabled" : "❌ disabled") (order: \(service.order))")
+            }
+            
             return savedServices
         }
         
         // Return default services if none saved
+        let sortedDefaults = defaultServices.sorted { $0.order < $1.order }
+        print("📖 SettingsManager.getServices() - Using defaults (no saved data):")
+        for service in sortedDefaults {
+            print("   \(service.name): \(service.enabled ? "✅ enabled" : "❌ disabled") (order: \(service.order))")
+        }
+        
         return defaultServices
     }
     
     func saveServices(_ services: [AIService]) {
+        // Log what we're about to save
+        let sortedServices = services.sorted { $0.order < $1.order }
+        print("💾 SettingsManager.saveServices() - Saving to UserDefaults:")
+        for service in sortedServices {
+            print("   \(service.name): \(service.enabled ? "✅ enabled" : "❌ disabled") (order: \(service.order))")
+        }
+        
         if let encoded = try? JSONEncoder().encode(services) {
             userDefaults.set(encoded, forKey: servicesKey)
+            userDefaults.synchronize() // Force immediate write to disk
+            print("💾 SettingsManager.saveServices() - Save completed successfully")
+        } else {
+            print("❌ SettingsManager.saveServices() - Failed to encode services")
         }
     }
     

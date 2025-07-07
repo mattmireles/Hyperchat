@@ -46,9 +46,8 @@ import Sparkle
 /// - First responder chain actions
 class MenuBuilder {
     
-    static func createMainMenu() -> NSMenu {
+    static func createMainMenu(appDelegate: AppDelegate?) -> NSMenu {
         let mainMenu = NSMenu()
-        let appDelegate = NSApp.delegate as? AppDelegate
         
         // Application menu
         let appMenuItem = NSMenuItem()
@@ -221,6 +220,12 @@ class MenuBuilder {
         let services = SettingsManager.shared.getServices()
         let sortedServices = services.sorted { $0.order < $1.order }
         
+        // Log what services we're using to create menu items
+        print("🍽️ MenuBuilder.createAIServicesMenu() - Creating menu with services:")
+        for service in sortedServices {
+            print("   \(service.name): \(service.enabled ? "✅ enabled" : "❌ disabled") → menu state: \(service.enabled ? ".on" : ".off")")
+        }
+        
         // Add menu item for each service
         for service in sortedServices {
             let menuItem = NSMenuItem(title: service.name, action: #selector(AppDelegate.toggleAIService(_:)), keyEquivalent: "")
@@ -237,6 +242,8 @@ class MenuBuilder {
         reorderItem.target = nil // Will find AppDelegate through responder chain
         reorderItem.indentationLevel = 0 // Ensure no indentation
         menu.addItem(reorderItem)
+        
+        print("🍽️ MenuBuilder.createAIServicesMenu() - Menu creation completed")
     }
 }
 
@@ -314,10 +321,9 @@ class AppDelegate: NSObject, NSApplicationDelegate, SPUUpdaterDelegate {
     /// - Update checker delayed to prevent conflicts
     /// - Notifications connect components loosely
     func applicationDidFinishLaunching(_ aNotification: Notification) {
-        // Set up the main menu with async dispatch to ensure it runs after SwiftUI initialization
-        DispatchQueue.main.async {
-            NSApp.mainMenu = MenuBuilder.createMainMenu()
-        }
+        // Set up the main menu synchronously, passing a reference to self
+        NSApp.mainMenu = MenuBuilder.createMainMenu(appDelegate: self)
+        print("🍽️ Main menu created synchronously, aiServicesMenu reference: \(aiServicesMenu != nil ? "✅ available" : "❌ nil")")
         
         // Register custom fonts
         registerCustomFonts()
@@ -482,12 +488,17 @@ class AppDelegate: NSObject, NSApplicationDelegate, SPUUpdaterDelegate {
     /// 2. Toggle the service's enabled state
     /// 3. Update via SettingsManager to persist change
     /// 4. SettingsManager posts notification to update ServiceManager
+    /// 5. For Claude, show simple info window when first enabled
     @objc func toggleAIService(_ sender: Any?) {
+        print("🔘 AppDelegate.toggleAIService() - Menu item clicked")
+        
         guard let menuItem = sender as? NSMenuItem,
               let serviceId = menuItem.representedObject as? String else {
             print("⚠️ Could not extract service ID from menu item")
             return
         }
+        
+        print("🔘 Toggling service: \(serviceId)")
         
         var services = SettingsManager.shared.getServices()
         if let index = services.firstIndex(where: { $0.id == serviceId }) {
@@ -495,18 +506,23 @@ class AppDelegate: NSObject, NSApplicationDelegate, SPUUpdaterDelegate {
             services[index].enabled.toggle()
             let newState = services[index].enabled
             
-            // Special handling for Claude: show login alert when enabling
-            if serviceId == "claude" && !wasEnabled && newState {
-                // User is trying to enable Claude - show login alert
-                showClaudeLoginAlert(serviceIndex: index, services: services)
-                return
-            }
+            print("🔘 Service \(services[index].name): \(wasEnabled ? "enabled" : "disabled") → \(newState ? "enabled" : "disabled")")
             
+            // Save the service state immediately
             SettingsManager.shared.saveServices(services)
             print("🔘 AI Service \(services[index].name) toggled to: \(newState ? "enabled" : "disabled")")
             
-            // Post notification to update ServiceManager
+            // Special handling for Claude: show info window when enabling
+            if serviceId == "claude" && !wasEnabled && newState {
+                // User enabled Claude - show simple info window
+                showClaudeInfoWindow()
+            }
+            
+            // Post notification to update ServiceManager and this AppDelegate
+            print("📣 Posting .servicesUpdated notification")
             NotificationCenter.default.post(name: .servicesUpdated, object: nil)
+        } else {
+            print("❌ Could not find service with ID: \(serviceId)")
         }
     }
     
@@ -521,36 +537,21 @@ class AppDelegate: NSObject, NSApplicationDelegate, SPUUpdaterDelegate {
     }
     
     
-    /// Shows Claude login alert when user tries to enable Claude service.
+    /// Shows Claude info window when user enables Claude service.
     ///
     /// Called by:
     /// - `toggleAIService` when user enables Claude from menu
     ///
-    /// Process:
-    /// 1. Always show the Claude login alert when enabling Claude
-    /// 2. Reset service to disabled temporarily
-    /// 3. User can login or cancel
-    /// 4. Service is enabled automatically if login succeeds
-    ///
-    /// - Parameters:
-    ///   - serviceIndex: Index of Claude service in services array
-    ///   - services: Current services array
-    private func showClaudeLoginAlert(serviceIndex: Int, services: [AIService]) {
-        print("🔍 Showing Claude login alert...")
+    /// Shows a simple informational window explaining that Claude works
+    /// like other services and the user can log in normally.
+    private func showClaudeInfoWindow() {
+        print("ℹ️ Showing Claude info window...")
         
-        // Reset the service to disabled state temporarily
-        var updatedServices = services
-        updatedServices[serviceIndex].enabled = false
-        SettingsManager.shared.saveServices(updatedServices)
-        
-        // Show Claude login alert
+        // Show Claude info window
         if claudeLoginAlertController == nil {
             claudeLoginAlertController = ClaudeLoginAlertController()
         }
         claudeLoginAlertController?.showWindow(nil)
-        
-        // The service will be enabled when the user completes the login flow
-        // This happens automatically in ClaudeLoginAlertController.handleLoginComplete()
     }
     
     // MARK: - Menu Update Methods
@@ -575,8 +576,21 @@ class AppDelegate: NSObject, NSApplicationDelegate, SPUUpdaterDelegate {
     /// - Service reordering
     /// - New or removed services
     private func updateAIServicesMenu() {
-        guard let menu = aiServicesMenu else { return }
+        print("🔄 AppDelegate.updateAIServicesMenu() - Menu update triggered")
+        guard let menu = aiServicesMenu else { 
+            print("❌ AppDelegate.updateAIServicesMenu() - aiServicesMenu is nil! Deferring update...")
+            // Defer the update to the next run loop cycle in case menu creation is still in progress
+            DispatchQueue.main.async { [weak self] in
+                self?.updateAIServicesMenu()
+            }
+            return 
+        }
+        
         MenuBuilder.createAIServicesMenu(menu)
+        
+        // Force the menu to update its display
+        menu.update()
+        print("🔄 AppDelegate.updateAIServicesMenu() - Menu update completed")
     }
     
     /// Starts the Sparkle updater for automatic update checks.
