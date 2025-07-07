@@ -240,7 +240,7 @@ struct SettingsView: View {
                     .font(.largeTitle)
                     .fontWeight(.bold)
                 
-                Text("Customize your Hyperchat experience")
+                Text("Personalize Hyperchat to suite you")
                     .font(.subheadline)
                     .foregroundColor(.secondary)
             }

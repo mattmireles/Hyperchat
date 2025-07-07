@@ -48,6 +48,7 @@ class MenuBuilder {
     
     static func createMainMenu() -> NSMenu {
         let mainMenu = NSMenu()
+        let appDelegate = NSApp.delegate as? AppDelegate
         
         // Application menu
         let appMenuItem = NSMenuItem()
@@ -103,6 +104,18 @@ class MenuBuilder {
         let quitItem = NSMenuItem(title: "Quit Hyperchat", action: #selector(NSApplication.terminate(_:)), keyEquivalent: "q")
         appMenu.addItem(quitItem)
         
+        // AI Services menu (moved to be first after app menu)
+        let aiServicesMenuItem = NSMenuItem()
+        aiServicesMenuItem.title = "AI Services"
+        mainMenu.addItem(aiServicesMenuItem)
+        
+        let aiServicesMenu = NSMenu(title: "AI Services")
+        aiServicesMenuItem.submenu = aiServicesMenu
+        appDelegate?.aiServicesMenu = aiServicesMenu
+        
+        // Add service menu items dynamically
+        MenuBuilder.createAIServicesMenu(aiServicesMenu)
+        
         // Edit menu
         let editMenuItem = NSMenuItem()
         editMenuItem.title = "Edit"
@@ -144,6 +157,15 @@ class MenuBuilder {
         let viewMenu = NSMenu(title: "View")
         viewMenuItem.submenu = viewMenu
         
+        // Show Floating Button toggle
+        let showFloatingButtonItem = NSMenuItem(title: "Show Floating Button", action: #selector(AppDelegate.toggleFloatingButton(_:)), keyEquivalent: "")
+        showFloatingButtonItem.target = nil // Will find AppDelegate through responder chain
+        showFloatingButtonItem.state = SettingsManager.shared.isFloatingButtonEnabled ? .on : .off
+        appDelegate?.showFloatingButtonMenuItem = showFloatingButtonItem
+        viewMenu.addItem(showFloatingButtonItem)
+        
+        viewMenu.addItem(NSMenuItem.separator())
+        
         let enterFullScreenItem = NSMenuItem(title: "Enter Full Screen", action: #selector(NSWindow.toggleFullScreen(_:)), keyEquivalent: "f")
         enterFullScreenItem.keyEquivalentModifierMask = [NSEvent.ModifierFlags.command, NSEvent.ModifierFlags.control]
         viewMenu.addItem(enterFullScreenItem)
@@ -177,10 +199,44 @@ class MenuBuilder {
         helpMenuItem.submenu = helpMenu
         NSApp.helpMenu = helpMenu
         
-        let helpItem = NSMenuItem(title: "Hyperchat Help", action: #selector(NSApplication.showHelp(_:)), keyEquivalent: "?")
+        let helpItem = NSMenuItem(title: "Get Help", action: #selector(AppDelegate.getHelp(_:)), keyEquivalent: "?")
+        helpItem.target = nil // Will find AppDelegate through responder chain
         helpMenu.addItem(helpItem)
         
         return mainMenu
+    }
+    
+    /// Creates the AI Services submenu with all available services.
+    ///
+    /// This method:
+    /// - Gets current services from SettingsManager
+    /// - Creates menu items for each service with checkmarks for enabled state
+    /// - Adds separator and "Reorder..." option
+    /// - Sets up actions to toggle service state
+    static func createAIServicesMenu(_ menu: NSMenu) {
+        // Clear existing items
+        menu.removeAllItems()
+        
+        // Get services from SettingsManager
+        let services = SettingsManager.shared.getServices()
+        let sortedServices = services.sorted { $0.order < $1.order }
+        
+        // Add menu item for each service
+        for service in sortedServices {
+            let menuItem = NSMenuItem(title: service.name, action: #selector(AppDelegate.toggleAIService(_:)), keyEquivalent: "")
+            menuItem.target = nil // Will find AppDelegate through responder chain
+            menuItem.representedObject = service.id
+            menuItem.state = service.enabled ? .on : .off
+            menu.addItem(menuItem)
+        }
+        
+        // Add separator and reorder option
+        menu.addItem(NSMenuItem.separator())
+        
+        let reorderItem = NSMenuItem(title: "Reorder...", action: #selector(AppDelegate.openReorderSettings(_:)), keyEquivalent: "")
+        reorderItem.target = nil // Will find AppDelegate through responder chain
+        reorderItem.indentationLevel = 0 // Ensure no indentation
+        menu.addItem(reorderItem)
     }
 }
 
@@ -217,11 +273,22 @@ class AppDelegate: NSObject, NSApplicationDelegate, SPUUpdaterDelegate {
     
     /// Settings window controller (created on demand)
     var settingsWindowController: SettingsWindowController?
+    
+    /// Reference to AI Services menu for dynamic updates
+    var aiServicesMenu: NSMenu?
+    
+    /// Reference to Show Floating Button menu item for dynamic updates
+    var showFloatingButtonMenuItem: NSMenuItem?
+    
+    
+    /// Claude login alert controller (created on demand)
+    var claudeLoginAlertController: ClaudeLoginAlertController?
 
     override init() {
         self.floatingButtonManager = FloatingButtonManager()
         self.overlayController = OverlayController()
-        self.promptWindowController = PromptWindowController()
+        // Pass app focus publisher to promptWindowController for app focus state access
+        self.promptWindowController = PromptWindowController(appFocusPublisher: self.overlayController.$isAppFocused.eraseToAnyPublisher())
         super.init()
         self.updaterController = SPUStandardUpdaterController(startingUpdater: false, updaterDelegate: self, userDriverDelegate: nil)
     }
@@ -283,6 +350,22 @@ class AppDelegate: NSObject, NSApplicationDelegate, SPUUpdaterDelegate {
         // Listen for overlay hide to ensure floating button stays visible
         NotificationCenter.default.addObserver(forName: .overlayDidHide, object: nil, queue: .main) { [weak self] _ in
             self?.floatingButtonManager.ensureFloatingButtonVisible()
+        }
+        
+        // Listen for floating button toggle to update menu state
+        NotificationCenter.default.addObserver(forName: .floatingButtonToggled, object: nil, queue: .main) { [weak self] notification in
+            self?.updateFloatingButtonMenuItem()
+        }
+        
+        // Listen for services updates to refresh AI Services menu
+        NotificationCenter.default.addObserver(forName: .servicesUpdated, object: nil, queue: .main) { [weak self] _ in
+            self?.updateAIServicesMenu()
+        }
+        
+        
+        // Listen for Claude login alert closure to clean up reference
+        NotificationCenter.default.addObserver(forName: .claudeLoginAlertClosed, object: nil, queue: .main) { [weak self] _ in
+            self?.claudeLoginAlertController = nil
         }
     }
     
@@ -352,6 +435,148 @@ class AppDelegate: NSObject, NSApplicationDelegate, SPUUpdaterDelegate {
             settingsWindowController = SettingsWindowController()
         }
         settingsWindowController?.showWindow(sender)
+    }
+    
+    /// Opens the default email client to send a help request.
+    ///
+    /// Called by:
+    /// - Help menu "Get Help" item (Cmd+?)
+    ///
+    /// Creates a mailto URL with pre-filled recipient and subject line.
+    /// The email address is matt@hyperchat.app with subject "Help Me".
+    @objc func getHelp(_ sender: Any?) {
+        let emailAddress = "matt@hyperchat.app"
+        let subject = "Help Me"
+        let encodedSubject = subject.addingPercentEncoding(withAllowedCharacters: .urlQueryAllowed) ?? subject
+        
+        guard let mailtoURL = URL(string: "mailto:\(emailAddress)?subject=\(encodedSubject)") else {
+            print("❌ Failed to create mailto URL")
+            return
+        }
+        
+        NSWorkspace.shared.open(mailtoURL)
+    }
+    
+    /// Toggles the floating button visibility on/off.
+    ///
+    /// Called by:
+    /// - View menu "Show Floating Button" item
+    ///
+    /// Process:
+    /// 1. Toggle the setting in SettingsManager
+    /// 2. SettingsManager posts notification to update UI
+    /// 3. FloatingButtonManager responds to notification
+    @objc func toggleFloatingButton(_ sender: Any?) {
+        let newState = !SettingsManager.shared.isFloatingButtonEnabled
+        SettingsManager.shared.isFloatingButtonEnabled = newState
+        print("🔘 Floating button toggled to: \(newState ? "enabled" : "disabled")")
+    }
+    
+    /// Toggles an AI service on or off.
+    ///
+    /// Called by:
+    /// - AI Services menu items
+    ///
+    /// Process:
+    /// 1. Extract service ID from menu item's representedObject
+    /// 2. Toggle the service's enabled state
+    /// 3. Update via SettingsManager to persist change
+    /// 4. SettingsManager posts notification to update ServiceManager
+    @objc func toggleAIService(_ sender: Any?) {
+        guard let menuItem = sender as? NSMenuItem,
+              let serviceId = menuItem.representedObject as? String else {
+            print("⚠️ Could not extract service ID from menu item")
+            return
+        }
+        
+        var services = SettingsManager.shared.getServices()
+        if let index = services.firstIndex(where: { $0.id == serviceId }) {
+            let wasEnabled = services[index].enabled
+            services[index].enabled.toggle()
+            let newState = services[index].enabled
+            
+            // Special handling for Claude: show login alert when enabling
+            if serviceId == "claude" && !wasEnabled && newState {
+                // User is trying to enable Claude - show login alert
+                showClaudeLoginAlert(serviceIndex: index, services: services)
+                return
+            }
+            
+            SettingsManager.shared.saveServices(services)
+            print("🔘 AI Service \(services[index].name) toggled to: \(newState ? "enabled" : "disabled")")
+            
+            // Post notification to update ServiceManager
+            NotificationCenter.default.post(name: .servicesUpdated, object: nil)
+        }
+    }
+    
+    /// Opens the settings window to the reorder section.
+    ///
+    /// Called by:
+    /// - AI Services menu "Reorder..." item
+    ///
+    /// Simply shows the settings window where users can reorder services.
+    @objc func openReorderSettings(_ sender: Any?) {
+        showSettings(sender)
+    }
+    
+    
+    /// Shows Claude login alert when user tries to enable Claude service.
+    ///
+    /// Called by:
+    /// - `toggleAIService` when user enables Claude from menu
+    ///
+    /// Process:
+    /// 1. Always show the Claude login alert when enabling Claude
+    /// 2. Reset service to disabled temporarily
+    /// 3. User can login or cancel
+    /// 4. Service is enabled automatically if login succeeds
+    ///
+    /// - Parameters:
+    ///   - serviceIndex: Index of Claude service in services array
+    ///   - services: Current services array
+    private func showClaudeLoginAlert(serviceIndex: Int, services: [AIService]) {
+        print("🔍 Showing Claude login alert...")
+        
+        // Reset the service to disabled state temporarily
+        var updatedServices = services
+        updatedServices[serviceIndex].enabled = false
+        SettingsManager.shared.saveServices(updatedServices)
+        
+        // Show Claude login alert
+        if claudeLoginAlertController == nil {
+            claudeLoginAlertController = ClaudeLoginAlertController()
+        }
+        claudeLoginAlertController?.showWindow(nil)
+        
+        // The service will be enabled when the user completes the login flow
+        // This happens automatically in ClaudeLoginAlertController.handleLoginComplete()
+    }
+    
+    // MARK: - Menu Update Methods
+    
+    /// Updates the floating button menu item's checkmark state.
+    ///
+    /// Called by:
+    /// - Notification observer when floating button setting changes
+    ///
+    /// This keeps the View menu in sync with the Settings window toggle.
+    private func updateFloatingButtonMenuItem() {
+        showFloatingButtonMenuItem?.state = SettingsManager.shared.isFloatingButtonEnabled ? .on : .off
+    }
+    
+    /// Updates the AI Services menu items to reflect current service states.
+    ///
+    /// Called by:
+    /// - Notification observer when services are updated
+    ///
+    /// This rebuilds the entire AI Services menu to reflect:
+    /// - Service enabled/disabled states
+    /// - Service reordering
+    /// - New or removed services
+    private func updateAIServicesMenu() {
+        guard let menu = aiServicesMenu else { return }
+        MenuBuilder.createAIServicesMenu(menu)
     }
     
     /// Starts the Sparkle updater for automatic update checks.
