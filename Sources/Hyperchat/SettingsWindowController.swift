@@ -190,10 +190,6 @@ struct ServiceRowView: View {
                     }
                     .frame(width: 32, height: 32)
                     .clipShape(RoundedRectangle(cornerRadius: 8))
-                    .overlay(
-                        RoundedRectangle(cornerRadius: 8)
-                            .stroke(Color.secondary.opacity(0.2), lineWidth: 1)
-                    )
                 } else {
                     let _ = print("⚪ No favicon URL for \(service.name), using colored circle")
                     // No favicon URL, use colored circle
@@ -253,8 +249,44 @@ struct SettingsView: View {
             
             Divider()
             
-            ScrollView {
-                VStack(alignment: .leading, spacing: 24) {
+            VStack(alignment: .leading, spacing: 24) {
+                    // Floating Button Section
+                    VStack(alignment: .leading, spacing: 12) {
+                        Text("Floating Button")
+                            .font(.headline)
+                            .padding(.horizontal, 16)
+                        
+                        HStack {
+                            VStack(alignment: .leading, spacing: 4) {
+                                Text("Show Floating Button")
+                                    .font(.system(size: 14, weight: .medium))
+                                
+                                Text("Access Hyperchat from anywhere with a floating button")
+                                    .font(.caption)
+                                    .foregroundColor(.secondary)
+                            }
+                            
+                            Spacer()
+                            
+                            Toggle("", isOn: $viewModel.isFloatingButtonEnabled)
+                                .toggleStyle(SwitchToggleStyle())
+                                .labelsHidden()
+                                .onChange(of: viewModel.isFloatingButtonEnabled) { oldValue, newValue in
+                                    viewModel.toggleFloatingButton()
+                                }
+                        }
+                        .padding(.horizontal, SettingsLayout.sectionHorizontalPadding)
+                        .padding(.vertical, SettingsLayout.floatingButtonRowPadding)
+                        .background(
+                            RoundedRectangle(cornerRadius: SettingsLayout.serviceRowCornerRadius)
+                                .fill(Color.gray.opacity(SettingsLayout.floatingButtonBackgroundOpacity))
+                        )
+                        .padding(.horizontal, SettingsLayout.sectionHorizontalPadding)
+                    }
+                    
+                    Divider()
+                        .padding(.horizontal, 16)
+                    
                     // Services Section
                     VStack(alignment: .leading, spacing: 12) {
                         Text("AI Services")
@@ -290,49 +322,11 @@ struct SettingsView: View {
                         }
                         .padding(.horizontal, 8)
                     }
-                    
-                    Divider()
-                        .padding(.horizontal, 16)
-                    
-                    // Floating Button Section
-                    VStack(alignment: .leading, spacing: 12) {
-                        Text("Floating Button")
-                            .font(.headline)
-                            .padding(.horizontal, 16)
-                        
-                        HStack {
-                            VStack(alignment: .leading, spacing: 4) {
-                                Text("Show Floating Button")
-                                    .font(.system(size: 14, weight: .medium))
-                                
-                                Text("Access Hyperchat from anywhere with a floating button")
-                                    .font(.caption)
-                                    .foregroundColor(.secondary)
-                            }
-                            
-                            Spacer()
-                            
-                            Toggle("", isOn: $viewModel.isFloatingButtonEnabled)
-                                .toggleStyle(SwitchToggleStyle())
-                                .labelsHidden()
-                                .onChange(of: viewModel.isFloatingButtonEnabled) { oldValue, newValue in
-                                    viewModel.toggleFloatingButton()
-                                }
-                        }
-                        .padding(.horizontal, SettingsLayout.sectionHorizontalPadding)
-                        .padding(.vertical, SettingsLayout.floatingButtonRowPadding)
-                        .background(
-                            RoundedRectangle(cornerRadius: SettingsLayout.serviceRowCornerRadius)
-                                .fill(Color.gray.opacity(SettingsLayout.floatingButtonBackgroundOpacity))
-                        )
-                        .padding(.horizontal, SettingsLayout.sectionHorizontalPadding)
-                    }
-                }
-                .padding(.vertical, 20)
             }
+            .padding(.vertical, 20)
         }
-        .frame(width: 400, height: 500)
-        .background(Color(NSColor.windowBackgroundColor))
+        .frame(width: 400, height: 520)
+        .background(Color.clear)
     }
 }
 
@@ -373,8 +367,8 @@ class SettingsWindowController: NSWindowController {
     
     convenience init() {
         let window = NSWindow(
-            contentRect: NSRect(x: 0, y: 0, width: 400, height: 500),
-            styleMask: [.titled, .closable, .miniaturizable],
+            contentRect: NSRect(x: 0, y: 0, width: 400, height: 520),
+            styleMask: [.titled, .closable, .miniaturizable, .fullSizeContentView],
             backing: .buffered,
             defer: false
         )
@@ -382,14 +376,43 @@ class SettingsWindowController: NSWindowController {
         window.title = "Hyperchat Settings"
         window.center()
         window.isReleasedWhenClosed = false
-        window.titlebarAppearsTransparent = false
-        window.titleVisibility = .visible
+        window.titlebarAppearsTransparent = true
+        window.titleVisibility = .hidden
+        window.backgroundColor = NSColor.clear
+        window.isMovableByWindowBackground = true
+        window.level = .floating
         window.standardWindowButton(.zoomButton)?.isHidden = true
+        window.standardWindowButton(.closeButton)?.isHidden = false
+        window.standardWindowButton(.miniaturizeButton)?.isHidden = false
         
         self.init(window: window)
         
         let contentView = NSHostingView(rootView: SettingsView())
-        window.contentView = contentView
+        
+        // Create container view to hold both background and content
+        let containerView = NSView(frame: NSRect(x: 0, y: 0, width: 400, height: 520))
+        containerView.autoresizingMask = [.width, .height]
+        
+        // Add visual effect background to settings window
+        let backgroundEffectView = NSVisualEffectView(frame: NSRect(x: 0, y: 0, width: 400, height: 520))
+        backgroundEffectView.material = .hudWindow
+        backgroundEffectView.blendingMode = .behindWindow
+        backgroundEffectView.state = .active
+        backgroundEffectView.autoresizingMask = [.width, .height]
+        
+        containerView.addSubview(backgroundEffectView)
+        containerView.addSubview(contentView)
+        
+        // Set content view constraints
+        contentView.translatesAutoresizingMaskIntoConstraints = false
+        NSLayoutConstraint.activate([
+            contentView.topAnchor.constraint(equalTo: containerView.topAnchor),
+            contentView.leadingAnchor.constraint(equalTo: containerView.leadingAnchor),
+            contentView.trailingAnchor.constraint(equalTo: containerView.trailingAnchor),
+            contentView.bottomAnchor.constraint(equalTo: containerView.bottomAnchor)
+        ])
+        
+        window.contentView = containerView
     }
     
     override func showWindow(_ sender: Any?) {
