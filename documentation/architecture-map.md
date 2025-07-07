@@ -103,3 +103,27 @@ Here is the step-by-step flow of a typical user interaction:
 - **Automated Deployment**: The release process is fully automated via the `./deploy-hyperchat.sh` script, which handles signing, notarization, and DMG creation.
 - **Direct Distribution (Not Sandboxed)**: Hyperchat is distributed directly and is not sandboxed. This simplifies development and enables more powerful system-level features.
 - **Automatic Updates (Sparkle)**: The Sparkle framework is integrated to provide seamless, automatic updates to users.
+
+**Documentation Structure**
+
+The project documentation is organized as follows:
+
+- **Documentation/**: Core project documentation
+  - `architecture-map.md` (this file) - System overview and component relationships
+  - `Testing.md` - Testing strategy and automated test suite details
+  - `deploy.md` - Deployment and release process documentation
+  - `SPM-Development.md` - Swift Package Manager configuration
+  - `README_LOGGING.md` - Logging configuration and usage
+  - `Hyperchat-product-spec.md` - Product requirements and specifications
+
+- **Documentation/Websites/**: Browser automation guides and service-specific notes
+  - `browser-automation-guide.md` - General browser automation patterns and best practices
+  - `ChatGPT/` - ChatGPT-specific automation documentation
+  - `Claude/` - Claude automation notes and ProseMirror/React integration guides
+  - `Google/` - Google Search automation documentation  
+  - `Perplexity/` - Perplexity automation notes
+
+- **Documentation/Archive/**: Historical debugging documentation and resolved issues
+  - Various crash fix summaries and WebKit debugging guides (archived for reference)
+
+For browser automation work, start with `Documentation/Websites/browser-automation-guide.md` and then refer to the service-specific directories for detailed implementation notes.

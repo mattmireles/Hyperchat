@@ -28,139 +28,6 @@ import SwiftUI
 import WebKit
 import Combine
 
-// MARK: - Focus Indicator Components
-
-/// NSHostingView subclass that passes through all mouse events.
-///
-/// This ensures the focus indicator border doesn't block any clicks or interactions
-/// with the underlying browser content.
-private class ClickThroughHostingView<Content: View>: NSHostingView<Content> {
-    override func hitTest(_ point: NSPoint) -> NSView? {
-        // Always return nil to pass through all mouse events
-        return nil
-    }
-    
-    override var acceptsFirstResponder: Bool {
-        return false
-    }
-}
-
-/// Reusable animated glowing border component for focus indication.
-///
-/// Provides a consistent visual language for focus states using
-/// the same pink-to-blue animated gradient pattern as other app components.
-private struct FocusIndicatorView: View {
-    let isVisible: Bool
-    let cornerRadius: CGFloat
-    let lineWidth: CGFloat
-    
-    @State private var phase: CGFloat = 0
-    @State private var animationTask: Task<Void, Never>?
-    
-    private enum Appearance {
-        static let pinkColor = Color(red: 1.0, green: 0.0, blue: 0.8)
-        static let blueColor = Color(red: 0.0, green: 0.6, blue: 1.0)
-        static let outerGlowOpacity: Double = 0.4
-        static let middleGlowOpacity: Double = 0.6
-        static let outerGlowBlur: CGFloat = 6
-        static let middleGlowBlur: CGFloat = 3
-        static let innerGlowBlur: CGFloat = 0.5
-        static let outerGlowMultiplier: CGFloat = 1.2
-        static let middleGlowMultiplier: CGFloat = 0.8
-        static let innerGlowMultiplier: CGFloat = 0.3
-        static let gradientRotationDuration: TimeInterval = 3.0
-        static let fadeDuration: TimeInterval = 0.2
-    }
-    
-    var body: some View {
-        ZStack {
-            // Outer glow layer
-            RoundedRectangle(cornerRadius: cornerRadius)
-                .stroke(
-                    AngularGradient(
-                        gradient: Gradient(colors: [
-                            Appearance.pinkColor, Appearance.blueColor,
-                            Appearance.pinkColor, Appearance.blueColor, Appearance.pinkColor
-                        ]),
-                        center: .center,
-                        startAngle: .degrees(phase),
-                        endAngle: .degrees(phase + 360)
-                    ),
-                    lineWidth: lineWidth * Appearance.outerGlowMultiplier
-                )
-                .blur(radius: Appearance.outerGlowBlur)
-                .opacity(Appearance.outerGlowOpacity)
-            
-            // Middle glow layer
-            RoundedRectangle(cornerRadius: cornerRadius)
-                .stroke(
-                    AngularGradient(
-                        gradient: Gradient(colors: [
-                            Appearance.pinkColor, Appearance.blueColor,
-                            Appearance.pinkColor, Appearance.blueColor, Appearance.pinkColor
-                        ]),
-                        center: .center,
-                        startAngle: .degrees(phase),
-                        endAngle: .degrees(phase + 360)
-                    ),
-                    lineWidth: lineWidth * Appearance.middleGlowMultiplier
-                )
-                .blur(radius: Appearance.middleGlowBlur)
-                .opacity(Appearance.middleGlowOpacity)
-            
-            // Inner sharp layer
-            RoundedRectangle(cornerRadius: cornerRadius)
-                .stroke(
-                    AngularGradient(
-                        gradient: Gradient(colors: [
-                            Appearance.pinkColor, Appearance.blueColor,
-                            Appearance.pinkColor, Appearance.blueColor, Appearance.pinkColor
-                        ]),
-                        center: .center,
-                        startAngle: .degrees(phase),
-                        endAngle: .degrees(phase + 360)
-                    ),
-                    lineWidth: lineWidth * Appearance.innerGlowMultiplier
-                )
-                .blur(radius: Appearance.innerGlowBlur)
-        }
-        .opacity(isVisible ? 1 : 0)
-        .animation(.easeInOut(duration: Appearance.fadeDuration), value: isVisible)
-        .allowsHitTesting(false)
-        .onChange(of: isVisible) { oldValue, newValue in
-            if newValue {
-                startAnimation()
-            } else {
-                stopAnimation()
-            }
-        }
-        .onAppear {
-            if isVisible {
-                startAnimation()
-            }
-        }
-        .onDisappear {
-            stopAnimation()
-        }
-    }
-    
-    private func startAnimation() {
-        animationTask?.cancel()
-        animationTask = Task {
-            while !Task.isCancelled {
-                withAnimation(.linear(duration: Appearance.gradientRotationDuration)) {
-                    phase += 360
-                }
-                try? await Task.sleep(nanoseconds: UInt64(Appearance.gradientRotationDuration * 1_000_000_000))
-            }
-        }
-    }
-    
-    private func stopAnimation() {
-        animationTask?.cancel()
-        animationTask = nil
-    }
-}
 
 // MARK: - Loading Overlay View
 
@@ -423,17 +290,7 @@ class OverlayController: NSObject, NSWindowDelegate, ObservableObject {
     /// Key: NSWindow, Value: Array of BrowserViewControllers
     private var windowBrowserViewControllers: [NSWindow: [BrowserViewController]] = [:]
     
-    /// Focus indicator hosting views for each window.
-    /// Key: NSWindow, Value: Array of ClickThroughHostingView for focus indicators
-    private var windowFocusIndicators: [NSWindow: [ClickThroughHostingView<FocusIndicatorView>]] = [:]
     
-    /// Browser views for each window (for repositioning focus indicators).
-    /// Key: NSWindow, Value: Array of BrowserView instances
-    private var windowBrowserViews: [NSWindow: [NSView]] = [:]
-    
-    /// Stack views for each window (for coordinate conversion).
-    /// Key: NSWindow, Value: NSStackView containing browser views
-    private var windowStackViews: [NSWindow: NSStackView] = [:]
     
     // MARK: - Window Hibernation
     
@@ -758,13 +615,19 @@ class OverlayController: NSObject, NSWindowDelegate, ObservableObject {
         
         var browserViewControllers: [BrowserViewController] = []
         var browserViews: [NSView] = []
-        var focusIndicators: [ClickThroughHostingView<FocusIndicatorView>] = []
         
         for (index, service) in sortedServices.enumerated() {
             if let webService = windowServiceManager.webServices[service.id] {
                 let webView = webService.webView
                 let isFirstService = index == 0
-                let controller = BrowserViewController(webView: webView, service: service, isFirstService: isFirstService)
+                
+                // Pass app focus publisher to BrowserViewController for proper focus indicator binding
+                let controller = BrowserViewController(
+                    webView: webView, 
+                    service: service, 
+                    isFirstService: isFirstService,
+                    appFocusPublisher: self.$isAppFocused.eraseToAnyPublisher()
+                )
                 browserViewControllers.append(controller)
                 
                 // Get the BrowserView directly - no wrapper container
@@ -778,39 +641,17 @@ class OverlayController: NSObject, NSWindowDelegate, ObservableObject {
                 
                 browserViews.append(browserView)
                 
-                // Create focus indicator for this service (positioned independently)
-                let focusIndicator = FocusIndicatorView(
-                    isVisible: false,
-                    cornerRadius: 8,
-                    lineWidth: 2
-                )
-                let focusHostingView = ClickThroughHostingView(rootView: focusIndicator)
-                focusHostingView.translatesAutoresizingMaskIntoConstraints = false
-                focusHostingView.wantsLayer = true
-                focusHostingView.layer?.backgroundColor = NSColor.clear.cgColor
-                focusIndicators.append(focusHostingView)
-                
-                // Add focus indicator directly to container view (not in stack)
-                containerView.addSubview(focusHostingView)
-                
                 // Register the controller with ServiceManager for delegate handoff
                 windowServiceManager.browserViewControllers[service.id] = controller
                 
-                // Set up focus state binding for this service
-                self.bindFocusState(
-                    focusHostingView: focusHostingView,
-                    browserController: controller,
-                    for: window
-                )
+                print("✅ [DIRECT LAYOUT] Created BrowserView directly for \(service.name)")
             }
         }
         
-        // Store controllers and focus indicators for this window
+        // Store controllers for this window
         windowBrowserViewControllers[window] = browserViewControllers
-        windowFocusIndicators[window] = focusIndicators
-        windowBrowserViews[window] = browserViews
         
-        // CRITICAL: Put BrowserViews directly in stack view (original working pattern)
+        // DIRECT PATTERN: Put BrowserView instances directly into NSStackView (bb49011 pattern)
         let browserStackView = NSStackView(views: browserViews)
         browserStackView.distribution = .fillEqually
         browserStackView.orientation = .horizontal
@@ -828,6 +669,8 @@ class OverlayController: NSObject, NSWindowDelegate, ObservableObject {
         containerView.addSubview(browserStackView)
         containerView.addSubview(inputBarHostingView)
         
+        print("✅ [DIRECT LAYOUT] \(browserViews.count) BrowserViews added directly to stack")
+        
         let constraints = [
             // Browser stack with margins
             browserStackView.topAnchor.constraint(equalTo: containerView.topAnchor, constant: 0),
@@ -844,93 +687,11 @@ class OverlayController: NSObject, NSWindowDelegate, ObservableObject {
         NSLayoutConstraint.activate(constraints)
         stackViewConstraints = constraints
         
-        // Store stack view for repositioning
-        windowStackViews[window] = browserStackView
         
-        // Position focus indicators after layout is established
-        DispatchQueue.main.async {
-            self.positionFocusIndicators(
-                browserViews: browserViews,
-                focusIndicators: focusIndicators,
-                browserStackView: browserStackView
-            )
-        }
+        // Focus indicators are now handled individually by each BrowserViewController
+        // Each BrowserViewController manages its own focus indicator with proper app focus binding
     }
     
-    /// Positions focus indicators to exactly match their corresponding BrowserView frames.
-    ///
-    /// Called after layout is established to manually position the independent focus overlays.
-    /// This ensures each focus indicator perfectly covers its BrowserView without affecting layout.
-    ///
-    /// - Parameters:
-    ///   - browserViews: Array of BrowserView instances in stack view
-    ///   - focusIndicators: Array of focus indicator views to position
-    ///   - browserStackView: The stack view containing the browser views
-    private func positionFocusIndicators(
-        browserViews: [NSView],
-        focusIndicators: [ClickThroughHostingView<FocusIndicatorView>],
-        browserStackView: NSStackView
-    ) {
-        guard browserViews.count == focusIndicators.count else {
-            print("⚠️ Mismatch between browser views (\(browserViews.count)) and focus indicators (\(focusIndicators.count))")
-            return
-        }
-        
-        // Force layout if needed
-        browserStackView.layoutSubtreeIfNeeded()
-        
-        for (index, browserView) in browserViews.enumerated() {
-            let focusIndicator = focusIndicators[index]
-            
-            // Get the frame of the browser view in the container view's coordinate system
-            guard let containerView = browserStackView.superview else { continue }
-            
-            let browserFrameInContainer = browserStackView.convert(browserView.frame, to: containerView)
-            
-            // Position the focus indicator to exactly match the browser view frame
-            focusIndicator.frame = browserFrameInContainer
-            
-            print("📍 Positioned focus indicator \(index): frame=\(browserFrameInContainer)")
-        }
-    }
-    
-    /// Binds focus state from browser controller and app focus to a focus indicator.
-    ///
-    /// Called for each service to connect focus state publishers.
-    /// The border is visible when BOTH app has focus AND webview has focus.
-    ///
-    /// - Parameters:
-    ///   - focusHostingView: The focus indicator hosting view to update
-    ///   - browserController: Source of webview focus state
-    ///   - window: Window this binding belongs to
-    private func bindFocusState(
-        focusHostingView: ClickThroughHostingView<FocusIndicatorView>,
-        browserController: BrowserViewController,
-        for window: NSWindow
-    ) {
-        // Combine both focus states to determine if border should be visible
-        Publishers.CombineLatest(
-            browserController.$hasWebViewFocus,
-            self.$isAppFocused
-        )
-        .map { webViewFocused, appFocused in
-            return webViewFocused && appFocused
-        }
-        .removeDuplicates()
-        .sink { [weak self, weak focusHostingView, weak browserController] shouldShowBorder in
-            guard let self = self, let focusView = focusHostingView, let controller = browserController else { return }
-            print("🎯 Focus state changed for \(controller.serviceName): webView=\(controller.hasWebViewFocus), app=\(self.isAppFocused), border=\(shouldShowBorder)")
-            
-            // Update the SwiftUI view's visibility
-            let updatedIndicator = FocusIndicatorView(
-                isVisible: shouldShowBorder,
-                cornerRadius: 8,
-                lineWidth: 2
-            )
-            focusView.rootView = updatedIndicator
-        }
-        .store(in: &cancellables)
-    }
 
     func hideOverlay() {
         // Close all windows
@@ -941,7 +702,6 @@ class OverlayController: NSObject, NSWindowDelegate, ObservableObject {
         // Clean up all window-specific ServiceManagers and controllers
         windowServiceManagers.removeAll()
         windowBrowserViewControllers.removeAll()
-        windowFocusIndicators.removeAll()
         // Clean up hibernation data
         windowSnapshots.removeAll()
         hibernatedWindows.removeAll()
@@ -963,9 +723,8 @@ class OverlayController: NSObject, NSWindowDelegate, ObservableObject {
         // Note: WebView cleanup is now handled in windowWillClose delegate method
         // This ensures script message handlers are removed before deallocation
         
-        // Clean up view controllers and focus indicators for this window
+        // Clean up view controllers for this window
         windowBrowserViewControllers.removeValue(forKey: window)
-        windowFocusIndicators.removeValue(forKey: window)
         
         // Clean up hibernation data
         windowSnapshots.removeValue(forKey: window)
@@ -1037,7 +796,7 @@ class OverlayController: NSObject, NSWindowDelegate, ObservableObject {
     /// Updates the `isAppFocused` published property to `true`, which triggers
     /// focus indicator borders to become visible in UI components throughout the app.
     @objc func applicationDidBecomeActive(_ notification: Notification) {
-        print("🔵 App became active - focus indicators enabled")
+        print("🔵 [APP FOCUS DEBUG] App became active - focus indicators enabled, isAppFocused: false -> true")
         isAppFocused = true
     }
     
@@ -1051,7 +810,7 @@ class OverlayController: NSObject, NSWindowDelegate, ObservableObject {
     /// Updates the `isAppFocused` published property to `false`, which triggers
     /// focus indicator borders to become hidden in UI components throughout the app.
     @objc func applicationWillResignActive(_ notification: Notification) {
-        print("🔴 App resigned active - focus indicators disabled")
+        print("🔴 [APP FOCUS DEBUG] App resigned active - focus indicators disabled, isAppFocused: true -> false")
         isAppFocused = false
     }
     
@@ -1177,9 +936,8 @@ class OverlayController: NSObject, NSWindowDelegate, ObservableObject {
             NSLayoutConstraint.deactivate(stackViewConstraints)
             stackViewConstraints.removeAll()
             
-            // Clear browser view controllers and focus indicators for this window
+            // Clear browser view controllers for this window
             windowBrowserViewControllers.removeValue(forKey: window)
-            windowFocusIndicators.removeValue(forKey: window)
             
             // Recreate browser views with updated services
             setupBrowserViews(in: contentView, using: serviceManager, for: window)
@@ -1215,7 +973,7 @@ class OverlayController: NSObject, NSWindowDelegate, ObservableObject {
     /// First window: Up to 7 seconds with typewriter effect
     /// Subsequent windows: Brief flash then fade out
     private func setupLoadingOverlay(for window: NSWindow, in containerView: NSView) {
-        // Create SwiftUI wrapper for binding
+        // Create SwiftUI binding for loading overlay opacity
         loadingOverlayOpacities[window] = 1.0
         
         let loadingView = LoadingOverlayView(
@@ -1337,19 +1095,8 @@ class OverlayController: NSObject, NSWindowDelegate, ObservableObject {
     // MARK: - NSWindowDelegate
     
     func windowDidResize(_ notification: Notification) {
-        guard let window = notification.object as? NSWindow,
-              let browserViews = windowBrowserViews[window],
-              let focusIndicators = windowFocusIndicators[window],
-              let stackView = windowStackViews[window] else { return }
-        
-        // Reposition focus indicators after window resize
-        DispatchQueue.main.async {
-            self.positionFocusIndicators(
-                browserViews: browserViews,
-                focusIndicators: focusIndicators,
-                browserStackView: stackView
-            )
-        }
+        // Focus indicators are now handled by individual BrowserViewController instances
+        // Each BrowserViewController automatically manages its own focus indicator positioning
     }
     
     func windowWillClose(_ notification: Notification) {
@@ -1410,11 +1157,6 @@ class OverlayController: NSObject, NSWindowDelegate, ObservableObject {
             
             // Clean up view controller references
             windowBrowserViewControllers.removeValue(forKey: window)
-            
-            // Clean up focus indicator references
-            windowFocusIndicators.removeValue(forKey: window)
-            windowBrowserViews.removeValue(forKey: window)
-            windowStackViews.removeValue(forKey: window)
             
             print("✅ [\(Date().timeIntervalSince1970)] windowWillClose cleanup complete")
         }

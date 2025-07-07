@@ -27,6 +27,7 @@
 import AppKit
 import WebKit
 import SwiftUI
+import Combine
 
 // MARK: - Timing Constants
 
@@ -35,6 +36,152 @@ private enum BrowserTimings {
     /// Delay before allowing WebView to capture focus
     /// Prevents unwanted text selection during initial page load
     static let focusCaptureDelay: TimeInterval = 3.0
+}
+
+// MARK: - Focus Indicator Components
+
+/// Observable state model for focus indicators.
+///
+/// This allows SwiftUI views to reactively update when focus state changes
+/// without recreating the entire view hierarchy.
+private class FocusIndicatorState: ObservableObject {
+    @Published var isVisible: Bool = false
+    
+    init(isVisible: Bool = false) {
+        self.isVisible = isVisible
+    }
+}
+
+/// NSHostingView subclass that passes through all mouse events.
+///
+/// This ensures the focus indicator border doesn't block any clicks or interactions
+/// with the underlying browser content.
+private class ClickThroughHostingView<Content: View>: NSHostingView<Content> {
+    override func hitTest(_ point: NSPoint) -> NSView? {
+        // Always return nil to pass through all mouse events
+        return nil
+    }
+    
+    override var acceptsFirstResponder: Bool {
+        return false
+    }
+}
+
+/// Reusable animated glowing border component for focus indication.
+///
+/// Provides a consistent visual language for focus states using
+/// the same pink-to-blue animated gradient pattern as other app components.
+private struct FocusIndicatorView: View {
+    @ObservedObject var focusState: FocusIndicatorState
+    let cornerRadius: CGFloat
+    let lineWidth: CGFloat
+    
+    @State private var phase: CGFloat = 0
+    @State private var animationTask: Task<Void, Never>?
+    
+    private enum Appearance {
+        static let pinkColor = Color(red: 1.0, green: 0.0, blue: 0.8)
+        static let blueColor = Color(red: 0.0, green: 0.6, blue: 1.0)
+        static let outerGlowOpacity: Double = 0.4
+        static let middleGlowOpacity: Double = 0.6
+        static let outerGlowBlur: CGFloat = 6
+        static let middleGlowBlur: CGFloat = 3
+        static let innerGlowBlur: CGFloat = 0.5
+        static let outerGlowMultiplier: CGFloat = 1.2
+        static let middleGlowMultiplier: CGFloat = 0.8
+        static let innerGlowMultiplier: CGFloat = 0.3
+        static let gradientRotationDuration: TimeInterval = 3.0
+        static let fadeDuration: TimeInterval = 0.2
+    }
+    
+    var body: some View {
+        ZStack {
+            // Outer glow layer
+            RoundedRectangle(cornerRadius: cornerRadius)
+                .stroke(
+                    AngularGradient(
+                        gradient: Gradient(colors: [
+                            Appearance.pinkColor, Appearance.blueColor,
+                            Appearance.pinkColor, Appearance.blueColor, Appearance.pinkColor
+                        ]),
+                        center: .center,
+                        startAngle: .degrees(phase),
+                        endAngle: .degrees(phase + 360)
+                    ),
+                    lineWidth: lineWidth * Appearance.outerGlowMultiplier
+                )
+                .blur(radius: Appearance.outerGlowBlur)
+                .opacity(Appearance.outerGlowOpacity)
+            
+            // Middle glow layer
+            RoundedRectangle(cornerRadius: cornerRadius)
+                .stroke(
+                    AngularGradient(
+                        gradient: Gradient(colors: [
+                            Appearance.pinkColor, Appearance.blueColor,
+                            Appearance.pinkColor, Appearance.blueColor, Appearance.pinkColor
+                        ]),
+                        center: .center,
+                        startAngle: .degrees(phase),
+                        endAngle: .degrees(phase + 360)
+                    ),
+                    lineWidth: lineWidth * Appearance.middleGlowMultiplier
+                )
+                .blur(radius: Appearance.middleGlowBlur)
+                .opacity(Appearance.middleGlowOpacity)
+            
+            // Inner sharp layer
+            RoundedRectangle(cornerRadius: cornerRadius)
+                .stroke(
+                    AngularGradient(
+                        gradient: Gradient(colors: [
+                            Appearance.pinkColor, Appearance.blueColor,
+                            Appearance.pinkColor, Appearance.blueColor, Appearance.pinkColor
+                        ]),
+                        center: .center,
+                        startAngle: .degrees(phase),
+                        endAngle: .degrees(phase + 360)
+                    ),
+                    lineWidth: lineWidth * Appearance.innerGlowMultiplier
+                )
+                .blur(radius: Appearance.innerGlowBlur)
+        }
+        .opacity(focusState.isVisible ? 1 : 0)
+        .animation(.easeInOut(duration: Appearance.fadeDuration), value: focusState.isVisible)
+        .allowsHitTesting(false)
+        .onChange(of: focusState.isVisible) { oldValue, newValue in
+            if newValue {
+                startAnimation()
+            } else {
+                stopAnimation()
+            }
+        }
+        .onAppear {
+            if focusState.isVisible {
+                startAnimation()
+            }
+        }
+        .onDisappear {
+            stopAnimation()
+        }
+    }
+    
+    private func startAnimation() {
+        animationTask?.cancel()
+        animationTask = Task {
+            while !Task.isCancelled {
+                withAnimation(.linear(duration: Appearance.gradientRotationDuration)) {
+                    phase += 360
+                }
+                try? await Task.sleep(nanoseconds: UInt64(Appearance.gradientRotationDuration * 1_000_000_000))
+            }
+        }
+    }
+    
+    private func stopAnimation() {
+        animationTask?.cancel()
+        animationTask = nil
+    }
 }
 
 // MARK: - Browser View Controller
@@ -101,13 +248,23 @@ class BrowserViewController: NSViewController, ObservableObject {
     /// Timer for periodic focus state checking
     private var focusCheckTimer: Timer?
     
+    /// Focus indicator hosting view that displays animated border around WebView
+    private var focusIndicatorHostingView: ClickThroughHostingView<FocusIndicatorView>?
+    
+    /// Publisher for app focus state from OverlayController
+    private let appFocusPublisher: AnyPublisher<Bool, Never>
+    
+    /// Combine cancellables for focus binding
+    private var cancellables = Set<AnyCancellable>()
+    
     /// Unique identifier for debugging lifecycle (first 8 chars of UUID)
     private let instanceId = UUID().uuidString.prefix(8)
     
-    init(webView: WKWebView, service: AIService, isFirstService: Bool = false) {
+    init(webView: WKWebView, service: AIService, isFirstService: Bool = false, appFocusPublisher: AnyPublisher<Bool, Never>) {
         self.webView = webView
         self.service = service
         self.isFirstService = isFirstService
+        self.appFocusPublisher = appFocusPublisher
         self.browserView = BrowserView(webView: webView, isFirstService: isFirstService)
         
         super.init(nibName: nil, bundle: nil)
@@ -138,6 +295,9 @@ class BrowserViewController: NSViewController, ObservableObject {
     deinit {
         focusCheckTimer?.invalidate()
         focusCheckTimer = nil
+        focusIndicatorHostingView?.removeFromSuperview()
+        focusIndicatorHostingView = nil
+        cancellables.removeAll()
         print("🔴 [\(Date().timeIntervalSince1970)] BrowserViewController DEINIT \(instanceId) for \(service.name)")
     }
     
@@ -162,6 +322,7 @@ class BrowserViewController: NSViewController, ObservableObject {
     override func viewDidLoad() {
         super.viewDidLoad()
         setupToolbarButtons()
+        setupFocusIndicator()
     }
     
     /// Sets up navigation toolbar buttons with actions.
@@ -217,6 +378,76 @@ class BrowserViewController: NSViewController, ObservableObject {
         // Set up URL field action
         browserView.urlField.target = self
         browserView.urlField.action = #selector(loadURL)
+    }
+    
+    /// Sets up focus indicator that displays animated border around WebView.
+    ///
+    /// Called by:
+    /// - `viewDidLoad()` after toolbar setup
+    ///
+    /// This creates a focus indicator border that:
+    /// - Combines WebView focus state AND app focus state (both must be true)
+    /// - Is pinned directly to the WebView using Auto Layout constraints  
+    /// - Passes through all mouse events to the underlying WebView
+    /// - Displays animated pink-to-blue gradient border when both conditions are met
+    private func setupFocusIndicator() {
+        // Create focus state for reactivity - starts as false
+        let focusState = FocusIndicatorState(isVisible: false)
+        
+        // Create focus indicator view bound to reactive state
+        let focusIndicator = FocusIndicatorView(
+            focusState: focusState,
+            cornerRadius: 8,
+            lineWidth: 2
+        )
+        
+        // Create click-through hosting view
+        let hostingView = ClickThroughHostingView(rootView: focusIndicator)
+        hostingView.translatesAutoresizingMaskIntoConstraints = false
+        hostingView.wantsLayer = true
+        hostingView.layer?.backgroundColor = NSColor.clear.cgColor
+        
+        // Add to view hierarchy - hostingView and webView are now siblings in BrowserView
+        view.addSubview(hostingView)
+        
+        // Pin focus indicator directly to WebView bounds
+        // This is much simpler than coordinate conversion since they're siblings
+        NSLayoutConstraint.activate([
+            hostingView.leadingAnchor.constraint(equalTo: browserView.webView.leadingAnchor),
+            hostingView.trailingAnchor.constraint(equalTo: browserView.webView.trailingAnchor),
+            hostingView.topAnchor.constraint(equalTo: browserView.webView.topAnchor),
+            hostingView.bottomAnchor.constraint(equalTo: browserView.webView.bottomAnchor)
+        ])
+        
+        // Store reference for cleanup
+        self.focusIndicatorHostingView = hostingView
+        
+        // CRITICAL: Bind focus state to BOTH webview focus AND app focus
+        // Border only shows when BOTH conditions are true
+        Publishers.CombineLatest(
+            self.$hasWebViewFocus,
+            appFocusPublisher
+        )
+        .map { webViewFocused, appFocused in
+            return webViewFocused && appFocused
+        }
+        .removeDuplicates()
+        .sink { [weak focusState, weak self] shouldShowBorder in
+            guard let state = focusState, let self = self else { return }
+            
+            // Update the focus state reactively - SwiftUI will handle the UI update
+            DispatchQueue.main.async {
+                if state.isVisible != shouldShowBorder {
+                    print("🔄 [FOCUS UPDATE] \(self.service.name): webView=\(self.hasWebViewFocus), border=\(state.isVisible) -> \(shouldShowBorder)")
+                    state.isVisible = shouldShowBorder
+                } else {
+                    print("➖ [FOCUS UNCHANGED] \(self.service.name): border state already \(shouldShowBorder)")
+                }
+            }
+        }
+        .store(in: &cancellables)
+        
+        print("🎯 [FOCUS INDICATOR] Set up for \(service.name) - pinned directly to WebView with proper focus binding")
     }
     
     /// Navigates back in WebView history.
@@ -344,15 +575,27 @@ class BrowserViewController: NSViewController, ObservableObject {
     /// Sets up JavaScript-based focus detection within the webview.
     ///
     /// Called after initial page load delay to avoid interfering with page setup.
-    /// Injects focus/blur event listeners and starts periodic focus checking.
+    /// Sets up message handler and starts periodic focus checking.
+    /// Focus listeners are injected after each navigation in didFinish.
     ///
     /// Focus detection methods:
-    /// 1. JavaScript event listeners for real-time focus/blur detection
+    /// 1. JavaScript event listeners for real-time focus/blur detection (re-injected per page)
     /// 2. Periodic polling as backup for missed events
     /// 3. Integration with native responder chain events
     private func setupFocusDetection() {
-        // Inject JavaScript to detect focus state changes
-        let focusScript = """
+        // Add message handler for focus state updates (only once)
+        webView.configuration.userContentController.add(self, name: "focusHandler")
+        
+        // Start periodic focus checking as backup
+        startPeriodicFocusChecking()
+    }
+    
+    /// Returns the JavaScript code for focus detection.
+    ///
+    /// Extracted as separate method so it can be re-injected after every navigation.
+    /// This ensures every page has focus listeners, even after navigation changes.
+    private func focusDetectionScript() -> String {
+        return """
             (function() {
                 function updateFocusState() {
                     const hasFocus = document.hasFocus() && 
@@ -376,15 +619,21 @@ class BrowserViewController: NSViewController, ObservableObject {
                 updateFocusState();
             })();
             """
-        
-        let userScript = WKUserScript(source: focusScript, injectionTime: .atDocumentEnd, forMainFrameOnly: false)
-        webView.configuration.userContentController.addUserScript(userScript)
-        
-        // Add message handler for focus state updates
-        webView.configuration.userContentController.add(self, name: "focusHandler")
-        
-        // Start periodic focus checking as backup
-        startPeriodicFocusChecking()
+    }
+    
+    /// Injects focus detection script into the current page.
+    ///
+    /// Called after every navigation to ensure focus listeners are present.
+    /// Uses evaluateJavaScript instead of userScript to avoid accumulation.
+    private func injectFocusDetectionScript() {
+        let script = focusDetectionScript()
+        webView.evaluateJavaScript(script) { [weak self] _, error in
+            if let error = error {
+                print("⚠️ Failed to inject focus detection script for \(self?.service.name ?? "unknown"): \(error)")
+            } else {
+                print("✅ Focus detection script injected for \(self?.service.name ?? "unknown")")
+            }
+        }
     }
     
     /// Starts periodic checking of webview focus state.
@@ -425,8 +674,10 @@ class BrowserViewController: NSViewController, ObservableObject {
             
             if let resultDict = result as? [String: Any],
                let hasFocus = resultDict["hasFocus"] as? Bool {
+                let activeElement = resultDict["activeElement"] as? String ?? "unknown"
                 DispatchQueue.main.async {
                     if self.hasWebViewFocus != hasFocus {
+                        print("⏰ [PERIODIC DEBUG] Focus changed for \(self.service.name): \(self.hasWebViewFocus) -> \(hasFocus), activeElement: \(activeElement)")
                         self.hasWebViewFocus = hasFocus
                     }
                 }
@@ -454,6 +705,9 @@ extension BrowserViewController {
     }
     
     override func becomeFirstResponder() -> Bool {
+        let eventType = NSApp.currentEvent?.type
+        print("🖱️ [RESPONDER DEBUG] becomeFirstResponder called for \(service.name), allowFocusCapture: \(allowFocusCapture), eventType: \(eventType?.rawValue ?? 999)")
+        
         // Only allow the webView to become first responder if:
         // 1. Focus capture is allowed (after 3-second delay), AND
         // 2. It's been explicitly clicked (left or right mouse)
@@ -462,6 +716,7 @@ extension BrowserViewController {
         if allowFocusCapture && (NSApp.currentEvent?.type == .leftMouseDown || 
                                   NSApp.currentEvent?.type == .rightMouseDown) {
             let didBecome = webView.becomeFirstResponder()
+            print("📱 [RESPONDER DEBUG] WebView becomeFirstResponder for \(service.name): \(didBecome)")
             if didBecome {
                 // Update focus state when webview gains native focus
                 DispatchQueue.main.asyncAfter(deadline: .now() + 0.1) {
@@ -470,6 +725,7 @@ extension BrowserViewController {
             }
             return didBecome
         }
+        print("❌ [RESPONDER DEBUG] Blocked becomeFirstResponder for \(service.name)")
         return false
     }
 }
@@ -552,6 +808,9 @@ extension BrowserViewController: WKNavigationDelegate {
             self?.browserView.urlField.toolTip = fullURL.isEmpty ? "Enter URL..." : fullURL
             self?.updateBackButton()
         }
+        
+        // Re-inject focus detection script after navigation to ensure every page has listeners
+        injectFocusDetectionScript()
         
         // Extract favicon after page loads
         print("🔍 Extracting favicon for \(service.name) from URL: \(webView.url?.absoluteString ?? "unknown")")
@@ -652,9 +911,13 @@ extension BrowserViewController: WKScriptMessageHandler {
         
         DispatchQueue.main.async { [weak self] in
             guard let self = self else { return }
+            let activeElement = messageBody["activeElement"] as? String ?? "unknown"
+            
             if self.hasWebViewFocus != hasFocus {
-                print("📱 WebView focus changed for \(self.service.name): \(hasFocus)")
+                print("🎯 [FOCUS DEBUG] WebView focus changed for \(self.service.name): \(self.hasWebViewFocus) -> \(hasFocus), activeElement: \(activeElement)")
                 self.hasWebViewFocus = hasFocus
+            } else {
+                print("🔍 [FOCUS DEBUG] WebView focus message for \(self.service.name): \(hasFocus) (no change), activeElement: \(activeElement)")
             }
         }
     }
