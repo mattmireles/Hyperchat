@@ -313,6 +313,16 @@ class BrowserViewController: NSViewController, ObservableObject {
     func takeOverNavigationDelegate() {
         webView.navigationDelegate = self
         print("🎯 [\(Date().timeIntervalSince1970)] BrowserViewController \(instanceId) took over navigation delegate for \(service.name)")
+
+        // Manually update the URL bar with the current URL when taking over.
+        // This ensures the initial URL loaded by ServiceManager is displayed.
+        DispatchQueue.main.async { [weak self] in
+            guard let self = self else { return }
+            let fullURL = self.webView.url?.absoluteString ?? ""
+            self.browserView.urlField.stringValue = self.cleanURLForDisplay(fullURL)
+            self.browserView.urlField.toolTip = fullURL.isEmpty ? "Enter URL..." : fullURL
+            self.updateBackButton()
+        }
     }
     
     override func loadView() {
