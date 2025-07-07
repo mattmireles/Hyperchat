@@ -64,18 +64,8 @@ class BrowserView: NSView {
         flexibleSpacer.setContentHuggingPriority(.init(1), for: .horizontal)
         flexibleSpacer.setContentCompressionResistancePriority(.init(1), for: .horizontal)
         
-        let topToolbar: NSStackView
-        if isFirstService {
-            // For Google: add fixed spacing for traffic lights
-            let trafficLightSpacer = NSView()
-            trafficLightSpacer.widthAnchor.constraint(equalToConstant: 70).isActive = true
-            
-            // Note: Button views will be set up by the controller
-            topToolbar = NSStackView(views: [trafficLightSpacer, flexibleSpacer])
-        } else {
-            // Standard toolbar for other services
-            topToolbar = NSStackView(views: [flexibleSpacer])
-        }
+        // Standard toolbar for all services - no special cases
+        let topToolbar = NSStackView(views: [flexibleSpacer])
         topToolbar.orientation = .horizontal
         topToolbar.spacing = 6
         topToolbar.distribution = .fill
