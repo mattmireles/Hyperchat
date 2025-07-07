@@ -43,7 +43,7 @@ class ServiceManagerTests: XCTestCase {
         // Verify each active service has a WebView
         for service in serviceManager.activeServices {
             XCTAssertNotNil(serviceManager.webServices[service.id])
-            XCTAssertNotNil(serviceManager.webServices[service.id]?.browserView.webView)
+            XCTAssertNotNil(serviceManager.webServices[service.id]?.webView)
         }
     }
     
@@ -54,7 +54,7 @@ class ServiceManagerTests: XCTestCase {
             return
         }
         
-        let webView = webService.browserView.webView
+        let webView = webService.webView
         let configuration = webView.configuration
         
         // Verify WebView configuration
@@ -143,7 +143,7 @@ class ServiceManagerTests: XCTestCase {
         
         for service in serviceManager.activeServices {
             if let webService = serviceManager.webServices[service.id] {
-                let webView = webService.browserView.webView
+                let webView = webService.webView
                 XCTAssertEqual(webView.configuration.processPool, processPool)
             }
         }
