@@ -74,11 +74,14 @@ struct TypewriterText: View {
             .foregroundStyle(
                 LinearGradient(
                     gradient: Gradient(stops: [
-                        .init(color: Color(red: 1.0, green: 0.0, blue: 0.6), location: 0.0),      // Pink
-                        .init(color: Color(red: 0.6, green: 0.2, blue: 0.8), location: 1)     // Purple
+                        .init(color: Color(red: 1.0, green: 0.0, blue: 0.8), location: 0.0),        // Pink
+                        .init(color: Color(red: 1.0, green: 0.0, blue: 0.8), location: 0.4),        // Pink
+                        .init(color: Color(red: 0.6, green: 0.2, blue: 0.8), location: 0.6),      // Purple
+                        .init(color: Color(red: 0.0, green: 0.6, blue: 1.0), location: 0.85),      // Blue
+                        .init(color: Color(red: 0.0, green: 0.6, blue: 1.0), location: 1.0)      // Blue
                     ]),
-                    startPoint: .leading,
-                    endPoint: .trailing
+                    startPoint: .top,
+                    endPoint: .bottom
                 )
             )
             .mask(
@@ -149,11 +152,14 @@ struct LoadingOverlayView: View {
                     .foregroundStyle(
                         LinearGradient(
                             gradient: Gradient(stops: [
-                        .init(color: Color(red: 1.0, green: 0.0, blue: 0.6), location: 0.0),      // Pink
-                        .init(color: Color(red: 0.6, green: 0.2, blue: 0.8), location: 1)     // Purple
-                            ]),
-                            startPoint: .leading,
-                            endPoint: .trailing
+                        .init(color: Color(red: 1.0, green: 0.0, blue: 0.8), location: 0.0),        // Pink
+                        .init(color: Color(red: 1.0, green: 0.0, blue: 0.8), location: 0.4),        // Pink
+                        .init(color: Color(red: 0.6, green: 0.2, blue: 0.8), location: 0.6),      // Purple
+                        .init(color: Color(red: 0.0, green: 0.6, blue: 1.0), location: 0.85),      // Blue
+                        .init(color: Color(red: 0.0, green: 0.6, blue: 1.0), location: 1.0)      // Blue
+                    ]),
+                            startPoint: .top,
+                            endPoint: .bottom
                         )
                     )
                     .padding(.bottom, 75)
