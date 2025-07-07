@@ -152,11 +152,20 @@ struct ClaudeInfoView: View {
                 .foregroundColor(.primary)
             
             // Info message
-            Text("When you login to Claude using your email, it will send you a confirmation email. DO NOT CLICK THE LINK IN THE EMAIL. Instead, right-click on the button the email, select \"Copy URL\" and paste the URL into the URL bar above the Claude window. \n It's a little wonky. Sorry about that.")
+            (Text("When you login to Claude using your email, it will send you a confirmation email. ")
+                .foregroundColor(.secondary) +
+             Text("DO NOT CLICK THE LINK IN THE EMAIL.")
+                .fontWeight(.bold)
+                .foregroundColor(.red) +
+             Text("\n\nInstead, right-click on the button in the email, select ")
+                .foregroundColor(.secondary) +
+             Text("\"Copy URL\"")
+                .fontWeight(.bold)
+                .foregroundColor(.secondary) +
+             Text(" and paste the URL into the URL bar above the Claude window.\n\nIt's a little wonky. Sorry about that.")
+                .foregroundColor(.secondary))
                 .font(.system(size: 14))
-                .foregroundColor(.secondary)
-                .multilineTextAlignment(.center)
-                .lineLimit(nil)
+                .multilineTextAlignment(.leading)
                 .fixedSize(horizontal: false, vertical: true)
         }
         .padding(20)

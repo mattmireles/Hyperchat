@@ -10,7 +10,7 @@ set -u
 
 # Dynamically determine project root. This script can now be run from anywhere.
 SCRIPT_DIR=$(cd -- "$(dirname -- "${BASH_SOURCE[0]}")" &> /dev/null && pwd)
-PROJECT_DIR=$(dirname "$SCRIPT_DIR")
+PROJECT_DIR=$(dirname "$(dirname "$SCRIPT_DIR")")
 
 # Configuration
 APP_NAME="Hyperchat"

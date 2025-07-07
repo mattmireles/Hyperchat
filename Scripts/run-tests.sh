@@ -4,7 +4,7 @@
 # This script needs to be run from the macos project directory.
 # This finds the project root and cds into it.
 SCRIPT_DIR=$(cd -- "$(dirname -- "${BASH_SOURCE[0]}")" &> /dev/null && pwd)
-PROJECT_ROOT=$(dirname "$SCRIPT_DIR")
+PROJECT_ROOT=$(dirname "$(dirname "$SCRIPT_DIR")")
 MACOS_DIR="${PROJECT_ROOT}/hyperchat-macos"
 cd "${MACOS_DIR}"
 # --- END FIX ---
