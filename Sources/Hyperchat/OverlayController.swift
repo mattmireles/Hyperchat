@@ -338,6 +338,17 @@ class OverlayController: NSObject, NSWindowDelegate, ObservableObject {
     /// - `applicationWillResignActive(_:)` when app loses focus
     @Published public private(set) var isAppFocused: Bool = false
     
+    /// Published property indicating whether any main window has key window status.
+    ///
+    /// This state is used to differentiate between main window focus and prompt window focus:
+    /// - `true`: A main window (OverlayWindow) is the key window
+    /// - `false`: No main window is key (prompt window, other app, etc.)
+    ///
+    /// Updated by:
+    /// - `windowDidBecomeKey(_:)` when main window gains key status
+    /// - `windowDidResignKey(_:)` when main window loses key status
+    @Published public private(set) var isMainWindowFocused: Bool = false
+    
     // Public accessor for window's ServiceManager
     func serviceManager(for window: NSWindow) -> ServiceManager? {
         return windowServiceManagers[window]
@@ -760,7 +771,14 @@ class OverlayController: NSObject, NSWindowDelegate, ObservableObject {
     @objc func windowDidBecomeKey(_ notification: Notification) {
         // Only handle OverlayWindow instances, not PromptWindow
         guard let window = notification.object as? OverlayWindow,
-              windows.contains(where: { $0 == window }) else { return }
+              windows.contains(where: { $0 == window }) else {
+            // If this is not an OverlayWindow (e.g., PromptWindow), main windows lose focus
+            isMainWindowFocused = false
+            return
+        }
+        
+        // A main window gained key status
+        isMainWindowFocused = true
         
         // Restore this window if it was hibernated
         if hibernatedWindows.contains(window) {
@@ -785,6 +803,14 @@ class OverlayController: NSObject, NSWindowDelegate, ObservableObject {
     /// - User switches to other apps
     /// - System dialogs appear
     @objc func windowDidResignKey(_ notification: Notification) {
+        // Check if a main window lost key status
+        if let window = notification.object as? OverlayWindow,
+           windows.contains(where: { $0 == window }) {
+            // A main window resigned key status
+            // Don't immediately set isMainWindowFocused = false because another main window might become key
+            // The windowDidBecomeKey handler will update the state appropriately
+        }
+        
         // Don't automatically hibernate when window loses focus
         // Hibernation now only happens when another OverlayWindow gains focus
         // This prevents hibernation when the prompt window appears or when switching to other apps
@@ -1418,7 +1444,7 @@ struct UnifiedInputBar: View {
                 .overlay(
                     // Animated focus indicator border
                     InputFocusIndicatorView(
-                        isVisible: isInputFocused && overlayController.isAppFocused,
+                        isVisible: isInputFocused && overlayController.isAppFocused && overlayController.isMainWindowFocused,
                         cornerRadius: 10,
                         lineWidth: 4
                     )
