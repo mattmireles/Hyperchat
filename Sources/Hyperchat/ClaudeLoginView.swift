@@ -10,7 +10,9 @@ struct ClaudeLoginView: View {
     var body: some View {
         Text("This view is deprecated")
             .onAppear {
-                onComplete()
+                DispatchQueue.main.async {
+                    onComplete()
+                }
             }
     }
 }
