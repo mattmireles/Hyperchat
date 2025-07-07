@@ -26,6 +26,7 @@
 
 import Cocoa
 import SwiftUI
+import Combine
 
 // MARK: - Timing Constants
 
@@ -191,8 +192,14 @@ class PromptWindowController: NSWindowController {
     
     /// Current screen for positioning and max height calculations
     private var currentScreen: NSScreen?
+    
+    /// App focus publisher for accessing app focus state
+    private var appFocusPublisher: AnyPublisher<Bool, Never>?
+    
+    /// Tracks whether this prompt window is the key window
+    @Published public private(set) var isPromptWindowFocused: Bool = false
 
-    convenience init() {
+    init(appFocusPublisher: AnyPublisher<Bool, Never>?) {
         let window = PromptWindow(
             contentRect: NSRect(x: 0, y: 0, width: PromptWindowLayout.windowWidth, height: PromptWindowLayout.windowHeight), // Includes padding
             styleMask: [.borderless],
@@ -204,16 +211,69 @@ class PromptWindowController: NSWindowController {
         window.hasShadow = false
         window.level = .floating
 
-        self.init(window: window)
+        super.init(window: window)
+        self.appFocusPublisher = appFocusPublisher
+        setupWindowFocusTracking()
+        setupPromptView()
+    }
+    
+    convenience init() {
+        self.init(appFocusPublisher: nil)
+    }
+    
+    required init?(coder: NSCoder) {
+        fatalError("init(coder:) has not been implemented")
+    }
+    
+    deinit {
+        // Clean up notification observers
+        NotificationCenter.default.removeObserver(self)
+    }
+    
+    /// Sets up window focus tracking for the prompt window.
+    ///
+    /// Called during initialization to track when this prompt window
+    /// becomes/resigns key window status for conditional glow border display.
+    private func setupWindowFocusTracking() {
+        guard let window = window else { return }
+        
+        // Listen for this window becoming key
+        NotificationCenter.default.addObserver(
+            forName: NSWindow.didBecomeKeyNotification,
+            object: window,
+            queue: .main
+        ) { [weak self] _ in
+            self?.isPromptWindowFocused = true
+        }
+        
+        // Listen for this window resigning key
+        NotificationCenter.default.addObserver(
+            forName: NSWindow.didResignKeyNotification,
+            object: window,
+            queue: .main
+        ) { [weak self] _ in
+            self?.isPromptWindowFocused = false
+        }
+    }
+    
+    private func setupPromptView() {
+        guard let window = window else { return }
 
         // Create the SwiftUI view with callbacks for dynamic behavior
         // onHeightChange: Adjusts window height for multi-line input (future)
         // maxHeight: Provides screen-aware maximum height
-        let promptView = PromptView(onHeightChange: { [weak self] newHeight in
-            self?.adjustWindowHeight(to: newHeight)
-        }, maxHeight: { [weak self] in
-            self?.getMaxHeight() ?? 600
-        })
+        // appFocusPublisher: Provides app focus state for conditional glow border
+        // windowFocusPublisher: Provides prompt window focus state for window-specific glow border
+        let promptView = PromptView(
+            onHeightChange: { [weak self] newHeight in
+                self?.adjustWindowHeight(to: newHeight)
+            }, 
+            maxHeight: { [weak self] in
+                self?.getMaxHeight() ?? 600
+            },
+            appFocusPublisher: appFocusPublisher,
+            windowFocusPublisher: $isPromptWindowFocused.eraseToAnyPublisher()
+        )
         
         hostingController = NSHostingController(rootView: promptView)
         window.contentViewController = hostingController
@@ -331,16 +391,23 @@ class PromptWindowController: NSWindowController {
 /// Animation:
 /// - 3-second full rotation
 /// - Linear, non-reversing
-/// - Starts on view appearance
+/// - Starts/stops based on visibility state
+/// - Fades in/out when visibility changes
 struct AnimatedGradientBorder: View {
     /// Current rotation angle of gradient (0-360)
     @State private var phase: CGFloat = 0
+    
+    /// Controls border visibility and animation
+    let isVisible: Bool
     
     /// Corner radius matching the window shape
     let cornerRadius: CGFloat
     
     /// Base line width (multiplied for different layers)
     let lineWidth: CGFloat
+    
+    /// Animation task for continuous rotation
+    @State private var animationTask: Task<Void, Never>?
     
     var body: some View {
         ZStack {
@@ -403,11 +470,49 @@ struct AnimatedGradientBorder: View {
                 )
                 .blur(radius: 0.5)
         }
-        .onAppear {
-            withAnimation(.linear(duration: PromptWindowTimings.gradientRotationDuration).repeatForever(autoreverses: false)) {
-                phase = 360
+        .opacity(isVisible ? 1 : 0)
+        .animation(.easeInOut(duration: 0.2), value: isVisible)
+        .allowsHitTesting(false)
+        .onChange(of: isVisible) { oldValue, newValue in
+            if newValue {
+                startAnimation()
+            } else {
+                stopAnimation()
             }
         }
+        .onAppear {
+            if isVisible {
+                startAnimation()
+            }
+        }
+        .onDisappear {
+            stopAnimation()
+        }
+    }
+    
+    /// Starts the continuous gradient rotation animation.
+    ///
+    /// Uses a Task-based approach instead of SwiftUI's repeatForever
+    /// to allow proper start/stop control based on visibility state.
+    private func startAnimation() {
+        animationTask?.cancel()
+        animationTask = Task {
+            while !Task.isCancelled {
+                withAnimation(.linear(duration: PromptWindowTimings.gradientRotationDuration)) {
+                    phase += 360
+                }
+                try? await Task.sleep(nanoseconds: UInt64(PromptWindowTimings.gradientRotationDuration * 1_000_000_000))
+            }
+        }
+    }
+    
+    /// Stops the gradient rotation animation.
+    ///
+    /// Cancels the animation task to prevent unnecessary CPU usage
+    /// when the border is not visible.
+    private func stopAnimation() {
+        animationTask?.cancel()
+        animationTask = nil
     }
 }
 
@@ -454,17 +559,25 @@ struct HeightPreferenceKey: PreferenceKey {
 /// - Auto-focuses on appearance
 /// - Enter to submit, Shift+Enter for newline
 /// - Animated submit button (flame icon)
-/// - Blur background with gradient border
+/// - Blur background with conditional gradient border
+/// - Focus-aware glow border (only shows when app is focused)
 ///
 /// Callbacks:
 /// - onHeightChange: Reports height for window sizing
 /// - maxHeight: Gets maximum allowed height
+/// - appFocusPublisher: Provides app focus state for conditional border
 struct PromptView: View {
     /// Callback when view height changes (for dynamic sizing)
     var onHeightChange: (CGFloat) -> Void
     
     /// Callback to get maximum height from window controller
     var maxHeight: () -> CGFloat
+    
+    /// Publisher that provides app focus state for conditional glow border
+    let appFocusPublisher: AnyPublisher<Bool, Never>?
+    
+    /// Publisher that provides window focus state for window-specific glow border
+    let windowFocusPublisher: AnyPublisher<Bool, Never>?
 
     /// Current prompt text
     @State private var promptText: String = ""
@@ -477,6 +590,15 @@ struct PromptView: View {
     
     /// Shows flame icon during submit animation
     @State private var showFlameIcon = false
+    
+    /// Tracks whether the app has focus (for conditional glow border)
+    @State private var isAppFocused: Bool = false
+    
+    /// Tracks whether the prompt window has focus (for window-specific glow border)
+    @State private var isWindowFocused: Bool = false
+    
+    /// Combine subscription for app focus updates
+    @State private var cancellables: Set<AnyCancellable> = []
 
     var body: some View {
         // Outer transparent padding container
@@ -581,7 +703,11 @@ struct PromptView: View {
                 .clipShape(RoundedRectangle(cornerRadius: PromptWindowLayout.windowCornerRadius))
         )
         .overlay(
-            AnimatedGradientBorder(cornerRadius: PromptWindowLayout.windowCornerRadius, lineWidth: 4)
+            AnimatedGradientBorder(
+                isVisible: isInputFocused && isAppFocused && isWindowFocused,
+                cornerRadius: PromptWindowLayout.windowCornerRadius, 
+                lineWidth: 4
+            )
         )
         .overlay(
             GeometryReader { geometry in
@@ -595,7 +721,33 @@ struct PromptView: View {
             }
         }
         .padding(PromptWindowLayout.outerPadding) // Add transparent padding around everything
-        .onAppear { isInputFocused = true }
+        .onAppear { 
+            isInputFocused = true 
+            
+            // Subscribe to app focus updates if publisher is available
+            if let publisher = appFocusPublisher {
+                publisher
+                    .receive(on: DispatchQueue.main)
+                    .sink { newAppFocusState in
+                        isAppFocused = newAppFocusState
+                    }
+                    .store(in: &cancellables)
+            }
+            
+            // Subscribe to window focus updates if publisher is available
+            if let publisher = windowFocusPublisher {
+                publisher
+                    .receive(on: DispatchQueue.main)
+                    .sink { newWindowFocusState in
+                        isWindowFocused = newWindowFocusState
+                    }
+                    .store(in: &cancellables)
+            }
+        }
+        .onDisappear {
+            // Clean up subscriptions
+            cancellables.removeAll()
+        }
     }
     
     /// Submits prompt with flame icon animation.
