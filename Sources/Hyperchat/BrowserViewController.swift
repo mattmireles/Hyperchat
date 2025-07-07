@@ -651,7 +651,7 @@ class BrowserViewController: NSViewController, ObservableObject {
     /// Runs every 500ms as a backup to JavaScript event listeners.
     /// This ensures focus state stays accurate even if events are missed.
     private func startPeriodicFocusChecking() {
-        focusCheckTimer = Timer.scheduledTimer(withTimeInterval: 0.5, repeats: true) { [weak self] _ in
+        focusCheckTimer = Timer.scheduledTimer(withTimeInterval: 0.2, repeats: true) { [weak self] _ in
             self?.evaluateWebViewFocusState()
         }
     }

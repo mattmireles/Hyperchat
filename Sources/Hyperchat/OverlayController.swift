@@ -1325,6 +1325,7 @@ struct UnifiedInputBar: View {
     @State private var isRefreshHovering = false
     @State private var isSubmitHovering = false
     @State private var showFlameIcon = false
+    @State private var isHyperchatIconHovering = false
     
     private var isLoading: Bool {
         serviceManager.loadingStates.values.contains(true)
@@ -1349,16 +1350,41 @@ struct UnifiedInputBar: View {
         }
     }
     
+    /// Opens the Settings window when the Hyperchat icon is clicked.
+    ///
+    /// Called by:
+    /// - Hyperchat icon button in the lower left of the main window
+    ///
+    /// This method uses the same mechanism as the menu bar Settings action,
+    /// ensuring consistent behavior across the application.
+    private func openSettings() {
+        if let appDelegate = NSApp.delegate as? AppDelegate {
+            appDelegate.showSettings(nil)
+        }
+    }
+    
     var body: some View {
         VStack(spacing: 0) {
             HStack(spacing: 16) {
-                // Hyperchat logo
-                Image("HyperchatIcon")
-                    .resizable()
-                    .aspectRatio(contentMode: .fit)
-                    .frame(width: 62, height: 62)
-                    .cornerRadius(13)
-                    .shadow(color: Color.black.opacity(0.1), radius: 2, x: 0, y: 1)
+                // Hyperchat logo - clickable to open Settings
+                Button(action: {
+                    openSettings()
+                }) {
+                    Image("HyperchatIcon")
+                        .resizable()
+                        .aspectRatio(contentMode: .fit)
+                        .frame(width: 62, height: 62)
+                        .cornerRadius(13)
+                        .shadow(color: Color.black.opacity(0.1), radius: 2, x: 0, y: 1)
+                        .scaleEffect(isHyperchatIconHovering ? 1.05 : 1.0)
+                }
+                .buttonStyle(.plain)
+                .help("Open Settings")
+                .onHover { hovering in
+                    withAnimation(.easeInOut(duration: 0.2)) {
+                        isHyperchatIconHovering = hovering
+                    }
+                }
                 
                 // Input field section - fills remaining space
                 HStack(spacing: 0) {

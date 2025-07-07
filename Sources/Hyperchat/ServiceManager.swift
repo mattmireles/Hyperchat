@@ -106,15 +106,15 @@ struct AIService {
 /// URLs and parameters come from ServiceConfigurations.
 let defaultServices = [
     AIService(
-        id: "google",
-        name: "Google",
-        iconName: "google-icon",
+        id: "chatgpt",
+        name: "ChatGPT",
+        iconName: "chatgpt-icon",
         activationMethod: .urlParameter(
-            baseURL: ServiceConfigurations.google.baseURL,
-            parameter: ServiceConfigurations.google.queryParam
+            baseURL: ServiceConfigurations.chatGPT.baseURL,
+            parameter: ServiceConfigurations.chatGPT.queryParam
         ),
         enabled: true,
-        order: 3,  // Third position from left
+        order: 1,
         faviconURL: nil
     ),
     AIService(
@@ -130,15 +130,15 @@ let defaultServices = [
         faviconURL: nil
     ),
     AIService(
-        id: "chatgpt",
-        name: "ChatGPT",
-        iconName: "chatgpt-icon",
+        id: "google",
+        name: "Google",
+        iconName: "google-icon",
         activationMethod: .urlParameter(
-            baseURL: ServiceConfigurations.chatGPT.baseURL,
-            parameter: ServiceConfigurations.chatGPT.queryParam
+            baseURL: ServiceConfigurations.google.baseURL,
+            parameter: ServiceConfigurations.google.queryParam
         ),
         enabled: true,
-        order: 1,
+        order: 3,  // Third position from left
         faviconURL: nil
     ),
     AIService(

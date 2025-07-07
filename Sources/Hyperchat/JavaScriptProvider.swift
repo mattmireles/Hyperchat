@@ -825,4 +825,106 @@ struct JavaScriptProvider {
         })();
         """
     }
+    
+    /// Generates JavaScript to detect if the user is logged into Claude.
+    ///
+    /// This script checks for various indicators that suggest the user is
+    /// logged into Claude.ai:
+    /// - Presence of user profile/avatar elements
+    /// - Navigation elements that only appear when logged in
+    /// - Absence of login/signup buttons
+    /// - URL patterns that indicate authenticated state
+    ///
+    /// The result is sent back to Swift via the claudeLoginStatus message handler.
+    ///
+    /// - Returns: JavaScript string for Claude login detection
+    static func claudeLoginDetectionScript() -> String {
+        return """
+        (function() {
+            console.log('[Claude Login Detection] Starting login state check...');
+            
+            // Claude login detection selectors
+            // These are elements that typically appear when user is logged in
+            const loggedInSelectors = [
+                '[data-testid="user-menu"]',           // User profile menu
+                '[aria-label*="user menu"]',           // User menu button
+                '.user-avatar',                        // User avatar image
+                '[data-testid="chat-input"]',          // Chat input (only visible when logged in)
+                '[data-testid="conversation-list"]',   // Conversation sidebar
+                'button[aria-label*="New chat"]',      // New chat button
+                '[data-testid="profile-button"]',      // Profile button
+                '.claude-logo + nav',                  // Navigation after logo (logged in nav)
+            ];
+            
+            // Claude logged out selectors
+            // These elements typically appear when user is NOT logged in
+            const loggedOutSelectors = [
+                'button[data-testid="login-button"]',  // Login button
+                'a[href*="login"]',                    // Login links
+                'button:contains("Sign in")',          // Sign in buttons
+                'button:contains("Log in")',           // Log in buttons
+                '.login-form',                         // Login form
+                '[data-testid="signup-button"]',       // Signup button
+            ];
+            
+            // Check for logged in indicators
+            let loggedInIndicators = 0;
+            for (const selector of loggedInSelectors) {
+                const elements = document.querySelectorAll(selector);
+                if (elements.length > 0) {
+                    console.log('[Claude Login Detection] Found logged-in indicator:', selector);
+                    loggedInIndicators++;
+                }
+            }
+            
+            // Check for logged out indicators
+            let loggedOutIndicators = 0;
+            for (const selector of loggedOutSelectors) {
+                const elements = document.querySelectorAll(selector);
+                if (elements.length > 0) {
+                    console.log('[Claude Login Detection] Found logged-out indicator:', selector);
+                    loggedOutIndicators++;
+                }
+            }
+            
+            // Check URL patterns
+            const url = window.location.href;
+            const isLoginPage = url.includes('/login') || url.includes('/auth') || url.includes('/signin');
+            const isMainApp = url.includes('claude.ai') && !isLoginPage;
+            
+            // Determine login status
+            let isLoggedIn = false;
+            let confidence = 'low';
+            
+            if (loggedInIndicators >= 2 && loggedOutIndicators === 0 && isMainApp) {
+                isLoggedIn = true;
+                confidence = 'high';
+            } else if (loggedInIndicators >= 1 && loggedOutIndicators === 0 && isMainApp) {
+                isLoggedIn = true;
+                confidence = 'medium';
+            } else if (loggedOutIndicators > 0 || isLoginPage) {
+                isLoggedIn = false;
+                confidence = 'high';
+            }
+            
+            const result = {
+                isLoggedIn: isLoggedIn,
+                confidence: confidence,
+                loggedInIndicators: loggedInIndicators,
+                loggedOutIndicators: loggedOutIndicators,
+                url: url,
+                timestamp: Date.now()
+            };
+            
+            console.log('[Claude Login Detection] Result:', result);
+            
+            // Send result back to Swift
+            if (window.webkit && window.webkit.messageHandlers && window.webkit.messageHandlers.claudeLoginStatus) {
+                window.webkit.messageHandlers.claudeLoginStatus.postMessage(JSON.stringify(result));
+            }
+            
+            return result;
+        })();
+        """
+    }
 }
