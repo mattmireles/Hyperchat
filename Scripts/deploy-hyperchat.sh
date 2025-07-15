@@ -29,6 +29,13 @@ DEBUG_LOG="${MACOS_DIR}/deploy-debug.log"
 exec 1> >(tee -a "${DEBUG_LOG}")
 exec 2>&1
 
+# Colors for output
+RED='\033[0;31m'
+GREEN='\033[0;32m'
+YELLOW='\033[1;33m'
+BLUE='\033[0;34m'
+NC='\033[0m'
+
 # Version info - increment build number
 CURRENT_BUILD=$(/usr/libexec/PlistBuddy -c "Print CFBundleVersion" "${MACOS_DIR}/Info.plist")
 NEW_BUILD=$((CURRENT_BUILD + 1))
@@ -49,13 +56,6 @@ if [[ "$USER_INPUT" != "n" ]]; then
     /usr/libexec/PlistBuddy -c "Set :CFBundleShortVersionString ${NEW_VERSION}" Info.plist
     VERSION="$NEW_VERSION"
 fi
-
-# Colors for output
-RED='\033[0;31m'
-GREEN='\033[0;32m'
-YELLOW='\033[1;33m'
-BLUE='\033[0;34m'
-NC='\033[0m'
 
 echo -e "${GREEN}╔════════════════════════════════════════════════╗${NC}"
 echo -e "${GREEN}║   HyperChat Simplified Deployment Script       ║${NC}"
