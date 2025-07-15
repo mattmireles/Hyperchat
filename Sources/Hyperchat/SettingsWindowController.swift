@@ -381,6 +381,7 @@ class SettingsWindowController: NSWindowController {
         window.backgroundColor = NSColor.clear
         window.isMovableByWindowBackground = true
         window.level = .normal
+        window.collectionBehavior = [.managed, .moveToActiveSpace]
         window.standardWindowButton(.zoomButton)?.isHidden = true
         window.standardWindowButton(.closeButton)?.isHidden = false
         window.standardWindowButton(.miniaturizeButton)?.isHidden = false

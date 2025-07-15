@@ -584,7 +584,9 @@ class OverlayController: NSObject, NSWindowDelegate, ObservableObject {
         window.minSize = NSSize(width: 800, height: 600)
         window.level = .normal
         // Don't use canJoinAllSpaces - we want window to stay in current space
-        window.collectionBehavior = [.managed, .fullScreenPrimary]
+        // By adding .moveToActiveSpace, we ensure new windows appear on the active
+        // space rather than forcing a switch to a space with an existing window.
+        window.collectionBehavior = [.managed, .fullScreenPrimary, .moveToActiveSpace]
         window.isMovable = true
         // Make window background transparent so visual effect shows through
         window.backgroundColor = NSColor.clear
