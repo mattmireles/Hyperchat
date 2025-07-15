@@ -34,6 +34,22 @@ CURRENT_BUILD=$(/usr/libexec/PlistBuddy -c "Print CFBundleVersion" "${MACOS_DIR}
 NEW_BUILD=$((CURRENT_BUILD + 1))
 VERSION=$(/usr/libexec/PlistBuddy -c "Print CFBundleShortVersionString" "${MACOS_DIR}/Info.plist")
 
+# New: Prompt for version update
+echo -e "${YELLOW}Current version: ${VERSION}${NC}"
+IFS='.' read -ra VERSION_PARTS <<< "$VERSION"
+MAJOR=${VERSION_PARTS[0]:-1}
+MINOR=${VERSION_PARTS[1]:-0}
+PATCH=${VERSION_PARTS[2]:-0}
+NEW_MINOR=$((MINOR + 1))
+SUGGESTED_VERSION="$MAJOR.$NEW_MINOR.0"
+read -p "Enter new version (default: $SUGGESTED_VERSION, enter 'n' for no change): " USER_INPUT
+if [[ "$USER_INPUT" != "n" ]]; then
+    NEW_VERSION=${USER_INPUT:-$SUGGESTED_VERSION}
+    echo -e "${YELLOW}Updating version to ${NEW_VERSION}...${NC}"
+    /usr/libexec/PlistBuddy -c "Set :CFBundleShortVersionString ${NEW_VERSION}" Info.plist
+    VERSION="$NEW_VERSION"
+fi
+
 # Colors for output
 RED='\033[0;31m'
 GREEN='\033[0;32m'
