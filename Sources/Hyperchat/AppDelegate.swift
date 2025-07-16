@@ -416,17 +416,34 @@ class AppDelegate: NSObject, NSApplicationDelegate, SPUUpdaterDelegate {
     @objc func checkForUpdates(_ sender: Any?) {
         guard let updaterController = updaterController else {
             print("Sparkle: Updater controller not initialized")
+            // Show error to user
+            let alert = NSAlert()
+            alert.messageText = "Update Check Failed"
+            alert.informativeText = "The updater is not available. Please restart the app and try again."
+            alert.alertStyle = .warning
+            alert.addButton(withTitle: "OK")
+            alert.runModal()
             return
         }
+        
         // Ensure updater is started before checking for updates
         if !updaterController.updater.sessionInProgress {
             do {
                 try updaterController.updater.start()
             } catch {
                 print("Sparkle: Failed to start updater - \(error.localizedDescription)")
+                // Show error to user
+                let alert = NSAlert()
+                alert.messageText = "Update Check Failed"
+                alert.informativeText = "Unable to start the updater. Error: \(error.localizedDescription)"
+                alert.alertStyle = .warning
+                alert.addButton(withTitle: "OK")
+                alert.runModal()
                 return
             }
         }
+        
+        // Trigger the update check - delegate methods will handle user feedback
         updaterController.checkForUpdates(sender)
     }
     
@@ -626,10 +643,30 @@ class AppDelegate: NSObject, NSApplicationDelegate, SPUUpdaterDelegate {
     
     func updaterDidNotFindUpdate(_ updater: SPUUpdater, error: Error) {
         print("Sparkle: No update found - \(error.localizedDescription)")
+        
+        // Show user-friendly dialog when no updates are available
+        DispatchQueue.main.async {
+            let alert = NSAlert()
+            alert.messageText = "You're up to date!"
+            alert.informativeText = "Hyperchat is already running the latest version."
+            alert.alertStyle = .informational
+            alert.addButton(withTitle: "OK")
+            alert.runModal()
+        }
     }
     
     func updater(_ updater: SPUUpdater, didAbortWithError error: Error) {
         print("Sparkle: Update aborted - \(error.localizedDescription)")
+        
+        // Show user-friendly dialog for update errors
+        DispatchQueue.main.async {
+            let alert = NSAlert()
+            alert.messageText = "Update Check Failed"
+            alert.informativeText = "Unable to check for updates. Please check your internet connection and try again."
+            alert.alertStyle = .warning
+            alert.addButton(withTitle: "OK")
+            alert.runModal()
+        }
     }
     
     func updater(_ updater: SPUUpdater, failedToDownloadUpdate item: SUAppcastItem, error: Error) {
