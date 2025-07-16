@@ -17,6 +17,7 @@
 		3EE13BAD2C4F6B2900A8A61E /* NSScreen+Extensions.swift in Sources */ = {isa = PBXBuildFile; fileRef = 3EE13BA72C4F6B2900A8A61E /* NSScreen+Extensions.swift */; };
 		3EE13BAE2C4F6B2900A8A61E /* ServiceConfiguration.swift in Sources */ = {isa = PBXBuildFile; fileRef = 3EE13BA82C4F6B2900A8A61E /* ServiceConfiguration.swift */; };
 		3EE13BB22C4F6B2900A8A61E /* Orbitron-Bold.ttf in Resources */ = {isa = PBXBuildFile; fileRef = 3EE13BB32C4F6B2900A8A61E /* Orbitron-Bold.ttf */; };
+		B037998FCEB2498C9615DFBE /* AnalyticsManager.swift in Sources */ = {isa = PBXBuildFile; fileRef = C663B2B952774CA1860EB479 /* AnalyticsManager.swift */; };
 		3EE13BB42C4F6B2900A8A61E /* SettingsManager.swift in Sources */ = {isa = PBXBuildFile; fileRef = 3EE13BB52C4F6B2900A8A61E /* SettingsManager.swift */; };
 		3EE13BB62C4F6B2900A8A61E /* SettingsWindowController.swift in Sources */ = {isa = PBXBuildFile; fileRef = 3EE13BB72C4F6B2900A8A61E /* SettingsWindowController.swift */; };
 		BE8135E42E01E24D0059C681 /* Sparkle in Frameworks */ = {isa = PBXBuildFile; productRef = BE8135E32E01E24D0059C681 /* Sparkle */; };
@@ -61,6 +62,7 @@
 /* Begin PBXFileReference section */
 		3EE13B8B2C4F6B2900A8A61E /* Hyperchat.app */ = {isa = PBXFileReference; explicitFileType = wrapper.application; includeInIndex = 0; path = Hyperchat.app; sourceTree = BUILT_PRODUCTS_DIR; };
 		3EE13B8E2C4F6B2900A8A61E /* AppDelegate.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = AppDelegate.swift; sourceTree = "<group>"; };
+		C663B2B952774CA1860EB479 /* AnalyticsManager.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = AnalyticsManager.swift; sourceTree = "<group>"; };
 		3EE13B8F2C4F6B2900A8A61E /* FloatingButtonManager.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = FloatingButtonManager.swift; sourceTree = "<group>"; };
 		3EE13B922C4F6B2900A8A61E /* Info.plist */ = {isa = PBXFileReference; lastKnownFileType = text.plist.xml; path = Info.plist; sourceTree = "<group>"; };
 		3EE13B932C4F6B2900A8A61E /* Assets.xcassets */ = {isa = PBXFileReference; lastKnownFileType = folder.assetcatalog; path = Assets.xcassets; sourceTree = "<group>"; };
@@ -155,6 +157,7 @@
 				BEC2A99C2E18A24500785B53 /* WebViewFactory.swift */,
 				BEC2A99E2E18A24500785B53 /* JavaScriptProvider.swift */,
 				3EE13B8E2C4F6B2900A8A61E /* AppDelegate.swift */,
+				C663B2B952774CA1860EB479 /* AnalyticsManager.swift */,
 				3EE13B8F2C4F6B2900A8A61E /* FloatingButtonManager.swift */,
 				3EE13B922C4F6B2900A8A61E /* Info.plist */,
 				3EE13B932C4F6B2900A8A61E /* Assets.xcassets */,
@@ -337,6 +340,7 @@
 			buildActionMask = 2147483647;
 			files = (
 				3EE13B9B2C4F6B2900A8A61E /* AppDelegate.swift in Sources */,
+				B037998FCEB2498C9615DFBE /* AnalyticsManager.swift in Sources */,
 				BEB355C32E18A6F4000164A8 /* UI/ButtonState.swift in Sources */,
 				BEB355C42E18A6F4000164A8 /* UI/GradientToolbarButton.swift in Sources */,
 				BEA4CA412E1BB07D00F810E4 /* ClaudeLoginAlertController.swift in Sources */,
