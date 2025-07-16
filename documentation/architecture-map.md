@@ -13,6 +13,7 @@ Here is the step-by-step flow of a typical user interaction:
 - **Job:** Manages the application lifecycle. On launch, it creates and connects all the primary controller objects.
 - **Interaction:**
 - Initializes FloatingButtonManager, PromptWindowController, and OverlayController.
+- Initializes AnalyticsManager for usage tracking (enabled by default, user can disable).
 - Acts as a central listener for key notifications, delegating tasks to the appropriate controller.
 
 **2. FloatingButtonManager (The Greeter)**
@@ -83,6 +84,16 @@ Here is the step-by-step flow of a typical user interaction:
 - **Clean Separation**: Isolates 300+ lines of JavaScript from ServiceManager into organized, reusable methods
 - **Key Scripts**: Paste automation, Claude-specific interactions, window hibernation pause/resume
 
+**11. AnalyticsManager (The Data Collector)**
+
+- **Job:** Centralized analytics service using Amplitude for usage tracking and product improvement
+- **Interaction:**
+- **Event Tracking**: Collects usage data on prompt submissions, button clicks, and webview interactions
+- **Privacy-Focused**: No PII collected, only usage patterns and feature adoption metrics
+- **Source Attribution**: Tracks whether prompts come from floating button vs direct window access
+- **Service Usage**: Monitors which AI services users interact with most frequently
+- **Configuration**: Loads API keys from Config.swift (excluded from version control)
+
 **Key Architectural Patterns**
 
 - **Hybrid Communication Model**: 
@@ -98,11 +109,12 @@ Here is the step-by-step flow of a typical user interaction:
 **Core Technologies & Practices**
 
 - **State Management**: Uses Apple's Combine framework for reactive state updates and publisher-subscriber patterns alongside traditional NotificationCenter for cross-module events.
-- **Dependency Management**: The project uses Swift Package Manager (SPM) to manage third-party libraries like Sparkle and KeyboardShortcuts.
+- **Dependency Management**: The project uses Swift Package Manager (SPM) to manage third-party libraries like Sparkle, KeyboardShortcuts, and AmplitudeSwift.
 - **Automated Testing**: A suite of unit and UI tests runs automatically via GitHub Actions to ensure stability. The testing strategy is detailed in `Testing.md`.
 - **Automated Deployment**: The release process is fully automated via the `./deploy-hyperchat.sh` script, which handles signing, notarization, and DMG creation.
 - **Direct Distribution (Not Sandboxed)**: Hyperchat is distributed directly and is not sandboxed. This simplifies development and enables more powerful system-level features.
 - **Automatic Updates (Sparkle)**: The Sparkle framework is integrated to provide seamless, automatic updates to users.
+- **Analytics (Amplitude)**: Usage analytics are collected by default to help improve the product, with user option to disable via settings.
 
 **Documentation Structure**
 
