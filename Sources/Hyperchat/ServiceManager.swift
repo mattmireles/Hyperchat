@@ -1076,6 +1076,9 @@ class ServiceManager: NSObject, ObservableObject {
     /// - `URLParameterService.executePrompt()` for ChatGPT/Perplexity/Google
     /// - `ClaudeService.executePrompt()` for Claude's clipboard method
     ///
+    /// Analytics:
+    /// - Tracks prompt submissions with source attribution and metadata
+    ///
     /// - Parameters:
     ///   - prompt: The user's text to send to AI services
     ///   - replyToAll: If true, pastes into existing chats; if false, creates new chats
@@ -1083,6 +1086,16 @@ class ServiceManager: NSObject, ObservableObject {
         if LoggingSettings.shared.debugPrompts {
             WebViewLogger.shared.log("🔄 executePrompt called - replyToAll: \(replyToAll), services: \(activeServices.map { $0.id }.joined(separator: ", "))", for: "system", type: .info)
         }
+        
+        // Track prompt submission analytics
+        let submissionMode: SubmissionMode = replyToAll ? .replyToAll : .newChat
+        let servicesUsed = activeServices.map { $0.id }
+        AnalyticsManager.shared.trackPromptSubmitted(
+            servicesCount: servicesUsed.count,
+            promptLength: prompt.count,
+            submissionMode: submissionMode,
+            servicesUsed: servicesUsed
+        )
         
         // Categorize services by execution method to prevent clipboard conflicts
         let urlParameterServices = activeServices.filter { service in

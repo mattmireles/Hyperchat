@@ -8,6 +8,7 @@ class SettingsManager {
     // Keys for UserDefaults
     private let servicesKey = "com.hyperchat.services"
     private let floatingButtonEnabledKey = "com.hyperchat.floatingButtonEnabled"
+    private let analyticsEnabledKey = "com.hyperchat.analyticsEnabled"
     
     private init() {}
     
@@ -95,6 +96,32 @@ class SettingsManager {
             NotificationCenter.default.post(name: .floatingButtonToggled, object: newValue)
         }
     }
+    
+    // MARK: - Analytics
+    
+    /// Whether analytics collection is enabled by the user.
+    /// 
+    /// Analytics is enabled by default to help improve the product.
+    /// - Defaults to true (enabled by default)
+    /// - Can be disabled at any time via settings
+    /// - Triggers notification when changed for AnalyticsManager to respond
+    var isAnalyticsEnabled: Bool {
+        get {
+            // Default to true - analytics is enabled by default
+            return userDefaults.object(forKey: analyticsEnabledKey) as? Bool ?? true
+        }
+        set {
+            let oldValue = isAnalyticsEnabled
+            userDefaults.set(newValue, forKey: analyticsEnabledKey)
+            userDefaults.synchronize() // Force immediate write
+            
+            // Only post notification if value actually changed
+            if oldValue != newValue {
+                NotificationCenter.default.post(name: .analyticsPreferenceChanged, object: newValue)
+                print("📊 SettingsManager: Analytics preference changed to \(newValue)")
+            }
+        }
+    }
 }
 
 // MARK: - Notifications
@@ -104,6 +131,7 @@ extension Notification.Name {
     static let servicesUpdated = Notification.Name("com.hyperchat.servicesUpdated")
     static let reloadOverlayUI = Notification.Name("com.hyperchat.reloadOverlayUI")
     static let faviconUpdated = Notification.Name("com.hyperchat.faviconUpdated")
+    static let analyticsPreferenceChanged = Notification.Name("com.hyperchat.analyticsPreferenceChanged")
 }
 
 // MARK: - AIService Codable Extension
