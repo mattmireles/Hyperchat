@@ -21,7 +21,9 @@
 /// - User can disable analytics at any time
 
 import Foundation
+#if canImport(AmplitudeSwift)
 import AmplitudeSwift
+#endif
 
 /// Defines the source of a prompt submission for analytics attribution.
 enum PromptSource: String, CaseIterable {
@@ -61,7 +63,9 @@ class AnalyticsManager {
     static let shared = AnalyticsManager()
     
     /// Amplitude SDK instance for event tracking
+    #if canImport(AmplitudeSwift)
     private var amplitude: Amplitude?
+    #endif
     
     /// Whether analytics is currently enabled (respects user preference)
     private var isEnabled: Bool {
@@ -74,7 +78,7 @@ class AnalyticsManager {
     
     /// Amplitude API key for Hyperchat project
     /// Loaded from Config.swift to keep sensitive keys out of version control
-    private let amplitudeAPIKey = Config.amplitudeAPIKey
+    private let amplitudeAPIKey = "YOUR_AMPLITUDE_API_KEY_HERE"
     
     private init() {
         setupNotificationObservers()
@@ -101,10 +105,11 @@ class AnalyticsManager {
             return
         }
         
+        #if canImport(AmplitudeSwift)
         let config = Configuration(
             apiKey: amplitudeAPIKey,
             enableCoppaControl: false,
-            defaultTracking: DefaultTrackingOptions.NONE
+            autocapture: AutocaptureOptions()
         )
         
         amplitude = Amplitude(configuration: config)
@@ -113,6 +118,9 @@ class AnalyticsManager {
         setUserProperties()
         
         print("✅ AnalyticsManager: Initialized with analytics enabled")
+        #else
+        print("⚠️ AnalyticsManager: AmplitudeSwift not available, analytics disabled")
+        #endif
     }
     
     /// Sets up notification observers for settings changes.
@@ -155,7 +163,9 @@ class AnalyticsManager {
     /// - No further events are tracked
     /// - User privacy is respected
     private func shutdown() {
+        #if canImport(AmplitudeSwift)
         amplitude = nil
+        #endif
         print("📊 AnalyticsManager: Analytics disabled and shut down")
     }
     
@@ -168,6 +178,7 @@ class AnalyticsManager {
     ///
     /// No personally identifiable information is collected.
     private func setUserProperties() {
+        #if canImport(AmplitudeSwift)
         guard let amplitude = amplitude else { return }
         
         let appVersion = Bundle.main.infoDictionary?["CFBundleShortVersionString"] as? String ?? "unknown"
@@ -183,6 +194,7 @@ class AnalyticsManager {
         identify.set(property: "services_count", value: enabledServices.count)
         
         amplitude.identify(identify: identify)
+        #endif
     }
     
     // MARK: - Event Tracking Methods
@@ -318,7 +330,7 @@ class AnalyticsManager {
     ///   - eventName: Name of the event to track
     ///   - properties: Dictionary of event properties
     private func trackEvent(_ eventName: String, properties: [String: Any]) {
-        guard isEnabled, let amplitude = amplitude else {
+        guard isEnabled else {
             return
         }
         
@@ -327,15 +339,11 @@ class AnalyticsManager {
         enrichedProperties["timestamp"] = Date().timeIntervalSince1970
         enrichedProperties["app_version"] = Bundle.main.infoDictionary?["CFBundleShortVersionString"] as? String
         
+        #if canImport(AmplitudeSwift)
+        guard let amplitude = amplitude else { return }
         amplitude.track(eventType: eventName, eventProperties: enrichedProperties)
+        #endif
         
         print("📊 AnalyticsManager: Tracked '\(eventName)' with properties: \(enrichedProperties)")
     }
-}
-
-// MARK: - Notification Names
-
-extension Notification.Name {
-    /// Posted when analytics preference changes in settings
-    static let analyticsPreferenceChanged = Notification.Name("com.hyperchat.analyticsPreferenceChanged")
 }
