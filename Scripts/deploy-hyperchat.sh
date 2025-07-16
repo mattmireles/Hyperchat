@@ -354,25 +354,7 @@ rm -rf "${DMG_DIR}"
 echo -e "${YELLOW}🔏 Signing DMG...${NC}"
 codesign --force --sign "${CERTIFICATE_IDENTITY}" --timestamp "${DMG_NAME}"
 
-# Step 9.5: Generate EdDSA signature for Sparkle
-echo -e "${YELLOW}🔏 Generating EdDSA signature for Sparkle...${NC}"
-
-# Explicit validation to prevent keychain fallback
-[[ -f "$SPARKLE_PRIVATE_KEY" ]] || { 
-    echo -e "${RED}❌ FATAL: Private key file missing: $SPARKLE_PRIVATE_KEY${NC}"
-    exit 1
-}
-
-# Debug: Show what we're about to sign with
-echo -e "${BLUE}  Private key file: ${SPARKLE_PRIVATE_KEY}${NC}"
-echo -e "${BLUE}  DMG file: ${DMG_NAME}${NC}"
-
-# Enable command debugging for this critical operation
-set -x
-ED_SIGNATURE=$("${SPARKLE_SIGN_TOOL}" "${DMG_NAME}" "${SPARKLE_PRIVATE_KEY}")
-set +x
-
-echo -e "${GREEN}✅ Generated EdDSA signature: ${ED_SIGNATURE:0:50}...${NC}"
+# Step 9.5: EdDSA signature will be generated after stapling (moved to Step 12.5)
 
 # Step 10: Notarize the DMG
 echo -e "${YELLOW}🍎 Submitting DMG for notarization...${NC}"
@@ -448,6 +430,26 @@ if [ $? -ne 0 ]; then
     exit 1
 fi
 
+# Step 12.5: Generate EdDSA signature for Sparkle (AFTER stapling)
+echo -e "${YELLOW}🔏 Generating EdDSA signature for Sparkle (post-stapling)...${NC}"
+
+# Explicit validation to prevent keychain fallback
+[[ -f "$SPARKLE_PRIVATE_KEY" ]] || { 
+    echo -e "${RED}❌ FATAL: Private key file missing: $SPARKLE_PRIVATE_KEY${NC}"
+    exit 1
+}
+
+# Debug: Show what we're about to sign with
+echo -e "${BLUE}  Private key file: ${SPARKLE_PRIVATE_KEY}${NC}"
+echo -e "${BLUE}  DMG file: ${DMG_NAME}${NC}"
+
+# Enable command debugging for this critical operation
+set -x
+ED_SIGNATURE=$("${SPARKLE_SIGN_TOOL}" "${DMG_NAME}" "${SPARKLE_PRIVATE_KEY}")
+set +x
+
+echo -e "${GREEN}✅ Generated EdDSA signature: ${ED_SIGNATURE:0:50}...${NC}"
+
 # Step 13: Deploy to website
 echo -e "${YELLOW}🚀 Deploying to website...${NC}"
 
@@ -505,10 +507,11 @@ git commit -m "Deploy Hyperchat v${VERSION} build ${NEW_BUILD}" || echo -e "${YE
 
 # Step 16: Post-deploy validation - Verify signature consistency
 echo -e "${YELLOW}🔍 Validating deployed appcast signature...${NC}"
-EXPECTED_SIGNATURE=$("${SPARKLE_SIGN_TOOL}" -p "${SPARKLE_PRIVATE_KEY}" | grep -o '[^=]*=' | head -1)
+# Extract just the signature part from our generated ED_SIGNATURE variable
+EXPECTED_SIGNATURE=$(echo "$ED_SIGNATURE" | grep -o 'sparkle:edSignature="[^"]*"' | sed 's/sparkle:edSignature="//;s/"//')
 DEPLOYED_SIGNATURE=$(curl -s -H "Cache-Control: no-cache" "https://hyperchat.app/appcast.xml" | grep -o 'sparkle:edSignature="[^"]*"' | sed 's/sparkle:edSignature="//;s/"//' | head -1)
 
-if [[ "$DEPLOYED_SIGNATURE" == *"$EXPECTED_SIGNATURE"* ]]; then
+if [[ "$DEPLOYED_SIGNATURE" == "$EXPECTED_SIGNATURE" ]]; then
     echo -e "${GREEN}✅ Signature validation passed!${NC}"
 else
     echo -e "${RED}❌ SIGNATURE MISMATCH!${NC}"
