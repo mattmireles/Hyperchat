@@ -1,0 +1,32 @@
+/// Config.swift.template - Configuration Template
+///
+/// This template file shows how to set up your configuration.
+/// 
+/// Setup Instructions:
+/// 1. Copy this file to Config.swift: `cp Config.swift.template Config.swift`
+/// 2. Replace placeholder values with your actual API keys
+/// 3. Never commit Config.swift to version control (it's in .gitignore)
+
+import Foundation
+
+/// Configuration values for the application.
+///
+/// Contains sensitive information like API keys that should not be committed to version control.
+/// Copy this template to Config.swift and replace placeholder values with your actual keys.
+struct Config {
+    /// Amplitude API key for analytics tracking.
+    /// 
+    /// To get your API key:
+    /// 1. Go to https://amplitude.com
+    /// 2. Create a project or select existing project
+    /// 3. Go to Settings > Projects > [Your Project] > General
+    /// 4. Copy the API Key from the Keys section
+    /// 5. Replace the placeholder below with your actual key
+    static let amplitudeAPIKey = "YOUR_AMPLITUDE_API_KEY_HERE"
+    
+    /// Add other configuration values here as needed
+    /// Examples:
+    /// static let openAIAPIKey = "YOUR_OPENAI_API_KEY_HERE"
+    /// static let debugMode = false
+    /// static let apiBaseURL = "https://api.example.com"
+}

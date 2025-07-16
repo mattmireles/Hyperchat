@@ -10,12 +10,16 @@ let package = Package(
         .executable(name: "Hyperchat", targets: ["Hyperchat"])
     ],
     dependencies: [
-        .package(url: "https://github.com/sparkle-project/Sparkle", from: "2.6.0")
+        .package(url: "https://github.com/sparkle-project/Sparkle", from: "2.6.0"),
+        .package(url: "https://github.com/amplitude/Amplitude-Swift", from: "1.0.0")
     ],
     targets: [
         .executableTarget(
             name: "Hyperchat",
-            dependencies: ["Sparkle"],
+            dependencies: [
+                "Sparkle",
+                .product(name: "AmplitudeSwift", package: "Amplitude-Swift")
+            ],
             resources: [
                 .process("Assets.xcassets"),
                 .process("Orbitron-Bold.ttf")

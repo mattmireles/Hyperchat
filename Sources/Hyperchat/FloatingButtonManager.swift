@@ -629,12 +629,19 @@ class FloatingButtonManager {
     /// - If prompt window already visible: brings to front
     /// - If prompt window hidden: shows on button's screen
     /// - Never hides overlay (prevents app hanging)
+    /// - Tracks analytics for floating button usage
     ///
     /// Screen selection priority:
     /// 1. Screen containing the button
     /// 2. Screen containing the mouse
     /// 3. Main screen as fallback
     private func floatingButtonClicked() {
+        // Track floating button click for analytics
+        AnalyticsManager.shared.trackFloatingButtonClicked()
+        
+        // Set prompt source for subsequent prompt submission attribution
+        AnalyticsManager.shared.setPromptSource(.floatingButton)
+        
         // Don't hide overlay if it's visible - just show prompt window
         // This prevents the hanging issue
         

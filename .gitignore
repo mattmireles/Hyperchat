@@ -13,3 +13,6 @@ build/
 TestResults/
 Tests.log
 *.xcresult
+
+# Configuration files with sensitive data
+Sources/Hyperchat/Config.swift

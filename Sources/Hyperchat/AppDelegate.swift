@@ -328,6 +328,9 @@ class AppDelegate: NSObject, NSApplicationDelegate, SPUUpdaterDelegate {
         // Register custom fonts
         registerCustomFonts()
         
+        // Initialize analytics (respects user privacy preferences)
+        AnalyticsManager.shared.initialize()
+        
         floatingButtonManager.promptWindowController = promptWindowController
         floatingButtonManager.overlayController = self.overlayController
         floatingButtonManager.showFloatingButton()

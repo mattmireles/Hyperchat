@@ -921,6 +921,16 @@ extension BrowserViewController: WKNavigationDelegate {
         }
         
         if isAllowedHost {
+            // Track internal navigation for analytics (only for user-initiated link clicks)
+            if navigationAction.navigationType == .linkActivated {
+                let destinationDomain = url.host ?? "unknown"
+                AnalyticsManager.shared.trackWebViewLinkClicked(
+                    service: service.id,
+                    destinationDomain: destinationDomain,
+                    isExternal: false
+                )
+            }
+            
             decisionHandler(.allow)
             return
         }
@@ -928,6 +938,15 @@ extension BrowserViewController: WKNavigationDelegate {
         // For external links, open in default browser
         if navigationAction.navigationType == .linkActivated {
             print("🔗 Opening external link in browser for \(service.name): \(url.absoluteString)")
+            
+            // Track external link click for analytics
+            let destinationDomain = url.host ?? "unknown"
+            AnalyticsManager.shared.trackWebViewLinkClicked(
+                service: service.id,
+                destinationDomain: destinationDomain,
+                isExternal: true
+            )
+            
             NSWorkspace.shared.open(url)
             decisionHandler(.cancel)
             return
@@ -988,6 +1007,11 @@ extension BrowserViewController: WKScriptMessageHandler {
             if self.hasWebViewFocus != hasFocus {
                 print("🎯 [FOCUS DEBUG] WebView focus changed for \(self.service.name): \(self.hasWebViewFocus) -> \(hasFocus), activeElement: \(activeElement)")
                 self.hasWebViewFocus = hasFocus
+                
+                // Track window focus events for analytics (only when gaining focus)
+                if hasFocus {
+                    AnalyticsManager.shared.trackWindowFocused(service: self.service.id)
+                }
             } else {
                 print("🔍 [FOCUS DEBUG] WebView focus message for \(self.service.name): \(hasFocus) (no change), activeElement: \(activeElement)")
             }
