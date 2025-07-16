@@ -18,9 +18,11 @@
 		3EE13BAE2C4F6B2900A8A61E /* ServiceConfiguration.swift in Sources */ = {isa = PBXBuildFile; fileRef = 3EE13BA82C4F6B2900A8A61E /* ServiceConfiguration.swift */; };
 		3EE13BB22C4F6B2900A8A61E /* Orbitron-Bold.ttf in Resources */ = {isa = PBXBuildFile; fileRef = 3EE13BB32C4F6B2900A8A61E /* Orbitron-Bold.ttf */; };
 		B037998FCEB2498C9615DFBE /* AnalyticsManager.swift in Sources */ = {isa = PBXBuildFile; fileRef = C663B2B952774CA1860EB479 /* AnalyticsManager.swift */; };
+		561E6056A5524A0D938FCA3B /* Config.swift in Sources */ = {isa = PBXBuildFile; fileRef = B132E7AF173A41718E328EEE /* Config.swift */; };
 		3EE13BB42C4F6B2900A8A61E /* SettingsManager.swift in Sources */ = {isa = PBXBuildFile; fileRef = 3EE13BB52C4F6B2900A8A61E /* SettingsManager.swift */; };
 		3EE13BB62C4F6B2900A8A61E /* SettingsWindowController.swift in Sources */ = {isa = PBXBuildFile; fileRef = 3EE13BB72C4F6B2900A8A61E /* SettingsWindowController.swift */; };
 		BE8135E42E01E24D0059C681 /* Sparkle in Frameworks */ = {isa = PBXBuildFile; productRef = BE8135E32E01E24D0059C681 /* Sparkle */; };
+		DCB94C1486C54FF2A246B60F /* AmplitudeSwift in Frameworks */ = {isa = PBXBuildFile; productRef = 776626FDA96A4A9E9F38B4B8 /* AmplitudeSwift */; };
 		BEA4CA412E1BB07D00F810E4 /* ClaudeLoginAlertController.swift in Sources */ = {isa = PBXBuildFile; fileRef = BEA4CA3E2E1BB07D00F810E4 /* ClaudeLoginAlertController.swift */; };
 		BEB355BD2E18A3F7000164A8 /* HyperchatApp.swift in Sources */ = {isa = PBXBuildFile; fileRef = BEB355BC2E18A3F7000164A8 /* HyperchatApp.swift */; };
 		BEB355C32E18A6F4000164A8 /* UI/ButtonState.swift in Sources */ = {isa = PBXBuildFile; fileRef = BEB355C12E18A6F4000164A8 /* UI/ButtonState.swift */; };
@@ -63,6 +65,7 @@
 		3EE13B8B2C4F6B2900A8A61E /* Hyperchat.app */ = {isa = PBXFileReference; explicitFileType = wrapper.application; includeInIndex = 0; path = Hyperchat.app; sourceTree = BUILT_PRODUCTS_DIR; };
 		3EE13B8E2C4F6B2900A8A61E /* AppDelegate.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = AppDelegate.swift; sourceTree = "<group>"; };
 		C663B2B952774CA1860EB479 /* AnalyticsManager.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = AnalyticsManager.swift; sourceTree = "<group>"; };
+		B132E7AF173A41718E328EEE /* Config.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = Config.swift; sourceTree = "<group>"; };
 		3EE13B8F2C4F6B2900A8A61E /* FloatingButtonManager.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = FloatingButtonManager.swift; sourceTree = "<group>"; };
 		3EE13B922C4F6B2900A8A61E /* Info.plist */ = {isa = PBXFileReference; lastKnownFileType = text.plist.xml; path = Info.plist; sourceTree = "<group>"; };
 		3EE13B932C4F6B2900A8A61E /* Assets.xcassets */ = {isa = PBXFileReference; lastKnownFileType = folder.assetcatalog; path = Assets.xcassets; sourceTree = "<group>"; };
@@ -103,6 +106,7 @@
 			isa = PBXFrameworksBuildPhase;
 			buildActionMask = 2147483647;
 			files = (
+				DCB94C1486C54FF2A246B60F /* AmplitudeSwift in Frameworks */,
 				BE8135E42E01E24D0059C681 /* Sparkle in Frameworks */,
 			);
 			runOnlyForDeploymentPostprocessing = 0;
@@ -158,6 +162,7 @@
 				BEC2A99E2E18A24500785B53 /* JavaScriptProvider.swift */,
 				3EE13B8E2C4F6B2900A8A61E /* AppDelegate.swift */,
 				C663B2B952774CA1860EB479 /* AnalyticsManager.swift */,
+				B132E7AF173A41718E328EEE /* Config.swift */,
 				3EE13B8F2C4F6B2900A8A61E /* FloatingButtonManager.swift */,
 				3EE13B922C4F6B2900A8A61E /* Info.plist */,
 				3EE13B932C4F6B2900A8A61E /* Assets.xcassets */,
@@ -293,6 +298,7 @@
 			);
 			mainGroup = 3EE13B862C4F6B2900A8A61E;
 			packageReferences = (
+				78C48B187DAD4CA28DCD9187 /* XCRemoteSwiftPackageReference "Amplitude-Swift" */,
 				BE8135E22E01E24D0059C681 /* XCRemoteSwiftPackageReference "Sparkle" */,
 			);
 			productRefGroup = 3EE13B8C2C4F6B2900A8A61E /* Products */;
@@ -341,6 +347,7 @@
 			files = (
 				3EE13B9B2C4F6B2900A8A61E /* AppDelegate.swift in Sources */,
 				B037998FCEB2498C9615DFBE /* AnalyticsManager.swift in Sources */,
+				561E6056A5524A0D938FCA3B /* Config.swift in Sources */,
 				BEB355C32E18A6F4000164A8 /* UI/ButtonState.swift in Sources */,
 				BEB355C42E18A6F4000164A8 /* UI/GradientToolbarButton.swift in Sources */,
 				BEA4CA412E1BB07D00F810E4 /* ClaudeLoginAlertController.swift in Sources */,
@@ -778,6 +785,14 @@
 /* End XCConfigurationList section */
 
 /* Begin XCRemoteSwiftPackageReference section */
+		78C48B187DAD4CA28DCD9187 /* XCRemoteSwiftPackageReference "Amplitude-Swift" */ = {
+			isa = XCRemoteSwiftPackageReference;
+			repositoryURL = "https://github.com/amplitude/Amplitude-Swift";
+			requirement = {
+				kind = upToNextMajorVersion;
+				minimumVersion = 1.0.0;
+			};
+		};
 		BE8135E22E01E24D0059C681 /* XCRemoteSwiftPackageReference "Sparkle" */ = {
 			isa = XCRemoteSwiftPackageReference;
 			repositoryURL = "https://github.com/sparkle-project/Sparkle";
@@ -789,6 +804,11 @@
 /* End XCRemoteSwiftPackageReference section */
 
 /* Begin XCSwiftPackageProductDependency section */
+		776626FDA96A4A9E9F38B4B8 /* AmplitudeSwift */ = {
+			isa = XCSwiftPackageProductDependency;
+			package = 78C48B187DAD4CA28DCD9187 /* XCRemoteSwiftPackageReference "Amplitude-Swift" */;
+			productName = AmplitudeSwift;
+		};
 		BE8135E32E01E24D0059C681 /* Sparkle */ = {
 			isa = XCSwiftPackageProductDependency;
 			package = BE8135E22E01E24D0059C681 /* XCRemoteSwiftPackageReference "Sparkle" */;
