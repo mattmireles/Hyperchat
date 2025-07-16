@@ -321,6 +321,23 @@ class AppDelegate: NSObject, NSApplicationDelegate, SPUUpdaterDelegate {
     /// - Update checker delayed to prevent conflicts
     /// - Notifications connect components loosely
     func applicationDidFinishLaunching(_ aNotification: Notification) {
+        // Debugging code
+        #if DEBUG
+        print("\n🔍 SPARKLE DEBUG INFO:")
+        print("🆔 Bundle ID: \(Bundle.main.bundleIdentifier ?? "nil")")
+
+        if let publicKey = Bundle.main.object(forInfoDictionaryKey: "SUPublicEDKey") as? String {
+            print("🔑 Public Key: \(publicKey)")
+        // Show first and last 20 chars to verify it's the right key
+            let prefix = String(publicKey.prefix(20))
+            let suffix = String(publicKey.suffix(20))
+            print("🔑 Key preview: \(prefix)...\(suffix)")
+            } 
+
+            print("🌐 Feed URL: \(Bundle.main.object(forInfoDictionaryKey: "SUFeedURL") ?? "nil")")
+            print(String(repeating: "=", count: 50))
+            #endif
+        
         // Set up the main menu synchronously, passing a reference to self
         NSApp.mainMenu = MenuBuilder.createMainMenu(appDelegate: self)
         print("🍽️ Main menu created synchronously, aiServicesMenu reference: \(aiServicesMenu != nil ? "✅ available" : "❌ nil")")

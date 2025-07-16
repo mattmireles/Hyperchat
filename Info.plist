@@ -15,9 +15,9 @@
 	<key>CFBundlePackageType</key>
 	<string>APPL</string>
 	<key>CFBundleShortVersionString</key>
-	<string>1.5.0</string>
+	<string>1.20.0</string>
 	<key>CFBundleVersion</key>
-	<string>71</string>
+	<string>75</string>
 	<key>LSMinimumSystemVersion</key>
 	<string>$(MACOSX_DEPLOYMENT_TARGET)</string>
 	<key>NSPrincipalClass</key>
@@ -27,7 +27,7 @@
 	<key>SUFeedURL</key>
 	<string>https://hyperchat.app/appcast.xml</string>
 	<key>SUPublicEDKey</key>
-	<string>rcWwv2W5b6l9pnJdueL18VAGyHzS16fcgXfNmmV9vF1NasUk7zYYbUY+EJsBCbU3gFIlxeoBP66y2FBP23pfCg==</string>
+	<string>***REMOVED-SPARKLE-KEY***=</string>
 	<key>SUScheduledCheckInterval</key>
 	<integer>1800</integer>
 </dict>

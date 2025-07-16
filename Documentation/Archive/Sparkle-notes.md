@@ -262,4 +262,92 @@ This was the missing piece that made all previous "fixes" temporary. Now it's bu
 
 ---
 
-*July 16, 2025 - Complete debugging session notes & permanent resolution*
+## July 16, 2025 - NOTARIZATION FAILURE: MISSING FRAMEWORK SIGNING
+
+### The Problem
+
+After resolving the EdDSA signature timing issue, a new deployment failure emerged during Apple notarization:
+
+**❌ Notarization Status: "Invalid"**
+
+**Critical errors from notarization log:**
+```json
+{
+  "issues": [
+    {
+      "path": "Hyperchat-b72.dmg/Hyperchat.app/Contents/MacOS/Hyperchat",
+      "message": "The signature of the binary is invalid."
+    },
+    {
+      "path": "Hyperchat-b72.dmg/Hyperchat.app/Contents/Frameworks/AmplitudeCore.framework/Versions/A/AmplitudeCore",
+      "message": "The signature of the binary is invalid."
+    },
+    {
+      "path": "Hyperchat-b72.dmg/Hyperchat.app/Contents/Frameworks/AmplitudeCore.framework/Versions/A/AmplitudeCore",
+      "message": "The signature does not include a secure timestamp."
+    }
+  ]
+}
+```
+
+### Root Cause Analysis
+
+**The deployment script was not signing the AmplitudeCore framework.**
+
+**What the script was signing:**
+- ✅ Sparkle.framework components (Autoupdate, XPC services, Updater.app, framework itself)
+- ✅ Main app bundle
+- ❌ **AmplitudeCore.framework** ← Missing!
+
+### The Fix Applied
+
+**Added AmplitudeCore framework signing to deployment script:**
+
+```bash
+# 3.5. Sign the AmplitudeCore framework (this was missing and causing notarization failure)
+echo -e "${BLUE}  Signing AmplitudeCore.framework...${NC}"
+AMPLITUDE_PATH="${TEMP_APP_PATH}/Contents/Frameworks/AmplitudeCore.framework"
+if [ -d "${AMPLITUDE_PATH}" ]; then
+    xattr -cr "${AMPLITUDE_PATH}"
+    codesign --force --sign "${CERTIFICATE_IDENTITY}" --options runtime --timestamp --verbose "${AMPLITUDE_PATH}"
+else
+    echo -e "${YELLOW}  Warning: AmplitudeCore.framework not found at ${AMPLITUDE_PATH}${NC}"
+fi
+```
+
+**Git commit:** `46f5277 - fix: Add AmplitudeCore framework signing to deployment script`
+
+### ⚠️ CURRENT STATUS: STILL BROKEN
+
+**The deployment is still failing and the EdDSA keys mismatch is still occurring.**
+
+This means:
+- The AmplitudeCore framework signing fix may not be sufficient
+- The EdDSA signature timing issue may not be fully resolved
+- There may be additional signing or key management issues
+- The "permanent resolution" claimed above was premature
+
+### What We Know Doesn't Work (Yet)
+
+1. **AmplitudeCore signing added** - but deployment still fails
+2. **EdDSA signature timing** - claimed to be fixed but keys still mismatch
+3. **Previous "bulletproof" fixes** - were not actually permanent
+
+### Next Steps Needed
+
+1. **Re-test the deployment** with the AmplitudeCore fix to see exact failure mode
+2. **Check if EdDSA keys are still mismatched** despite the timing fix
+3. **Investigate if there are other frameworks** that need signing
+4. **Verify the main app binary signature** is valid
+5. **Debug why the "permanent" EdDSA fix didn't stick**
+
+### Lesson: Don't Claim Victory Too Early
+
+The notes above declared multiple issues "permanently resolved" but the deployment is still broken. This shows the importance of:
+- **Full end-to-end testing** before claiming fixes work
+- **Verifying deployed results** not just local changes
+- **Being humble about complex debugging** - there may be multiple root causes
+
+---
+
+*July 16, 2025 - Ongoing debugging session - deployment still failing*
