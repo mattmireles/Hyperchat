@@ -256,6 +256,16 @@ echo -e "${BLUE}  Signing Sparkle.framework...${NC}"
 xattr -cr "${SPARKLE_PATH}"
 codesign --force --sign "${CERTIFICATE_IDENTITY}" --options runtime --timestamp --verbose "${SPARKLE_PATH}"
 
+# 3.5. Sign the AmplitudeCore framework (this was missing and causing notarization failure)
+echo -e "${BLUE}  Signing AmplitudeCore.framework...${NC}"
+AMPLITUDE_PATH="${TEMP_APP_PATH}/Contents/Frameworks/AmplitudeCore.framework"
+if [ -d "${AMPLITUDE_PATH}" ]; then
+    xattr -cr "${AMPLITUDE_PATH}"
+    codesign --force --sign "${CERTIFICATE_IDENTITY}" --options runtime --timestamp --verbose "${AMPLITUDE_PATH}"
+else
+    echo -e "${YELLOW}  Warning: AmplitudeCore.framework not found at ${AMPLITUDE_PATH}${NC}"
+fi
+
 # 4. Sign the main app bundle BEFORE moving (while it's not .app yet)
 echo -e "${YELLOW}🔏 Signing main app bundle (in temp location)...${NC}"
 codesign --force --sign "${CERTIFICATE_IDENTITY}" \
