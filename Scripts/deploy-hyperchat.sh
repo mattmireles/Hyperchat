@@ -23,6 +23,7 @@ CERTIFICATE_IDENTITY="***REMOVED-CERTIFICATE***"
 MACOS_DIR="${PROJECT_DIR}/hyperchat-macos"
 WEB_DIR="${PROJECT_DIR}/hyperchat-web"
 NOTARIZE_PROFILE="hyperchat-notarize"  # Keychain profile name
+SPARKLE_PRIVATE_KEY="${HOME}/.keys/sparkle_ed_private_key.pem"
 
 # Enable debug logging
 DEBUG_LOG="${MACOS_DIR}/deploy-debug.log"
@@ -53,9 +54,29 @@ read -p "Enter new version (default: $SUGGESTED_VERSION, enter 'n' for no change
 if [[ "$USER_INPUT" != "n" ]]; then
     NEW_VERSION=${USER_INPUT:-$SUGGESTED_VERSION}
     echo -e "${YELLOW}Updating version to ${NEW_VERSION}...${NC}"
-    /usr/libexec/PlistBuddy -c "Set :CFBundleShortVersionString ${NEW_VERSION}" Info.plist
+    /usr/libexec/PlistBuddy -c "Set :CFBundleShortVersionString ${NEW_VERSION}" "${MACOS_DIR}/Info.plist"
     VERSION="$NEW_VERSION"
 fi
+
+# --- Manual Release Notes Confirmation Step ---
+RELEASE_NOTES_FILE="${MACOS_DIR}/hyperchat-macos/RELEASE_NOTES.html"
+
+echo -e "${YELLOW}🔔 Release Notes Check${NC}"
+echo -e "The release notes for the appcast are read from:"
+echo -e "${BLUE}${RELEASE_NOTES_FILE}${NC}"
+echo ""
+read -p "Have you updated this file with the notes for v${VERSION}? [Y/n] " confirm_notes
+
+if [[ ! "$confirm_notes" =~ ^[Yy]$ && -n "$confirm_notes" ]]; then
+    echo -e "${RED}❌ Aborting deployment.${NC}"
+    echo "Please update the release notes in '${RELEASE_NOTES_FILE}' and run the script again."
+    exit 1
+fi
+
+# Read the finalized notes from the file
+RELEASE_NOTES_HTML=$(cat "${RELEASE_NOTES_FILE}")
+echo -e "${GREEN}✅ Release notes confirmed.${NC}"
+
 
 echo -e "${GREEN}╔════════════════════════════════════════════════╗${NC}"
 echo -e "${GREEN}║   HyperChat Simplified Deployment Script       ║${NC}"
@@ -100,6 +121,29 @@ else
     echo "6. Copy the generated password and use it in the command above"
     echo ""
     echo -e "${BLUE}After storing credentials, run this script again.${NC}"
+    exit 1
+fi
+
+# New: Verify the private key matches the public key in Info.plist
+echo -n "  Verifying key consistency... "
+SPARKLE_SIGN_TOOL="${MACOS_DIR}/DerivedData/SourcePackages/artifacts/sparkle/Sparkle/bin/sign_update"
+PLIST_PUB_KEY=$(/usr/libexec/PlistBuddy -c "Print :SUPublicEDKey" "${MACOS_DIR}/Info.plist")
+DERIVED_PUB_KEY=$("${SPARKLE_SIGN_TOOL}" -p "${SPARKLE_PRIVATE_KEY}")
+
+if [[ "${PLIST_PUB_KEY}" == "${DERIVED_PUB_KEY}" ]]; then
+    echo -e "${GREEN}✓${NC}"
+else
+    echo -e "${RED}✗${NC}"
+    echo ""
+    echo -e "${RED}❌ FATAL: Key Mismatch!${NC}"
+    echo "The public key in your Info.plist does not match your private key."
+    echo ""
+    echo -e "${YELLOW}Public Key in Info.plist:${NC} ${PLIST_PUB_KEY}"
+    echo -e "${YELLOW}Public Key from private key:${NC} ${DERIVED_PUB_KEY}"
+    echo ""
+    echo -e "${BLUE}This means any update you ship will FAIL validation for users.${NC}"
+    echo -e "${BLUE}To fix this, update the SUPublicEDKey in Info.plist to match the key derived from your private key.${NC}"
+    echo ""
     exit 1
 fi
 
@@ -309,6 +353,26 @@ rm -rf "${DMG_DIR}"
 echo -e "${YELLOW}🔏 Signing DMG...${NC}"
 codesign --force --sign "${CERTIFICATE_IDENTITY}" --timestamp "${DMG_NAME}"
 
+# Step 9.5: Generate EdDSA signature for Sparkle
+echo -e "${YELLOW}🔏 Generating EdDSA signature for Sparkle...${NC}"
+
+# Explicit validation to prevent keychain fallback
+[[ -f "$SPARKLE_PRIVATE_KEY" ]] || { 
+    echo -e "${RED}❌ FATAL: Private key file missing: $SPARKLE_PRIVATE_KEY${NC}"
+    exit 1
+}
+
+# Debug: Show what we're about to sign with
+echo -e "${BLUE}  Private key file: ${SPARKLE_PRIVATE_KEY}${NC}"
+echo -e "${BLUE}  DMG file: ${DMG_NAME}${NC}"
+
+# Enable command debugging for this critical operation
+set -x
+ED_SIGNATURE=$("${SPARKLE_SIGN_TOOL}" "${DMG_NAME}" "${SPARKLE_PRIVATE_KEY}")
+set +x
+
+echo -e "${GREEN}✅ Generated EdDSA signature: ${ED_SIGNATURE:0:50}...${NC}"
+
 # Step 10: Notarize the DMG
 echo -e "${YELLOW}🍎 Submitting DMG for notarization...${NC}"
 
@@ -416,14 +480,13 @@ cat > appcast.xml << EOF
       <pubDate>$(date -u +"%a, %d %b %Y %H:%M:%S +0000")</pubDate>
       <description>
         <![CDATA[
-          <h2>Hyperchat ${VERSION} (Build ${NEW_BUILD})</h2>
-          <p>Bug fixes and performance improvements.</p>
+          <h2>Hyperchat v${VERSION} (Build ${NEW_BUILD})</h2>
+${RELEASE_NOTES_HTML}
         ]]>
       </description>
       <enclosure url="https://hyperchat.app/archive/${DMG_NAME}"
-                 length="${DMG_SIZE}"
                  type="application/octet-stream"
-                 sparkle:edSignature="" />
+                 ${ED_SIGNATURE} />
       <sparkle:minimumSystemVersion>14.0</sparkle:minimumSystemVersion>
     </item>
   </channel>
