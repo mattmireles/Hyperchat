@@ -875,6 +875,68 @@ extension BrowserViewController: WKNavigationDelegate {
         }
     }
     
+    /// Called to decide whether to allow navigation to a URL.
+    ///
+    /// This method handles:
+    /// - Domain sandboxing for each AI service
+    /// - Opening external links in the default browser
+    /// - Allowing special schemes and internal navigation
+    ///
+    /// External links (outside allowed domains) are opened in the system browser
+    /// using `NSWorkspace.shared.open()` when the navigation type is `.linkActivated`.
+    func webView(_ webView: WKWebView, decidePolicyFor navigationAction: WKNavigationAction, decisionHandler: @escaping (WKNavigationActionPolicy) -> Void) {
+        guard let url = navigationAction.request.url else {
+            decisionHandler(.cancel)
+            return
+        }
+        
+        // Allow special schemes
+        let scheme = url.scheme?.lowercased() ?? ""
+        if ["javascript", "data", "about", "blob"].contains(scheme) {
+            decisionHandler(.allow)
+            return
+        }
+        
+        // Get the allowed domains for the current service
+        var allowedHosts: [String] = []
+        switch service.id {
+        case "google":
+            allowedHosts = ["google.com", "gstatic.com", "googleapis.com", "googleusercontent.com"]
+        case "perplexity":
+            allowedHosts = ["perplexity.ai"]
+        case "chatgpt":
+            allowedHosts = ["chatgpt.com", "openai.com", "oaistatic.com", "oaiusercontent.com"]
+        case "claude":
+            allowedHosts = ["claude.ai", "anthropic.com"]
+        default:
+            decisionHandler(.allow)
+            return
+        }
+        
+        let currentHost = url.host?.lowercased() ?? ""
+        
+        // Allow navigation within the same service domain or subdomains
+        let isAllowedHost = allowedHosts.contains { allowedHost in
+            currentHost == allowedHost || currentHost.hasSuffix(".\(allowedHost)")
+        }
+        
+        if isAllowedHost {
+            decisionHandler(.allow)
+            return
+        }
+        
+        // For external links, open in default browser
+        if navigationAction.navigationType == .linkActivated {
+            print("🔗 Opening external link in browser for \(service.name): \(url.absoluteString)")
+            NSWorkspace.shared.open(url)
+            decisionHandler(.cancel)
+            return
+        }
+        
+        // Allow other types of navigation (redirects, form submissions, etc.)
+        decisionHandler(.allow)
+    }
+    
     /// Called to decide whether to allow navigation based on response.
     ///
     /// Can inspect:
