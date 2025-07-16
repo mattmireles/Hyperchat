@@ -664,29 +664,15 @@ class AppDelegate: NSObject, NSApplicationDelegate, SPUUpdaterDelegate {
     func updaterDidNotFindUpdate(_ updater: SPUUpdater, error: Error) {
         print("Sparkle: No update found - \(error.localizedDescription)")
         
-        // Show user-friendly dialog when no updates are available
-        DispatchQueue.main.async {
-            let alert = NSAlert()
-            alert.messageText = "You're up to date!"
-            alert.informativeText = "Hyperchat is already running the latest version."
-            alert.alertStyle = .informational
-            alert.addButton(withTitle: "OK")
-            alert.runModal()
-        }
+        // Let Sparkle handle the user-facing dialog
+        // Custom alert removed to prevent duplicate notifications
     }
     
     func updater(_ updater: SPUUpdater, didAbortWithError error: Error) {
         print("Sparkle: Update aborted - \(error.localizedDescription)")
         
-        // Show user-friendly dialog for update errors
-        DispatchQueue.main.async {
-            let alert = NSAlert()
-            alert.messageText = "Update Check Failed"
-            alert.informativeText = "Unable to check for updates. Please check your internet connection and try again."
-            alert.alertStyle = .warning
-            alert.addButton(withTitle: "OK")
-            alert.runModal()
-        }
+        // Let Sparkle handle the user-facing dialog
+        // Custom alert removed to prevent duplicate notifications
     }
     
     func updater(_ updater: SPUUpdater, failedToDownloadUpdate item: SUAppcastItem, error: Error) {
