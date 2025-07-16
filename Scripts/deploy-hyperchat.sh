@@ -6,7 +6,8 @@
 
 set -e  # Exit on error
 set -o pipefail # Exit on pipeline failure
-set -u
+set -u  # Exit on undefined variable
+set -x  # Print commands as they execute (full logging)
 
 # Dynamically determine project root. This script can now be run from anywhere.
 SCRIPT_DIR=$(cd -- "$(dirname -- "${BASH_SOURCE[0]}")" &> /dev/null && pwd)
@@ -502,6 +503,20 @@ cd "${WEB_DIR}"
 git add .
 git commit -m "Deploy Hyperchat v${VERSION} build ${NEW_BUILD}" || echo -e "${YELLOW}Nothing to commit${NC}"
 
+# Step 16: Post-deploy validation - Verify signature consistency
+echo -e "${YELLOW}🔍 Validating deployed appcast signature...${NC}"
+EXPECTED_SIGNATURE=$("${SPARKLE_SIGN_TOOL}" -p "${SPARKLE_PRIVATE_KEY}" | grep -o '[^=]*=' | head -1)
+DEPLOYED_SIGNATURE=$(curl -s -H "Cache-Control: no-cache" "https://hyperchat.app/appcast.xml" | grep -o 'sparkle:edSignature="[^"]*"' | sed 's/sparkle:edSignature="//;s/"//' | head -1)
+
+if [[ "$DEPLOYED_SIGNATURE" == *"$EXPECTED_SIGNATURE"* ]]; then
+    echo -e "${GREEN}✅ Signature validation passed!${NC}"
+else
+    echo -e "${RED}❌ SIGNATURE MISMATCH!${NC}"
+    echo -e "${YELLOW}Expected: ${EXPECTED_SIGNATURE}${NC}"
+    echo -e "${YELLOW}Deployed: ${DEPLOYED_SIGNATURE}${NC}"
+    echo -e "${RED}CDN cache may need time to update or manual purge is required${NC}"
+fi
+
 echo ""
 echo -e "${GREEN}╔════════════════════════════════════════════════╗${NC}"
 echo -e "${GREEN}║            Deployment Complete! 🎉             ║${NC}"
@@ -514,4 +529,7 @@ echo ""
 echo -e "${YELLOW}Next steps:${NC}"
 echo "1. Push to GitHub: git push"
 echo "2. Deploy website to update download link"
+echo "3. If signature validation failed, purge CDN cache:"
+echo "   - GitHub Pages: Wait 5-10 minutes for automatic cache refresh"
+echo "   - Custom CDN: Manually purge /appcast.xml and /archive/ paths"
 echo ""
