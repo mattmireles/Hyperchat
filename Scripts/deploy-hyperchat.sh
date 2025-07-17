@@ -263,6 +263,22 @@ AMPLITUDE_PATH="${TEMP_APP_PATH}/Contents/Frameworks/AmplitudeCore.framework"
 if [ -d "${AMPLITUDE_PATH}" ]; then
     xattr -cr "${AMPLITUDE_PATH}"
     codesign --force --sign "${CERTIFICATE_IDENTITY}" --options runtime --timestamp --verbose "${AMPLITUDE_PATH}"
+
+    # ---- Patch invalid RPATH that points into local Xcode toolchain ----
+    AMP_BIN="${AMPLITUDE_PATH}/Versions/A/AmplitudeCore"
+    if [ -f "${AMP_BIN}" ]; then
+        echo -e "${BLUE}  Patching RPATH in AmplitudeCore...${NC}"
+        # Enumerate all LC_RPATH entries and remove those that begin with /Applications/Xcode
+        for rpath in $(otool -l "${AMP_BIN}" | awk '/LC_RPATH/ {getline; getline; print $2}'); do
+            if [[ "$rpath" == /Applications/Xcode* ]]; then
+                echo -e "${YELLOW}    Removing invalid RPATH: $rpath${NC}"
+                # Attempt to delete the RPATH; if it was already removed, ignore the non-zero exit status
+                install_name_tool -delete_rpath "$rpath" "${AMP_BIN}" || true
+            fi
+        done
+        # Re-sign after modification
+        codesign --force --sign "${CERTIFICATE_IDENTITY}" --options runtime --timestamp --verbose "${AMPLITUDE_PATH}"
+    fi
 else
     echo -e "${YELLOW}  Warning: AmplitudeCore.framework not found at ${AMPLITUDE_PATH}${NC}"
 fi
@@ -481,7 +497,7 @@ DMG_DIR="/tmp/Hyperchat-DMG-Final"
 rm -rf "${DMG_DIR}"
 mkdir -p "${DMG_DIR}"
 
-cp -R "${FINAL_APP_PATH}" "${DMG_DIR}/"
+ditto --rsrc --extattr --noqtn "${FINAL_APP_PATH}" "${DMG_DIR}/Hyperchat.app"
 ln -s /Applications "${DMG_DIR}/Applications"
 
 # Remove the old DMG and create new one with stapled app
@@ -497,16 +513,34 @@ rm -rf "${DMG_DIR}"
 echo -e "${BLUE}  Re-signing DMG with stapled app...${NC}"
 codesign --force --sign "${CERTIFICATE_IDENTITY}" --timestamp "${DMG_NAME}"
 
-# Note: We don't re-staple the DMG because it's a new file that hasn't been notarized.
-# The original DMG notarization doesn't apply to the recreated DMG.
-# However, this is fine because:
-# 1. The DMG signature is valid (just signed above)
-# 2. The app inside the DMG is properly stapled
-# 3. Users will extract the stapled app, which will pass Gatekeeper
-echo -e "${BLUE}  Skipping DMG re-stapling (not needed - app inside is stapled)...${NC}"
+# Notarize the final DMG (this was the missing step causing Gatekeeper warnings)
+echo -e "${YELLOW}🍎 Notarizing final DMG...${NC}"
+submit_output=$(xcrun notarytool submit "${DMG_NAME}" \
+                --keychain-profile "$NOTARIZE_PROFILE" --wait --output-format json 2>&1)
 
-# Skip DMG Gatekeeper verification - the recreated DMG isn't notarized, but that's okay
-echo -e "${BLUE}  Skipping DMG Gatekeeper verification (app inside is properly stapled)...${NC}"
+if [ $? -ne 0 ]; then
+    echo -e "${RED}❌ Final DMG notarization failed${NC}"
+    echo -e "${YELLOW}Error output:${NC} $submit_output"
+    exit 1
+fi
+
+# Parse the JSON output
+notarization_status=$(echo "$submit_output" | jq -r '.status' 2>/dev/null)
+if [[ "$notarization_status" != "Accepted" ]]; then
+    echo -e "${RED}❌ Final DMG notarization failed with status: $notarization_status${NC}"
+    exit 1
+fi
+
+# Staple the final DMG
+echo -e "${YELLOW}📎 Stapling notarization ticket to final DMG...${NC}"
+xcrun stapler staple "${DMG_NAME}"
+
+# Validate that DMG stapling worked (fail-fast check)
+echo -e "${BLUE}  Validating final DMG stapling...${NC}"
+stapler validate "${DMG_NAME}" || { 
+    echo -e "${RED}❌ Final DMG stapling failed!${NC}"
+    exit 1
+}
 
 # Step 12: Verify the app inside DMG instead of DMG itself
 echo -e "${YELLOW}🔍 Verifying app inside final DMG...${NC}"

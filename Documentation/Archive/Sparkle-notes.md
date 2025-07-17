@@ -350,4 +350,88 @@ The notes above declared multiple issues "permanently resolved" but the deployme
 
 ---
 
-*July 16, 2025 - Ongoing debugging session - deployment still failing*
+## July 17, 2025 - BUILD SCRIPT PERMISSION FIX: PARTIAL SUCCESS
+
+### What Was Fixed Successfully ✅
+
+**Problem**: `strip-frameworks.sh: Permission denied` during build
+**Solution Applied**:
+1. **Made script executable**: `chmod +x Scripts/strip-frameworks.sh`  
+2. **Fixed Xcode build phase**: Added `alwaysOutOfDate = 1;` to Strip Framework Signatures phase
+
+**Result**: ✅ **The permission error is completely resolved**
+- The `strip-frameworks.sh` script now runs successfully during build
+- No more "Permission denied" errors
+- Build warning about script running every time is eliminated
+
+### New Problem Revealed: AmplitudeCore Framework Signing ❌
+
+**After fixing the permission issue, the build now fails at a different step:**
+
+```
+CodeSign failed with a nonzero exit code
+/Users/***REMOVED-USERNAME***/Library/.../Hyperchat.app: code object is not signed at all
+In subcomponent: .../Contents/Frameworks/AmplitudeCore.framework
+```
+
+**This is the exact same AmplitudeCore framework signing issue documented above!**
+
+### The Pattern: Progressive Build Failures
+
+This debugging session shows a classic pattern:
+1. ✅ **Fixed permission issue** - script can now run
+2. ❌ **Revealed signing issue** - AmplitudeCore framework needs signing during build (not just deployment)
+
+The Sparkle notes document this AmplitudeCore issue in the deployment context, but it's also affecting the regular Xcode archive build process.
+
+### Status: Permission Fix Complete, Signing Issue Remains
+
+- **Strip frameworks script**: ✅ Working perfectly  
+- **AmplitudeCore framework signing**: ❌ Still needs resolution
+- **Overall build**: ❌ Still failing, but for a different reason
+
+This confirms the build script fixes worked as intended, but there are deeper code signing configuration issues in the Xcode project itself.
+
+---
+
+## July 17, 2025 - ENTITLEMENTS FIX: PARTIAL SUCCESS BUT STILL BROKEN
+
+### What Was Fixed Successfully ✅
+
+**Problem**: Both Debug and Release configurations were using debug entitlements (`Hyperchat.entitlements`)
+**Solution Applied**:
+1. **Changed Release configuration**: Updated `CODE_SIGN_ENTITLEMENTS` in project.pbxproj to use `Hyperchat.Release.entitlements`
+2. **Fixed strip-frameworks script**: Added check to skip execution during Archive builds (`ACTION = "install"`)
+
+**Result**: ✅ **Release archive now succeeds and uses correct entitlements**
+- Archive completes without code signing errors
+- Final app bundle excludes `com.apple.security.get-task-allow` (confirmed via `codesign -d --entitlements`)
+- Both AmplitudeCore and Sparkle frameworks properly signed during archive
+
+### ❌ PROBLEM STILL EXISTS: Deployment/Notarization Issues Persist
+
+**Despite the entitlements fix working for local archives, the deployment is still broken.**
+
+This indicates:
+1. ✅ **Local archive builds**: Now working correctly
+2. ❌ **Deployment script issues**: Still failing for different reasons
+3. ❌ **Notarization problems**: May have additional root causes beyond entitlements
+
+### Status: Entitlements Fixed, Deployment Still Broken
+
+- **Xcode Archive builds**: ✅ Working perfectly with correct entitlements
+- **Framework signing during archive**: ✅ Resolved by skipping strip script
+- **End-to-end deployment**: ❌ Still failing (needs separate investigation)
+
+The entitlements mismatch was definitely **one** of the problems, but there appear to be additional issues in the deployment pipeline that weren't addressed by this fix.
+
+### Next Steps Needed
+
+1. **Re-test full deployment script** with the entitlements fix
+2. **Check if EdDSA signature timing issue** is still present
+3. **Investigate notarization failure modes** beyond entitlements
+4. **Verify deployment script AmplitudeCore signing** is working
+
+---
+
+*July 17, 2025 - Entitlements issue resolved, but deployment pipeline still has additional problems*
