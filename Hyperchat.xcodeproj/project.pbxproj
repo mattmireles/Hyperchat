@@ -17,17 +17,16 @@
 		3EE13BAD2C4F6B2900A8A61E /* NSScreen+Extensions.swift in Sources */ = {isa = PBXBuildFile; fileRef = 3EE13BA72C4F6B2900A8A61E /* NSScreen+Extensions.swift */; };
 		3EE13BAE2C4F6B2900A8A61E /* ServiceConfiguration.swift in Sources */ = {isa = PBXBuildFile; fileRef = 3EE13BA82C4F6B2900A8A61E /* ServiceConfiguration.swift */; };
 		3EE13BB22C4F6B2900A8A61E /* Orbitron-Bold.ttf in Resources */ = {isa = PBXBuildFile; fileRef = 3EE13BB32C4F6B2900A8A61E /* Orbitron-Bold.ttf */; };
-		B037998FCEB2498C9615DFBE /* AnalyticsManager.swift in Sources */ = {isa = PBXBuildFile; fileRef = C663B2B952774CA1860EB479 /* AnalyticsManager.swift */; };
-		561E6056A5524A0D938FCA3B /* Config.swift in Sources */ = {isa = PBXBuildFile; fileRef = B132E7AF173A41718E328EEE /* Config.swift */; };
 		3EE13BB42C4F6B2900A8A61E /* SettingsManager.swift in Sources */ = {isa = PBXBuildFile; fileRef = 3EE13BB52C4F6B2900A8A61E /* SettingsManager.swift */; };
 		3EE13BB62C4F6B2900A8A61E /* SettingsWindowController.swift in Sources */ = {isa = PBXBuildFile; fileRef = 3EE13BB72C4F6B2900A8A61E /* SettingsWindowController.swift */; };
+		561E6056A5524A0D938FCA3B /* Config.swift in Sources */ = {isa = PBXBuildFile; fileRef = B132E7AF173A41718E328EEE /* Config.swift */; };
+		B037998FCEB2498C9615DFBE /* AnalyticsManager.swift in Sources */ = {isa = PBXBuildFile; fileRef = C663B2B952774CA1860EB479 /* AnalyticsManager.swift */; };
 		BE8135E42E01E24D0059C681 /* Sparkle in Frameworks */ = {isa = PBXBuildFile; productRef = BE8135E32E01E24D0059C681 /* Sparkle */; };
-		DCB94C1486C54FF2A246B60F /* AmplitudeSwift in Frameworks */ = {isa = PBXBuildFile; productRef = 776626FDA96A4A9E9F38B4B8 /* AmplitudeSwift */; };
 		BEA4CA412E1BB07D00F810E4 /* ClaudeLoginAlertController.swift in Sources */ = {isa = PBXBuildFile; fileRef = BEA4CA3E2E1BB07D00F810E4 /* ClaudeLoginAlertController.swift */; };
 		BEB355BD2E18A3F7000164A8 /* HyperchatApp.swift in Sources */ = {isa = PBXBuildFile; fileRef = BEB355BC2E18A3F7000164A8 /* HyperchatApp.swift */; };
-		BEB355C32E18A6F4000164A8 /* UI/ButtonState.swift in Sources */ = {isa = PBXBuildFile; fileRef = BEB355C12E18A6F4000164A8 /* UI/ButtonState.swift */; };
-		BEB355C42E18A6F4000164A8 /* UI/GradientToolbarButton.swift in Sources */ = {isa = PBXBuildFile; fileRef = BEB355C22E18A6F4000164A8 /* UI/GradientToolbarButton.swift */; };
-		BEB355C52E18A6F4000164A8 /* UI/BrowserView.swift in Sources */ = {isa = PBXBuildFile; fileRef = BEB355C02E18A6F4000164A8 /* UI/BrowserView.swift */; };
+		BEB355C32E18A6F4000164A8 /* UI/GradientToolbarButton.swift in Sources */ = {isa = PBXBuildFile; fileRef = BEB355C12E18A6F4000164A8 /* UI/GradientToolbarButton.swift */; };
+		BEB355C42E18A6F4000164A8 /* UI/BrowserView.swift in Sources */ = {isa = PBXBuildFile; fileRef = BEB355C22E18A6F4000164A8 /* UI/BrowserView.swift */; };
+		BEB355C52E18A6F4000164A8 /* UI/ButtonState.swift in Sources */ = {isa = PBXBuildFile; fileRef = BEB355C02E18A6F4000164A8 /* UI/ButtonState.swift */; };
 		BEC2A99D2E18A24500785B53 /* CrashDebugger.swift in Sources */ = {isa = PBXBuildFile; fileRef = BEC2A99A2E18A24500785B53 /* CrashDebugger.swift */; };
 		BEC2A99F2E18A24500785B53 /* BrowserViewController.swift in Sources */ = {isa = PBXBuildFile; fileRef = BEC2A9992E18A24500785B53 /* BrowserViewController.swift */; };
 		BEC2A9A02E18A24500785B53 /* WebViewFactory.swift in Sources */ = {isa = PBXBuildFile; fileRef = BEC2A99C2E18A24500785B53 /* WebViewFactory.swift */; };
@@ -41,6 +40,7 @@
 		BEC467D12E16483D007B45D0 /* HyperchatUITests.swift in Sources */ = {isa = PBXBuildFile; fileRef = BEC4679B2E164215007B45D0 /* HyperchatUITests.swift */; };
 		BEE13BAF2C4F6B2900A8A61E /* WebViewLogger.swift in Sources */ = {isa = PBXBuildFile; fileRef = BEE13BA92C4F6B2900A8A61E /* WebViewLogger.swift */; };
 		BEE13BB02C4F6B2900A8A61E /* AutoInstaller.swift in Sources */ = {isa = PBXBuildFile; fileRef = BEE13BB12C4F6B2900A8A61E /* AutoInstaller.swift */; };
+		DCB94C1486C54FF2A246B60F /* AmplitudeSwift in Frameworks */ = {isa = PBXBuildFile; productRef = 776626FDA96A4A9E9F38B4B8 /* AmplitudeSwift */; };
 		EB2CF06672284D57B0FCBCA5 /* FaviconFetcher.swift in Sources */ = {isa = PBXBuildFile; fileRef = EB2CF06672284D57B0FCBCA6 /* FaviconFetcher.swift */; };
 /* End PBXBuildFile section */
 
@@ -64,8 +64,6 @@
 /* Begin PBXFileReference section */
 		3EE13B8B2C4F6B2900A8A61E /* Hyperchat.app */ = {isa = PBXFileReference; explicitFileType = wrapper.application; includeInIndex = 0; path = Hyperchat.app; sourceTree = BUILT_PRODUCTS_DIR; };
 		3EE13B8E2C4F6B2900A8A61E /* AppDelegate.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = AppDelegate.swift; sourceTree = "<group>"; };
-		C663B2B952774CA1860EB479 /* AnalyticsManager.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = AnalyticsManager.swift; sourceTree = "<group>"; };
-		B132E7AF173A41718E328EEE /* Config.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = Config.swift; sourceTree = "<group>"; };
 		3EE13B8F2C4F6B2900A8A61E /* FloatingButtonManager.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = FloatingButtonManager.swift; sourceTree = "<group>"; };
 		3EE13B922C4F6B2900A8A61E /* Info.plist */ = {isa = PBXFileReference; lastKnownFileType = text.plist.xml; path = Info.plist; sourceTree = "<group>"; };
 		3EE13B932C4F6B2900A8A61E /* Assets.xcassets */ = {isa = PBXFileReference; lastKnownFileType = folder.assetcatalog; path = Assets.xcassets; sourceTree = "<group>"; };
@@ -78,6 +76,7 @@
 		3EE13BB32C4F6B2900A8A61E /* Orbitron-Bold.ttf */ = {isa = PBXFileReference; lastKnownFileType = file; path = "Orbitron-Bold.ttf"; sourceTree = "<group>"; };
 		3EE13BB52C4F6B2900A8A61E /* SettingsManager.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = SettingsManager.swift; sourceTree = "<group>"; };
 		3EE13BB72C4F6B2900A8A61E /* SettingsWindowController.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = SettingsWindowController.swift; sourceTree = "<group>"; };
+		B132E7AF173A41718E328EEE /* Config.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = Config.swift; sourceTree = "<group>"; };
 		BEA4CA3E2E1BB07D00F810E4 /* ClaudeLoginAlertController.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ClaudeLoginAlertController.swift; sourceTree = "<group>"; };
 		BEB355BC2E18A3F7000164A8 /* HyperchatApp.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = HyperchatApp.swift; sourceTree = "<group>"; };
 		BEB355C02E18A6F4000164A8 /* UI/ButtonState.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = UI/ButtonState.swift; sourceTree = "<group>"; };
@@ -98,6 +97,7 @@
 		BEC467C02E164462007B45D0 /* HyperchatUITests.xctest */ = {isa = PBXFileReference; explicitFileType = wrapper.cfbundle; includeInIndex = 0; path = HyperchatUITests.xctest; sourceTree = BUILT_PRODUCTS_DIR; };
 		BEE13BA92C4F6B2900A8A61E /* WebViewLogger.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = WebViewLogger.swift; sourceTree = "<group>"; };
 		BEE13BB12C4F6B2900A8A61E /* AutoInstaller.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = AutoInstaller.swift; sourceTree = "<group>"; };
+		C663B2B952774CA1860EB479 /* AnalyticsManager.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = AnalyticsManager.swift; sourceTree = "<group>"; };
 		EB2CF06672284D57B0FCBCA6 /* FaviconFetcher.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = FaviconFetcher.swift; sourceTree = "<group>"; };
 /* End PBXFileReference section */
 
@@ -152,9 +152,9 @@
 			isa = PBXGroup;
 			children = (
 				BEA4CA3E2E1BB07D00F810E4 /* ClaudeLoginAlertController.swift */,
-				BEB355C02E18A6F4000164A8 /* UI/BrowserView.swift */,
-				BEB355C12E18A6F4000164A8 /* UI/ButtonState.swift */,
-				BEB355C22E18A6F4000164A8 /* UI/GradientToolbarButton.swift */,
+				BEB355C02E18A6F4000164A8 /* UI/ButtonState.swift */,
+				BEB355C12E18A6F4000164A8 /* UI/GradientToolbarButton.swift */,
+				BEB355C22E18A6F4000164A8 /* UI/BrowserView.swift */,
 				BEB355BC2E18A3F7000164A8 /* HyperchatApp.swift */,
 				BEC2A9992E18A24500785B53 /* BrowserViewController.swift */,
 				BEC2A99A2E18A24500785B53 /* CrashDebugger.swift */,
@@ -213,6 +213,7 @@
 				3EE13B862C4F6B2800A8A61E /* Sparkle Key Sync */,
 				3EE13B872C4F6B2900A8A61E /* Sources */,
 				3EE13B882C4F6B2900A8A61E /* Frameworks */,
+				3EE13B862C4F6B2800A8A61F /* Strip Framework Signatures */,
 				3EE13B892C4F6B2900A8A61E /* Resources */,
 			);
 			buildRules = (
@@ -340,6 +341,48 @@
 		};
 /* End PBXResourcesBuildPhase section */
 
+/* Begin PBXShellScriptBuildPhase section */
+		3EE13B862C4F6B2800A8A61E /* Sparkle Key Sync */ = {
+			isa = PBXShellScriptBuildPhase;
+			alwaysOutOfDate = 1;
+			buildActionMask = 2147483647;
+			files = (
+			);
+			inputFileListPaths = (
+			);
+			inputPaths = (
+			);
+			name = "Sparkle Key Sync";
+			outputFileListPaths = (
+			);
+			outputPaths = (
+			);
+			runOnlyForDeploymentPostprocessing = 0;
+			shellPath = /bin/bash;
+			shellScript = "\"${SRCROOT}/Scripts/sync-sparkle-keys.sh\"\n";
+		};
+		3EE13B862C4F6B2800A8A61F /* Strip Framework Signatures */ = {
+			isa = PBXShellScriptBuildPhase;
+			alwaysOutOfDate = 1;
+			buildActionMask = 2147483647;
+			files = (
+			);
+			inputFileListPaths = (
+			);
+			inputPaths = (
+			);
+			name = "Strip Framework Signatures";
+			outputFileListPaths = (
+			);
+			outputPaths = (
+			);
+			runOnlyForDeploymentPostprocessing = 0;
+			shellPath = /bin/sh;
+			shellScript = "\"$SRCROOT/Scripts/strip-frameworks.sh\"\n";
+			showEnvVarsInLog = 0;
+		};
+/* End PBXShellScriptBuildPhase section */
+
 /* Begin PBXSourcesBuildPhase section */
 		3EE13B872C4F6B2900A8A61E /* Sources */ = {
 			isa = PBXSourcesBuildPhase;
@@ -348,10 +391,10 @@
 				3EE13B9B2C4F6B2900A8A61E /* AppDelegate.swift in Sources */,
 				B037998FCEB2498C9615DFBE /* AnalyticsManager.swift in Sources */,
 				561E6056A5524A0D938FCA3B /* Config.swift in Sources */,
-				BEB355C32E18A6F4000164A8 /* UI/ButtonState.swift in Sources */,
-				BEB355C42E18A6F4000164A8 /* UI/GradientToolbarButton.swift in Sources */,
+				BEB355C32E18A6F4000164A8 /* UI/GradientToolbarButton.swift in Sources */,
+				BEB355C42E18A6F4000164A8 /* UI/BrowserView.swift in Sources */,
 				BEA4CA412E1BB07D00F810E4 /* ClaudeLoginAlertController.swift in Sources */,
-				BEB355C52E18A6F4000164A8 /* UI/BrowserView.swift in Sources */,
+				BEB355C52E18A6F4000164A8 /* UI/ButtonState.swift in Sources */,
 				3EE13B9D2C4F6B2900A8A61E /* FloatingButtonManager.swift in Sources */,
 				3EE13BA92C4F6B2900A8A61E /* OverlayController.swift in Sources */,
 				3EE13BAA2C4F6B2900A8A61E /* PromptWindowController.swift in Sources */,
@@ -392,28 +435,6 @@
 			runOnlyForDeploymentPostprocessing = 0;
 		};
 /* End PBXSourcesBuildPhase section */
-
-/* Begin PBXShellScriptBuildPhase section */
-		3EE13B862C4F6B2800A8A61E /* Sparkle Key Sync */ = {
-			isa = PBXShellScriptBuildPhase;
-			alwaysOutOfDate = 1;
-			buildActionMask = 2147483647;
-			files = (
-			);
-			inputFileListPaths = (
-			);
-			inputPaths = (
-			);
-			name = "Sparkle Key Sync";
-			outputFileListPaths = (
-			);
-			outputPaths = (
-			);
-			runOnlyForDeploymentPostprocessing = 0;
-			shellPath = /bin/bash;
-			shellScript = "\"${SRCROOT}/Scripts/sync-sparkle-keys.sh\"\n";
-		};
-/* End PBXShellScriptBuildPhase section */
 
 /* Begin PBXTargetDependency section */
 		BEC467AE2E164429007B45D0 /* PBXTargetDependency */ = {
@@ -484,7 +505,7 @@
 				CLANG_ENABLE_OBJC_WEAK = YES;
 				CLANG_WARN_DOCUMENTATION_COMMENTS = YES;
 				CLANG_WARN_UNGUARDED_AVAILABILITY = YES_AGGRESSIVE;
-				CODE_SIGN_ENTITLEMENTS = Hyperchat.entitlements;
+				CODE_SIGN_ENTITLEMENTS = Hyperchat.Release.entitlements;
 				CODE_SIGN_STYLE = Automatic;
 				COPY_PHASE_STRIP = YES;
 				CURRENT_PROJECT_VERSION = 6;
