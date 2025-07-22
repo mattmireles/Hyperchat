@@ -198,6 +198,12 @@ class PromptWindowController: NSWindowController {
     
     /// Tracks whether this prompt window is the key window
     @Published public private(set) var isPromptWindowFocused: Bool = false
+    
+    /// Custom placeholder text for the prompt input
+    private var customPlaceholder: String?
+    
+    /// Custom completion handler for prompt submission
+    private var customOnSubmit: ((String) -> Void)?
 
     init(appFocusPublisher: AnyPublisher<Bool, Never>?) {
         let window = PromptWindow(
@@ -272,7 +278,9 @@ class PromptWindowController: NSWindowController {
                 self?.getMaxHeight() ?? 600
             },
             appFocusPublisher: appFocusPublisher,
-            windowFocusPublisher: $isPromptWindowFocused.eraseToAnyPublisher()
+            windowFocusPublisher: $isPromptWindowFocused.eraseToAnyPublisher(),
+            customPlaceholder: customPlaceholder,
+            customOnSubmit: customOnSubmit
         )
         
         hostingController = NSHostingController(rootView: promptView)
@@ -293,8 +301,12 @@ class PromptWindowController: NSWindowController {
     /// - Menu bar disruption
     /// - Focus stealing from other apps
     /// - WebView interference
-    func showWindow(on screen: NSScreen?) {
+    func showWindow(on screen: NSScreen? = nil, withPlaceholder placeholder: String? = nil, onSubmit: ((String) -> Void)? = nil) {
         guard let window = window else { return }
+        
+        // Store custom parameters
+        self.customPlaceholder = placeholder
+        self.customOnSubmit = onSubmit
         
         currentScreen = screen
 
@@ -306,6 +318,9 @@ class PromptWindowController: NSWindowController {
             let y = screenRect.origin.y + (screenRect.height - windowFrame.height) / 2
             window.setFrameOrigin(NSPoint(x: x, y: y))
         }
+
+        // Recreate the prompt view with custom parameters
+        setupPromptView()
 
         super.showWindow(nil)
         // Use gentle activation pattern to prevent menu bar reset
@@ -578,6 +593,12 @@ struct PromptView: View {
     
     /// Publisher that provides window focus state for window-specific glow border
     let windowFocusPublisher: AnyPublisher<Bool, Never>?
+    
+    /// Optional custom placeholder text for the input field
+    let customPlaceholder: String?
+    
+    /// Optional custom completion handler for prompt submission
+    let customOnSubmit: ((String) -> Void)?
 
     /// Current prompt text
     @State private var promptText: String = ""
@@ -616,7 +637,7 @@ struct PromptView: View {
                 HStack(spacing: 0) {
                     ZStack(alignment: .topLeading) {
                         if promptText.isEmpty {
-                            Text("Ask your AIs anything. `Esc` to dismiss.")
+                            Text(customPlaceholder ?? "Ask your AIs anything. `Esc` to dismiss.")
                                 .foregroundColor(.secondary.opacity(0.4))
                                 .font(.system(size: 14))
                                 .padding(.leading, 17)  // Adjusted to align with cursor
@@ -810,7 +831,12 @@ struct PromptView: View {
         guard !trimmed.isEmpty else { return }
 
         if let windowToClose = NSApp.keyWindow {
-            NotificationCenter.default.post(name: .showOverlay, object: trimmed)
+            // Use custom completion handler if provided, otherwise use default behavior
+            if let customHandler = customOnSubmit {
+                customHandler(trimmed)
+            } else {
+                NotificationCenter.default.post(name: .showOverlay, object: trimmed)
+            }
             promptText = ""
             windowToClose.close()
         }

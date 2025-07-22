@@ -355,8 +355,13 @@ class AppDelegate: NSObject, NSApplicationDelegate, SPUUpdaterDelegate {
         // Check for auto-installation on first launch
         AutoInstaller.shared.checkAndPromptInstallation()
         
-        // Show the window in normal view on startup
-        overlayController.showOverlay()
+        // Check if onboarding has been completed
+        if !SettingsManager.shared.hasCompletedOnboarding {
+            runOnboardingFlow()
+        } else {
+            // Show the window in normal view on startup
+            overlayController.showOverlay()
+        }
         
         // Delay constants
         let updaterStartDelay: TimeInterval = 2.0
@@ -628,6 +633,30 @@ class AppDelegate: NSObject, NSApplicationDelegate, SPUUpdaterDelegate {
         // Force the menu to update its display
         menu.update()
         print("🔄 AppDelegate.updateAIServicesMenu() - Menu update completed")
+    }
+    
+    /// Runs the onboarding flow for first-time users.
+    ///
+    /// Called by:
+    /// - `applicationDidFinishLaunching` when onboarding has not been completed
+    ///
+    /// Process:
+    /// 1. Show prompt window with welcome message
+    /// 2. Capture user's name from input
+    /// 3. Use name as first search query to demonstrate the app
+    /// 4. Mark onboarding as completed
+    private func runOnboardingFlow() {
+        let placeholder = "Welcome to Hyperchat! What's your name?"
+        
+        promptWindowController.showWindow(withPlaceholder: placeholder) { name in
+            guard !name.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty else { return }
+            
+            // Use the name directly as the prompt
+            NotificationCenter.default.post(name: .showOverlay, object: name)
+            
+            // Set the flag so this never runs again
+            SettingsManager.shared.hasCompletedOnboarding = true
+        }
     }
     
     /// Starts the Sparkle updater for automatic update checks.
