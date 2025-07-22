@@ -42,10 +42,10 @@ struct HyperchatApp: App {
     @StateObject private var loggingSettings = LoggingSettings.shared
 
     var body: some Scene {
-        // Use WindowGroup with EmptyView to prevent automatic window creation
-        // This allows AppDelegate to manage all windows without SwiftUI menu conflicts
-        WindowGroup {
-            EmptyView()
+        // Use Settings scene to prevent automatic window creation
+        // This is the idiomatic way to handle macOS apps that manage their own windows
+        Settings {
+            SettingsView()
         }
     }
 }
