@@ -9,6 +9,7 @@ class SettingsManager {
     private let servicesKey = "com.hyperchat.services"
     private let floatingButtonEnabledKey = "com.hyperchat.floatingButtonEnabled"
     private let analyticsEnabledKey = "com.hyperchat.analyticsEnabled"
+    private let hasCompletedOnboardingKey = "com.hyperchat.hasCompletedOnboarding"
     
     private init() {}
     
@@ -120,6 +121,26 @@ class SettingsManager {
                 NotificationCenter.default.post(name: .analyticsPreferenceChanged, object: newValue)
                 print("📊 SettingsManager: Analytics preference changed to \(newValue)")
             }
+        }
+    }
+    
+    // MARK: - Onboarding
+    
+    /// Whether the user has completed the onboarding flow.
+    /// 
+    /// Onboarding is a one-time experience that shows on first launch.
+    /// - Defaults to false (onboarding not completed)
+    /// - Set to true after user completes the welcome flow
+    /// - Once true, onboarding will never show again
+    var hasCompletedOnboarding: Bool {
+        get {
+            // Default to false - onboarding not completed by default
+            return userDefaults.object(forKey: hasCompletedOnboardingKey) as? Bool ?? false
+        }
+        set {
+            userDefaults.set(newValue, forKey: hasCompletedOnboardingKey)
+            userDefaults.synchronize() // Force immediate write
+            print("🎯 SettingsManager: Onboarding completion set to \(newValue)")
         }
     }
 }
