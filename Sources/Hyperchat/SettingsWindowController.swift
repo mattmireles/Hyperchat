@@ -379,7 +379,7 @@ class SettingsWindowController: NSWindowController {
         window.titlebarAppearsTransparent = true
         window.titleVisibility = .hidden
         window.backgroundColor = NSColor.clear
-        window.isMovableByWindowBackground = true
+        window.isMovableByWindowBackground = false
         window.level = .normal
         window.collectionBehavior = [.managed, .moveToActiveSpace]
         window.standardWindowButton(.zoomButton)?.isHidden = true
