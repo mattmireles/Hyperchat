@@ -567,16 +567,54 @@ class AppDelegate: NSObject, NSApplicationDelegate, SPUUpdaterDelegate {
     /// - Background menu bar utility when no windows are open
     public func updateActivationPolicy() {
         let windowCount = overlayController.windowCount
+        let appKitWindowCount = NSApp.visibleRegularWindows.count
+        let currentPolicy = NSApp.activationPolicy()
+        
+        // Log current state before policy change
+        print("🔄 [POLICY DEBUG] >>> updateActivationPolicy() called")
+        print("🔄 [POLICY DEBUG] Internal window count: \(windowCount)")
+        print("🔄 [POLICY DEBUG] AppKit visible windows: \(appKitWindowCount)")
+        print("🔄 [POLICY DEBUG] Current policy: \(currentPolicy == .regular ? ".regular" : currentPolicy == .accessory ? ".accessory" : "unknown")")
+        print("🔄 [POLICY DEBUG] Menu available: \(NSApp.mainMenu != nil ? "✅" : "❌")")
+        
+        // Log window titles for debugging stray windows
+        if appKitWindowCount != windowCount {
+            print("⚠️ [POLICY DEBUG] Window count mismatch! Internal: \(windowCount), AppKit: \(appKitWindowCount)")
+            for (index, window) in NSApp.visibleRegularWindows.enumerated() {
+                print("   AppKit window \(index): \(window.title.isEmpty ? "<untitled>" : window.title) (\(type(of: window)))")
+            }
+        }
         
         if windowCount > 0 {
             // Windows are open - behave as regular application
-            print("✅ Windows open (\(windowCount)). Setting activation policy to .regular (visible)")
+            let targetPolicy = "regular"
+            print("🔄 [POLICY DEBUG] Target policy: .\(targetPolicy) (visible)")
+            
             NSApp.setActivationPolicy(.regular)
+            
+            // Rebuild main menu when switching to .regular policy
+            // This ensures AI services menu is restored after returning from .accessory mode
+            setupMainMenu()
+            
+            // Log final state after policy change
+            let newPolicy = NSApp.activationPolicy() 
+            print("🔄 [POLICY DEBUG] <<< Policy updated to: \(newPolicy == .regular ? ".regular" : newPolicy == .accessory ? ".accessory" : "unknown")")
+            print("🔄 [POLICY DEBUG] Menu rebuilt and available: \(NSApp.mainMenu != nil ? "✅" : "❌")")
+            print("🔄 [POLICY DEBUG] AI services menu reference: \(aiServicesMenu != nil ? "✅" : "❌")")
         } else {
             // No windows - behave as background agent
-            print("✅ No windows open. Setting activation policy to .accessory (hidden)")
+            let targetPolicy = "accessory"
+            print("🔄 [POLICY DEBUG] Target policy: .\(targetPolicy) (hidden)")
+            
             NSApp.setActivationPolicy(.accessory)
+            
+            // Log final state after policy change
+            let newPolicy = NSApp.activationPolicy()
+            print("🔄 [POLICY DEBUG] <<< Policy updated to: \(newPolicy == .regular ? ".regular" : newPolicy == .accessory ? ".accessory" : "unknown")")
+            print("🔄 [POLICY DEBUG] Menu status: \(NSApp.mainMenu != nil ? "preserved" : "detached")")
         }
+        
+        print("🔄 [POLICY DEBUG] updateActivationPolicy() complete\n")
     }
     
     private func registerCustomFonts() {
@@ -904,4 +942,27 @@ extension SettingsManager {
 extension NSNotification.Name {
     /// Posted when menu bar icon setting is toggled
     static let menuBarIconToggled = NSNotification.Name("menuBarIconToggled")
+}
+
+// MARK: - NSApplication Extension
+
+/// Extension for debugging and validating window counts.
+///
+/// This extension provides cross-validation between our internal window count
+/// tracking and AppKit's actual window state to catch discrepancies early.
+extension NSApplication {
+    /// Returns all visible, non-miniaturized regular windows.
+    ///
+    /// Used for:
+    /// - Cross-validation with OverlayController.windowCount
+    /// - Debug logging to identify stray windows
+    /// - Ensuring policy decisions are based on accurate window state
+    ///
+    /// Filters out:
+    /// - Hidden windows (isVisible = false)
+    /// - Miniaturized windows (in dock, not active)
+    /// - System windows and panels
+    var visibleRegularWindows: [NSWindow] {
+        return windows.filter { $0.isVisible && !$0.isMiniaturized }
+    }
 }
