@@ -760,8 +760,12 @@ class OverlayController: NSObject, NSWindowDelegate, ObservableObject {
         print("📊 [\(Date().timeIntervalSince1970)] Remaining windows: \(windows.count)")
         
         // Update activation policy now that window count may have changed
-        if let appDelegate = NSApp.delegate as? AppDelegate {
-            appDelegate.updateActivationPolicy()
+        // Use DispatchQueue.main.async to defer policy update to next run loop
+        // This ensures the window is fully closed before evaluating policy
+        DispatchQueue.main.async {
+            if let appDelegate = NSApp.delegate as? AppDelegate {
+                appDelegate.updateActivationPolicy()
+            }
         }
         
         // Note: WebView cleanup is now handled in windowWillClose delegate method
