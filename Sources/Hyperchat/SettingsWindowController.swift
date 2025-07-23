@@ -15,6 +15,7 @@ private enum SettingsLayout {
 class SettingsViewModel: ObservableObject {
     @Published var services: [AIService] = []
     @Published var isFloatingButtonEnabled: Bool = true
+    @Published var isMenuBarIconEnabled: Bool = true
     
     let settingsManager = SettingsManager.shared
     
@@ -44,6 +45,7 @@ class SettingsViewModel: ObservableObject {
     func loadSettings() {
         services = settingsManager.getServices().sorted(by: { $0.order < $1.order })
         isFloatingButtonEnabled = settingsManager.isFloatingButtonEnabled
+        isMenuBarIconEnabled = settingsManager.isMenuBarIconEnabled
     }
     
     func toggleService(at index: Int) {
@@ -55,6 +57,11 @@ class SettingsViewModel: ObservableObject {
     func toggleFloatingButton() {
         isFloatingButtonEnabled.toggle()
         settingsManager.isFloatingButtonEnabled = isFloatingButtonEnabled
+    }
+    
+    func toggleMenuBarIcon() {
+        isMenuBarIconEnabled.toggle()
+        settingsManager.isMenuBarIconEnabled = isMenuBarIconEnabled
     }
     
     func moveService(from source: IndexSet, to destination: Int) {
@@ -273,6 +280,40 @@ struct SettingsView: View {
                                 .labelsHidden()
                                 .onChange(of: viewModel.isFloatingButtonEnabled) { oldValue, newValue in
                                     viewModel.toggleFloatingButton()
+                                }
+                        }
+                        .padding(.horizontal, SettingsLayout.sectionHorizontalPadding)
+                        .padding(.vertical, SettingsLayout.floatingButtonRowPadding)
+                        .background(
+                            RoundedRectangle(cornerRadius: SettingsLayout.serviceRowCornerRadius)
+                                .fill(Color.gray.opacity(SettingsLayout.floatingButtonBackgroundOpacity))
+                        )
+                        .padding(.horizontal, SettingsLayout.sectionHorizontalPadding)
+                    }
+                    
+                    // Menu Bar Icon Section
+                    VStack(alignment: .leading, spacing: 12) {
+                        Text("Menu Bar Icon")
+                            .font(.headline)
+                            .padding(.horizontal, 16)
+                        
+                        HStack {
+                            VStack(alignment: .leading, spacing: 4) {
+                                Text("Show Menu Bar Icon")
+                                    .font(.system(size: 14, weight: .medium))
+                                
+                                Text("Access Hyperchat from the menu bar")
+                                    .font(.caption)
+                                    .foregroundColor(.secondary)
+                            }
+                            
+                            Spacer()
+                            
+                            Toggle("", isOn: $viewModel.isMenuBarIconEnabled)
+                                .toggleStyle(SwitchToggleStyle())
+                                .labelsHidden()
+                                .onChange(of: viewModel.isMenuBarIconEnabled) { oldValue, newValue in
+                                    viewModel.toggleMenuBarIcon()
                                 }
                         }
                         .padding(.horizontal, SettingsLayout.sectionHorizontalPadding)

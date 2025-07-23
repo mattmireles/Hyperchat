@@ -36,16 +36,14 @@ struct HyperchatApp: App {
     /// Bridge to traditional AppKit app delegate
     /// AppDelegate handles all window creation and management
     @NSApplicationDelegateAdaptor(AppDelegate.self) var appDelegate
-    
-    /// Observable logging settings for potential future UI
-    /// Currently unused but available for SwiftUI views
-    @StateObject private var loggingSettings = LoggingSettings.shared
 
     var body: some Scene {
-        // Use Settings scene to prevent automatic window creation
-        // This is the idiomatic way to handle macOS apps that manage their own windows
+        // Use Settings scene as a headless placeholder scene.
+        // Combined with LSUIElement in Info.plist, this prevents any initial window
+        // while allowing AppDelegate to have full control over window management.
+        // This is the canonical architecture for delegate-driven window management.
         Settings {
-            SettingsView()
+            EmptyView()
         }
     }
 }

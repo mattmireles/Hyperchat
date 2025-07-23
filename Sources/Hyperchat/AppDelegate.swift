@@ -29,6 +29,97 @@ import Cocoa
 import SwiftUI
 import Sparkle
 
+// MARK: - Menu Bar Manager
+
+/// Manages the menu bar icon (NSStatusItem) for Hyperchat.
+class MenuBarManager: NSObject {
+    private var statusItem: NSStatusItem?
+    weak var overlayController: OverlayController?
+    weak var promptWindowController: PromptWindowController?
+    
+    override init() {
+        super.init()
+        setupMenuBarIcon()
+        setupSettingsObserver()
+    }
+    
+    deinit {
+        if let statusItem = statusItem {
+            NSStatusBar.system.removeStatusItem(statusItem)
+        }
+        NotificationCenter.default.removeObserver(self)
+    }
+    
+    private func setupMenuBarIcon() {
+        guard SettingsManager.shared.isMenuBarIconEnabled else {
+            hideMenuBarIcon()
+            return
+        }
+        
+        // Force Hyperchat to appear as first (rightmost) menu bar item
+        let autosaveName = "HyperchatMenuBarItem"
+        let positionKey = "NSStatusItem Preferred Position \(autosaveName)"
+        
+        // Force position to 0 (rightmost) if no user preference exists
+        if UserDefaults.standard.object(forKey: positionKey) == nil {
+            UserDefaults.standard.set(0, forKey: positionKey)
+            print("🍎 MenuBarManager: Set initial position to rightmost (position 0)")
+        }
+        
+        statusItem = NSStatusBar.system.statusItem(withLength: NSStatusItem.squareLength)
+        statusItem?.autosaveName = autosaveName  // Critical for positioning to work
+        
+        guard let statusItem = statusItem else { return }
+        
+        if let button = statusItem.button {
+            button.title = "H"
+            button.font = NSFont.systemFont(ofSize: 16, weight: .medium)
+            button.target = self
+            button.action = #selector(menuBarIconClicked(_:))
+            button.toolTip = "Hyperchat - Click to open"
+        }
+        
+        print("🍎 MenuBarManager: Menu bar icon created and enabled")
+    }
+    
+    @objc private func menuBarIconClicked(_ sender: Any?) {
+        print("🍎 MenuBarManager: Menu bar icon clicked")
+        NSApp.activate(ignoringOtherApps: true)
+        
+        if let promptWindowController = promptWindowController {
+            promptWindowController.showWindow(nil)
+        } else if let overlayController = overlayController {
+            overlayController.showOverlay()
+        }
+    }
+    
+    func showMenuBarIcon() {
+        setupMenuBarIcon()
+    }
+    
+    func hideMenuBarIcon() {
+        if let statusItem = statusItem {
+            NSStatusBar.system.removeStatusItem(statusItem)
+            self.statusItem = nil
+            print("🍎 MenuBarManager: Menu bar icon removed")
+        }
+    }
+    
+    private func setupSettingsObserver() {
+        NotificationCenter.default.addObserver(
+            forName: .menuBarIconToggled,
+            object: nil,
+            queue: .main
+        ) { [weak self] _ in
+            if SettingsManager.shared.isMenuBarIconEnabled {
+                self?.showMenuBarIcon()
+            } else {
+                self?.hideMenuBarIcon()
+            }
+        }
+    }
+}
+
 // MARK: - Menu Builder
 
 /// Creates the application's menu bar structure.
@@ -269,6 +360,9 @@ class AppDelegate: NSObject, NSApplicationDelegate, SPUUpdaterDelegate {
     /// Manager for the floating button that triggers Hyperchat
     var floatingButtonManager: FloatingButtonManager
     
+    /// Manager for the menu bar icon (NSStatusItem)
+    var menuBarManager: MenuBarManager
+    
     /// Controller for all application windows
     var overlayController: OverlayController
     
@@ -293,6 +387,7 @@ class AppDelegate: NSObject, NSApplicationDelegate, SPUUpdaterDelegate {
 
     override init() {
         self.floatingButtonManager = FloatingButtonManager()
+        self.menuBarManager = MenuBarManager()
         self.overlayController = OverlayController()
         // Pass app focus publisher to promptWindowController for app focus state access
         self.promptWindowController = PromptWindowController(appFocusPublisher: self.overlayController.$isAppFocused.eraseToAnyPublisher())
@@ -351,6 +446,10 @@ class AppDelegate: NSObject, NSApplicationDelegate, SPUUpdaterDelegate {
         floatingButtonManager.promptWindowController = promptWindowController
         floatingButtonManager.overlayController = self.overlayController
         floatingButtonManager.showFloatingButton()
+        
+        // Set up menu bar manager connections
+        menuBarManager.overlayController = self.overlayController
+        menuBarManager.promptWindowController = promptWindowController
         
         // Check for auto-installation on first launch
         AutoInstaller.shared.checkAndPromptInstallation()
@@ -707,4 +806,26 @@ class AppDelegate: NSObject, NSApplicationDelegate, SPUUpdaterDelegate {
     func updater(_ updater: SPUUpdater, failedToDownloadUpdate item: SUAppcastItem, error: Error) {
         print("Sparkle: Failed to download update - \(error.localizedDescription)")
     }
+}
+
+// MARK: - Settings Manager Extension
+
+extension SettingsManager {
+    /// Whether the menu bar icon should be shown.
+    var isMenuBarIconEnabled: Bool {
+        get {
+            return UserDefaults.standard.object(forKey: "menuBarIcon.enabled") as? Bool ?? true
+        }
+        set {
+            UserDefaults.standard.set(newValue, forKey: "menuBarIcon.enabled")
+            NotificationCenter.default.post(name: .menuBarIconToggled, object: nil)
+        }
+    }
+}
+
+// MARK: - Notifications
+
+extension NSNotification.Name {
+    /// Posted when menu bar icon setting is toggled
+    static let menuBarIconToggled = NSNotification.Name("menuBarIconToggled")
 }
