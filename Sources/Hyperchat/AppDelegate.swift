@@ -377,6 +377,10 @@ class AppDelegate: NSObject, NSApplicationDelegate, SPUUpdaterDelegate {
     /// Settings window controller (created on demand)
     var settingsWindowController: SettingsWindowController?
     
+    /// Tracks whether the first activation policy has been set during launch
+    /// This prevents redundant policy changes during the initial launch sequence
+    private var firstPolicySet = false
+    
     /// Reference to AI Services menu for dynamic updates
     var aiServicesMenu: NSMenu?
     
@@ -570,14 +574,25 @@ class AppDelegate: NSObject, NSApplicationDelegate, SPUUpdaterDelegate {
         let appKitWindowCount = NSApp.visibleRegularWindows.count
         let currentPolicy = NSApp.activationPolicy()
         
+        // Determine target policy based on window count
+        let wantsRegular = windowCount > 0
+        let targetPolicy: NSApplication.ActivationPolicy = wantsRegular ? .regular : .accessory
+        
+        // Guard against redundant policy changes, especially during launch
+        guard currentPolicy != targetPolicy || !firstPolicySet else {
+            print("🔄 [POLICY DEBUG] No policy change needed (current: \(currentPolicy == .regular ? ".regular" : ".accessory"), target: \(targetPolicy == .regular ? ".regular" : ".accessory"))")
+            return
+        }
+        
         // Log current state before policy change
         print("🔄 [POLICY DEBUG] >>> updateActivationPolicy() called")
         print("🔄 [POLICY DEBUG] Internal window count: \(windowCount)")
         print("🔄 [POLICY DEBUG] AppKit visible windows: \(appKitWindowCount)")
         print("🔄 [POLICY DEBUG] Current policy: \(currentPolicy == .regular ? ".regular" : currentPolicy == .accessory ? ".accessory" : "unknown")")
-        print("🔄 [POLICY DEBUG] Menu available: \(NSApp.mainMenu != nil ? "✅" : "❌")")
+        print("🔄 [POLICY DEBUG] Target policy: \(targetPolicy == .regular ? ".regular" : ".accessory")")
+        print("🔄 [POLICY DEBUG] First policy set: \(firstPolicySet)")
         
-        // Log window titles for debugging stray windows
+        // Log window titles for debugging stray windows, especially when dropping to .accessory
         if appKitWindowCount != windowCount {
             print("⚠️ [POLICY DEBUG] Window count mismatch! Internal: \(windowCount), AppKit: \(appKitWindowCount)")
             for (index, window) in NSApp.visibleRegularWindows.enumerated() {
@@ -585,36 +600,41 @@ class AppDelegate: NSObject, NSApplicationDelegate, SPUUpdaterDelegate {
             }
         }
         
-        if windowCount > 0 {
-            // Windows are open - behave as regular application
-            let targetPolicy = "regular"
-            print("🔄 [POLICY DEBUG] Target policy: .\(targetPolicy) (visible)")
+        // Log all AppKit windows when dropping to .accessory to spot stray windows
+        if !wantsRegular && appKitWindowCount > 0 {
+            print("🔍 [POLICY DEBUG] Dropping to .accessory but AppKit reports \(appKitWindowCount) windows:")
+            for (index, window) in NSApp.visibleRegularWindows.enumerated() {
+                print("   Stray window \(index): '\(window.title.isEmpty ? "<untitled>" : window.title)' (\(type(of: window)))")
+            }
+        }
+        
+        // Mark that we've set the first policy
+        firstPolicySet = true
+        
+        // Use DispatchQueue.main.async for one run-loop hop to ensure deterministic timing
+        // This guarantees all automatic window restoration has completed
+        DispatchQueue.main.async { [weak self] in
+            guard let self = self else { return }
             
-            NSApp.setActivationPolicy(.regular)
+            NSApp.setActivationPolicy(targetPolicy)
             
-            // Rebuild main menu when switching to .regular policy
-            // This ensures AI services menu is restored after returning from .accessory mode
-            setupMainMenu()
-            
-            // Log final state after policy change
-            let newPolicy = NSApp.activationPolicy() 
-            print("🔄 [POLICY DEBUG] <<< Policy updated to: \(newPolicy == .regular ? ".regular" : newPolicy == .accessory ? ".accessory" : "unknown")")
-            print("🔄 [POLICY DEBUG] Menu rebuilt and available: \(NSApp.mainMenu != nil ? "✅" : "❌")")
-            print("🔄 [POLICY DEBUG] AI services menu reference: \(aiServicesMenu != nil ? "✅" : "❌")")
-        } else {
-            // No windows - behave as background agent
-            let targetPolicy = "accessory"
-            print("🔄 [POLICY DEBUG] Target policy: .\(targetPolicy) (hidden)")
-            
-            NSApp.setActivationPolicy(.accessory)
+            if targetPolicy == .regular {
+                // Rebuild main menu when switching to .regular policy
+                // This ensures AI services menu is restored after returning from .accessory mode
+                self.setupMainMenu()
+                print("🔄 [POLICY DEBUG] Menu rebuilt for .regular policy")
+            }
             
             // Log final state after policy change
             let newPolicy = NSApp.activationPolicy()
             print("🔄 [POLICY DEBUG] <<< Policy updated to: \(newPolicy == .regular ? ".regular" : newPolicy == .accessory ? ".accessory" : "unknown")")
-            print("🔄 [POLICY DEBUG] Menu status: \(NSApp.mainMenu != nil ? "preserved" : "detached")")
+            print("🔄 [POLICY DEBUG] Menu available: \(NSApp.mainMenu != nil ? "✅" : "❌")")
+            if targetPolicy == .regular {
+                print("🔄 [POLICY DEBUG] AI services menu reference: \(self.aiServicesMenu != nil ? "✅" : "❌")")
+            }
+            print("🔄 [POLICY DEBUG] Windows: \(self.overlayController.windowCount) (internal), \(NSApp.visibleRegularWindows.count) (AppKit)")
+            print("🔄 [POLICY DEBUG] updateActivationPolicy() complete\n")
         }
-        
-        print("🔄 [POLICY DEBUG] updateActivationPolicy() complete\n")
     }
     
     private func registerCustomFonts() {
