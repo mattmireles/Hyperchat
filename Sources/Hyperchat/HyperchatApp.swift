@@ -6,18 +6,20 @@
 /// Key responsibilities:
 /// - Declares @main entry point for the application
 /// - Bridges to AppDelegate for window management
-/// - Provides Settings scene for menu commands
-/// - Avoids creating default SwiftUI window
-/// - Holds reference to logging settings
+/// - Creates WindowGroup for standard app behavior (dock icon, app switcher)
+/// - AppDelegate closes initial window immediately to maintain control
+/// - Enables manual settings window management
 ///
 /// Related files:
 /// - `AppDelegate.swift`: Handles actual app lifecycle and window creation
+/// - `SettingsWindowController.swift`: Manual settings window management
 /// - `LoggingSettings.swift`: Provides observable logging configuration
 ///
 /// Architecture:
 /// - SwiftUI App protocol for modern lifecycle
 /// - NSApplicationDelegateAdaptor for AppKit bridge
-/// - Settings scene prevents unwanted window creation
+/// - WindowGroup + close-on-launch pattern for hybrid control
+/// - Manual settings window to avoid SwiftUI Settings scene corruption
 
 import SwiftUI
 import AppKit
@@ -25,10 +27,11 @@ import AppKit
 /// Main SwiftUI app structure.
 ///
 /// Design decisions:
-/// - Uses Settings scene instead of WindowGroup
-/// - This prevents SwiftUI from creating a default window
-/// - Allows AppDelegate to manage all windows
-/// - Maintains SwiftUI menu commands functionality
+/// - Uses WindowGroup with EmptyView for normal app behavior
+/// - AppDelegate immediately closes the EmptyView window via async deferral
+/// - Manual settings window management prevents SwiftUI Settings scene corruption
+/// - Maintains full AppDelegate control over all windows
+/// - Enables dock icon and app switcher integration
 ///
 /// The @main attribute marks this as the app entry point.
 @main
@@ -38,10 +41,9 @@ struct HyperchatApp: App {
     @NSApplicationDelegateAdaptor(AppDelegate.self) var appDelegate
 
     var body: some Scene {
-        // Use Settings scene as a headless placeholder scene.
-        // Combined with LSUIElement in Info.plist, this prevents any initial window
-        // while allowing AppDelegate to have full control over window management.
-        // This is the canonical architecture for delegate-driven window management.
+        // Use Settings scene as headless placeholder for LSUIElement app.
+        // With LSUIElement=YES in Info.plist, this prevents the blank window issue
+        // while giving AppDelegate full control over window creation.
         Settings {
             EmptyView()
         }

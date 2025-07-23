@@ -308,11 +308,13 @@ class PromptWindowController: NSWindowController {
         self.customPlaceholder = placeholder
         self.customOnSubmit = onSubmit
         
-        currentScreen = screen
+        // Determine target screen: use provided screen, or fall back to screen with mouse, or main screen
+        let targetScreen = screen ?? NSScreen.screenWithMouse() ?? NSScreen.main ?? NSScreen.screens.first
+        currentScreen = targetScreen
 
-        // Center the window on the target screen
-        if let targetScreen = screen {
-            let screenRect = targetScreen.visibleFrame
+        // Always center the window on the target screen
+        if let screenToUse = targetScreen {
+            let screenRect = screenToUse.visibleFrame
             let windowFrame = window.frame
             let x = screenRect.origin.x + (screenRect.width - windowFrame.width) / 2
             let y = screenRect.origin.y + (screenRect.height - windowFrame.height) / 2
@@ -323,6 +325,9 @@ class PromptWindowController: NSWindowController {
         setupPromptView()
 
         super.showWindow(nil)
+        // Activate the app to bring it to foreground
+        NSApp.activate(ignoringOtherApps: true)
+        
         // Use gentle activation pattern to prevent menu bar reset
         window.orderFront(nil)
         DispatchQueue.main.asyncAfter(deadline: .now() + PromptWindowTimings.windowActivationDelay) {

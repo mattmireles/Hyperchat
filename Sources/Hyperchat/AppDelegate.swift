@@ -87,7 +87,9 @@ class MenuBarManager: NSObject {
         NSApp.activate(ignoringOtherApps: true)
         
         if let promptWindowController = promptWindowController {
-            promptWindowController.showWindow(nil)
+            // Determine the correct screen like FloatingButtonManager does
+            let screen = NSScreen.screenWithMouse() ?? NSScreen.main ?? NSScreen.screens.first
+            promptWindowController.showWindow(on: screen)
         } else if let overlayController = overlayController {
             overlayController.showOverlay()
         }
@@ -416,33 +418,52 @@ class AppDelegate: NSObject, NSApplicationDelegate, SPUUpdaterDelegate {
     /// - Update checker delayed to prevent conflicts
     /// - Notifications connect components loosely
     func applicationDidFinishLaunching(_ aNotification: Notification) {
-        // Debugging code
-        #if DEBUG
-        print("\n🔍 SPARKLE DEBUG INFO:")
-        print("🆔 Bundle ID: \(Bundle.main.bundleIdentifier ?? "nil")")
-
-        if let publicKey = Bundle.main.object(forInfoDictionaryKey: "SUPublicEDKey") as? String {
-            print("🔑 Public Key: \(publicKey)")
-        // Show first and last 20 chars to verify it's the right key
-            let prefix = String(publicKey.prefix(20))
-            let suffix = String(publicKey.suffix(20))
-            print("🔑 Key preview: \(prefix)...\(suffix)")
-            } 
-
-            print("🌐 Feed URL: \(Bundle.main.object(forInfoDictionaryKey: "SUFeedURL") ?? "nil")")
-            print(String(repeating: "=", count: 50))
-            #endif
+        // Use async deferral to ensure proper timing for window cleanup and menu setup
+        // This avoids race conditions with SwiftUI's initial window creation
+        DispatchQueue.main.async { [weak self] in
+            self?.setupApplicationAfterSwiftUIInit()
+        }
+    }
+    
+    /// Sets up the application after SwiftUI has completed its initialization.
+    ///
+    /// Called asynchronously from applicationDidFinishLaunching to ensure:
+    /// - Menu setup happens after any SwiftUI menu interference
+    /// - Proper application state setup
+    ///
+    /// With LSUIElement=YES and Settings scene, no window cleanup is needed.
+    private func setupApplicationAfterSwiftUIInit() {
+        // Step 1: Set up the main menu (after SwiftUI is done)
+        setupMainMenu()
         
-        // Set up the main menu synchronously, passing a reference to self
+        // Step 2: Initialize application components
+        initializeAppComponents()
+        
+        // Step 3: Show initial window or run onboarding
+        showInitialWindow()
+        
+        // Step 4: Start background services
+        startBackgroundServices()
+    }
+    
+    
+    /// Sets up the main menu after SwiftUI initialization is complete.
+    ///
+    /// This ensures our custom menu isn't overwritten by SwiftUI's menu setup.
+    private func setupMainMenu() {
         NSApp.mainMenu = MenuBuilder.createMainMenu(appDelegate: self)
-        print("🍽️ Main menu created synchronously, aiServicesMenu reference: \(aiServicesMenu != nil ? "✅ available" : "❌ nil")")
-        
+        print("🍽️ Main menu created after SwiftUI init, aiServicesMenu reference: \(aiServicesMenu != nil ? "✅ available" : "❌ nil")")
+    }
+    
+    /// Initializes core application components.
+    private func initializeAppComponents() {
         // Register custom fonts
         registerCustomFonts()
         
         // Initialize analytics (respects user privacy preferences)
         AnalyticsManager.shared.initialize()
         
+        // Set up floating button manager
         floatingButtonManager.promptWindowController = promptWindowController
         floatingButtonManager.overlayController = self.overlayController
         floatingButtonManager.showFloatingButton()
@@ -451,6 +472,12 @@ class AppDelegate: NSObject, NSApplicationDelegate, SPUUpdaterDelegate {
         menuBarManager.overlayController = self.overlayController
         menuBarManager.promptWindowController = promptWindowController
         
+        // Set up notification observers
+        setupNotificationObservers()
+    }
+    
+    /// Shows the initial window or runs onboarding flow.
+    private func showInitialWindow() {
         // Check for auto-installation on first launch
         AutoInstaller.shared.checkAndPromptInstallation()
         
@@ -461,7 +488,10 @@ class AppDelegate: NSObject, NSApplicationDelegate, SPUUpdaterDelegate {
             // Show the window in normal view on startup
             overlayController.showOverlay()
         }
-        
+    }
+    
+    /// Starts background services like the update checker.
+    private func startBackgroundServices() {
         // Delay constants
         let updaterStartDelay: TimeInterval = 2.0
         
@@ -469,7 +499,10 @@ class AppDelegate: NSObject, NSApplicationDelegate, SPUUpdaterDelegate {
         DispatchQueue.main.asyncAfter(deadline: .now() + updaterStartDelay) { [weak self] in
             self?.startUpdater()
         }
-        
+    }
+    
+    /// Sets up notification observers for component communication.
+    private func setupNotificationObservers() {
         // Listen for prompt submission to show overlay
         NotificationCenter.default.addObserver(forName: .showOverlay, object: nil, queue: .main) { [weak self] notification in
             if let prompt = notification.object as? String {
@@ -491,7 +524,6 @@ class AppDelegate: NSObject, NSApplicationDelegate, SPUUpdaterDelegate {
         NotificationCenter.default.addObserver(forName: .servicesUpdated, object: nil, queue: .main) { [weak self] _ in
             self?.updateAIServicesMenu()
         }
-        
         
         // Listen for Claude login alert closure to clean up reference
         NotificationCenter.default.addObserver(forName: .claudeLoginAlertClosed, object: nil, queue: .main) { [weak self] _ in
