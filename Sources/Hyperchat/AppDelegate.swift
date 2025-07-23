@@ -629,6 +629,25 @@ class AppDelegate: NSObject, NSApplicationDelegate, SPUUpdaterDelegate {
                 // This ensures AI services menu is restored after returning from .accessory mode
                 self.setupMainMenu()
                 print("🔄 [POLICY DEBUG] Menu rebuilt for .regular policy")
+                
+                // CRITICAL: Implement the "Activation Shuffle" pattern from dual-mode guide
+                // Simply setting policy to .regular isn't enough - we need to force activation
+                // to ensure the app becomes truly active and menu bar is responsive
+                DispatchQueue.main.async {
+                    print("🔄 [ACTIVATION SHUFFLE] Starting activation sequence...")
+                    NSApp.activate(ignoringOtherApps: true)
+                    
+                    // Make sure a window is visible and key for proper activation
+                    if let firstWindow = NSApp.windows.first {
+                        firstWindow.makeKeyAndOrderFront(nil)
+                        print("🔄 [ACTIVATION SHUFFLE] Made first window key and front: \(firstWindow.title)")
+                    }
+                    
+                    // Verify activation completed successfully
+                    let isActive = NSApp.isActive
+                    let hasKeyWindow = NSApp.keyWindow != nil
+                    print("🔄 [ACTIVATION SHUFFLE] Activation complete - Active: \(isActive ? "✅" : "❌"), KeyWindow: \(hasKeyWindow ? "✅" : "❌")")
+                }
             }
             
             // Log final state after policy change
