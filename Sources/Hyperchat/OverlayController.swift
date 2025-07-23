@@ -359,6 +359,12 @@ class OverlayController: NSObject, NSWindowDelegate, ObservableObject {
     func serviceManager(for window: NSWindow) -> ServiceManager? {
         return windowServiceManagers[window]
     }
+    
+    /// Public accessor for the number of windows currently managed by this controller.
+    /// Used by AppDelegate to determine activation policy based on window count.
+    public var windowCount: Int {
+        return windows.count
+    }
 
     /// Initializes the overlay controller.
     ///
@@ -571,6 +577,11 @@ class OverlayController: NSObject, NSWindowDelegate, ObservableObject {
         window.overlayController = self
         windows.append(window)
         
+        // Update activation policy now that we have a window
+        if let appDelegate = NSApp.delegate as? AppDelegate {
+            appDelegate.updateActivationPolicy()
+        }
+        
         // Store the window-specific ServiceManager
         windowServiceManagers[window] = windowServiceManager
         
@@ -616,6 +627,9 @@ class OverlayController: NSObject, NSWindowDelegate, ObservableObject {
             object: nil
         )
 
+        // Activate the app to bring it to foreground (essential for LSUIElement apps)
+        NSApp.activate(ignoringOtherApps: true)
+        
         // Use gentle activation pattern to prevent WebView disruption
         window.orderFront(nil)
         DispatchQueue.main.asyncAfter(deadline: .now() + 0.1) {
@@ -744,6 +758,11 @@ class OverlayController: NSObject, NSWindowDelegate, ObservableObject {
         // Remove window from array
         windows.removeAll { $0 == window }
         print("📊 [\(Date().timeIntervalSince1970)] Remaining windows: \(windows.count)")
+        
+        // Update activation policy now that window count may have changed
+        if let appDelegate = NSApp.delegate as? AppDelegate {
+            appDelegate.updateActivationPolicy()
+        }
         
         // Note: WebView cleanup is now handled in windowWillClose delegate method
         // This ensures script message handlers are removed before deallocation
