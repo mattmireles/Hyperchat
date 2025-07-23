@@ -398,6 +398,11 @@ class AppDelegate: NSObject, NSApplicationDelegate, SPUUpdaterDelegate {
     }
 
     func applicationWillFinishLaunching(_ notification: Notification) {
+        // Set initial activation policy to .accessory (background agent)
+        // This ensures app starts hidden from Dock and Cmd+Tab switcher
+        NSApp.setActivationPolicy(.accessory)
+        print("✅ Initial activation policy set to .accessory (hidden)")
+        
         // Menu setup moved to applicationDidFinishLaunching with async dispatch
         // to avoid conflicts with SwiftUI
     }
@@ -533,6 +538,45 @@ class AppDelegate: NSObject, NSApplicationDelegate, SPUUpdaterDelegate {
     
     func applicationWillTerminate(_ aNotification: Notification) {
         // Insert code here to tear down your application
+    }
+    
+    /// Prevents the application from terminating when the last window is closed.
+    ///
+    /// This ensures the app continues running as a menu bar utility when no windows are open,
+    /// maintaining the dynamic personality behavior where the app can switch between:
+    /// - Standard application mode (when windows are open)
+    /// - Background menu bar utility mode (when no windows are open)
+    ///
+    /// Without this method, the app would quit when the last window closes, preventing
+    /// the menu bar icon from being accessible to create new windows.
+    func applicationShouldTerminateAfterLastWindowClosed(_ sender: NSApplication) -> Bool {
+        return false
+    }
+    
+    /// Updates the application's activation policy based on window count.
+    ///
+    /// Called by:
+    /// - OverlayController when windows are created or destroyed
+    ///
+    /// Policy logic:
+    /// - Windows exist: Set to .regular (visible in Dock and Cmd+Tab)
+    /// - No windows: Set to .accessory (menu bar only, hidden from Dock/Cmd+Tab)
+    ///
+    /// This creates dynamic application personality where the app behaves as:
+    /// - Standard application when windows are open
+    /// - Background menu bar utility when no windows are open
+    public func updateActivationPolicy() {
+        let windowCount = overlayController.windowCount
+        
+        if windowCount > 0 {
+            // Windows are open - behave as regular application
+            print("✅ Windows open (\(windowCount)). Setting activation policy to .regular (visible)")
+            NSApp.setActivationPolicy(.regular)
+        } else {
+            // No windows - behave as background agent
+            print("✅ No windows open. Setting activation policy to .accessory (hidden)")
+            NSApp.setActivationPolicy(.accessory)
+        }
     }
     
     private func registerCustomFonts() {
