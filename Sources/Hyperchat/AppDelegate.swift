@@ -56,6 +56,12 @@ class MenuBarManager: NSObject {
             return
         }
         
+        // Guard against creating duplicate status items
+        guard statusItem == nil else {
+            print("🍎 MenuBarManager: Status item already exists, skipping creation")
+            return
+        }
+        
         // Force Hyperchat to appear as first (rightmost) menu bar item
         let autosaveName = "HyperchatMenuBarItem"
         let positionKey = "NSStatusItem Preferred Position \(autosaveName)"
