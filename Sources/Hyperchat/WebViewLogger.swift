@@ -63,18 +63,68 @@ private enum LoggingLimits {
 /// - `SettingsWindowController`: Provides UI for configuration
 /// - `WebViewLogger`: Checks flags before logging
 ///
-/// Settings are stored in UserDefaults with @AppStorage
-/// for automatic persistence and SwiftUI integration.
+/// Settings are stored in UserDefaults directly to avoid SwiftUI initialization dependencies.
+/// Maintains ObservableObject for SwiftUI compatibility.
 class LoggingSettings: ObservableObject {
     static let shared = LoggingSettings()
     
-    @AppStorage("logging.networkRequests") var networkRequests = false
-    @AppStorage("logging.userInteractions") var userInteractions = false
-    @AppStorage("logging.consoleMessages") var consoleMessages = true
-    @AppStorage("logging.domChanges") var domChanges = false
-    @AppStorage("logging.navigation") var navigation = true
-    @AppStorage("logging.debugPrompts") var debugPrompts = true
-    @AppStorage("logging.analyticsFilter") var analyticsFilter = true
+    private let defaults = UserDefaults.standard
+    
+    var networkRequests: Bool {
+        get { defaults.object(forKey: "logging.networkRequests") as? Bool ?? false }
+        set { 
+            defaults.set(newValue, forKey: "logging.networkRequests")
+            objectWillChange.send()
+        }
+    }
+    
+    var userInteractions: Bool {
+        get { defaults.object(forKey: "logging.userInteractions") as? Bool ?? false }
+        set { 
+            defaults.set(newValue, forKey: "logging.userInteractions")
+            objectWillChange.send()
+        }
+    }
+    
+    var consoleMessages: Bool {
+        get { defaults.object(forKey: "logging.consoleMessages") as? Bool ?? true }
+        set { 
+            defaults.set(newValue, forKey: "logging.consoleMessages")
+            objectWillChange.send()
+        }
+    }
+    
+    var domChanges: Bool {
+        get { defaults.object(forKey: "logging.domChanges") as? Bool ?? false }
+        set { 
+            defaults.set(newValue, forKey: "logging.domChanges")
+            objectWillChange.send()
+        }
+    }
+    
+    var navigation: Bool {
+        get { defaults.object(forKey: "logging.navigation") as? Bool ?? true }
+        set { 
+            defaults.set(newValue, forKey: "logging.navigation")
+            objectWillChange.send()
+        }
+    }
+    
+    var debugPrompts: Bool {
+        get { defaults.object(forKey: "logging.debugPrompts") as? Bool ?? true }
+        set { 
+            defaults.set(newValue, forKey: "logging.debugPrompts")
+            objectWillChange.send()
+        }
+    }
+    
+    var analyticsFilter: Bool {
+        get { defaults.object(forKey: "logging.analyticsFilter") as? Bool ?? true }
+        set { 
+            defaults.set(newValue, forKey: "logging.analyticsFilter")
+            objectWillChange.send()
+        }
+    }
     
     // Convenience methods for preset configurations
     func setMinimalLogging() {
