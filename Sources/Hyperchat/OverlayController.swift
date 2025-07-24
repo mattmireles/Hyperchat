@@ -277,6 +277,9 @@ class OverlayWindow: NSWindow {
 class OverlayController: NSObject, NSWindowDelegate, ObservableObject {
     // MARK: - Properties
     
+    /// Direct reference to the AppDelegate to avoid timing issues with NSApp.delegate
+    weak var appDelegate: AppDelegate?
+    
     /// All active windows managed by this controller
     private var windows: [OverlayWindow] = []
     
@@ -677,7 +680,8 @@ class OverlayController: NSObject, NSWindowDelegate, ObservableObject {
         
         // Update activation policy now that we have a window
         print("🪟 showOverlay: calling updateActivationPolicy")
-        if let appDelegate = NSApp.delegate as? AppDelegate {
+        print("🪟 delegate class:", String(describing: appDelegate))
+        if let appDelegate = self.appDelegate {
             appDelegate.updateActivationPolicy(source: "OverlayController.showOverlay")
         }
         
@@ -863,7 +867,8 @@ class OverlayController: NSObject, NSWindowDelegate, ObservableObject {
         // This ensures the window is fully closed before evaluating policy
         DispatchQueue.main.async {
             print("🪟 removeWindow: calling updateActivationPolicy")
-            if let appDelegate = NSApp.delegate as? AppDelegate {
+            print("🪟 delegate class:", String(describing: self.appDelegate))
+            if let appDelegate = self.appDelegate {
                 appDelegate.updateActivationPolicy(source: "OverlayController.closeWindow")
             }
         }

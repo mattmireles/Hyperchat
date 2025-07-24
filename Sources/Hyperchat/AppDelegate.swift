@@ -427,6 +427,10 @@ class AppDelegate: NSObject, NSApplicationDelegate, SPUUpdaterDelegate {
         // Pass app focus publisher to promptWindowController for app focus state access
         self.promptWindowController = PromptWindowController(appFocusPublisher: self.overlayController.$isAppFocused.eraseToAnyPublisher())
         super.init()
+        
+        // ** Manually wire the delegate to the controller to fix timing issue **
+        self.overlayController.appDelegate = self
+        
         self.updaterController = SPUStandardUpdaterController(startingUpdater: false, updaterDelegate: self, userDriverDelegate: nil)
     }
 
@@ -474,8 +478,12 @@ class AppDelegate: NSObject, NSApplicationDelegate, SPUUpdaterDelegate {
         // Step 1: Initialize application components
         initializeAppComponents()
         
-        // Step 2: Show initial window or run onboarding (this will trigger policy update)
-        showInitialWindow()
+        // Step 2: Defer window creation to ensure NSApp.delegate is fully initialized
+        // This prevents the delegate timing race condition that was causing updateActivationPolicy() to fail
+        DispatchQueue.main.async { [weak self] in
+            // Show initial window or run onboarding (this will trigger policy update)
+            self?.showInitialWindow()
+        }
         
         // Step 3: Start background services
         startBackgroundServices()
@@ -693,9 +701,12 @@ class AppDelegate: NSObject, NSApplicationDelegate, SPUUpdaterDelegate {
                     NSApp.activate(ignoringOtherApps: true)
                     
                     // Make sure a window is visible and key for proper activation
-                    if let firstWindow = NSApp.windows.first {
-                        firstWindow.makeKeyAndOrderFront(nil)
-                        print("🔄 [ACTIVATION SHUFFLE] Made first window key and front: \(firstWindow.title)")
+                    // Find the first window that is an OverlayWindow and can become key
+                    if let windowToActivate = NSApp.windows.first(where: { $0 is OverlayWindow && $0.canBecomeKey }) {
+                        windowToActivate.makeKeyAndOrderFront(nil)
+                        print("🔄 [ACTIVATION SHUFFLE] Made window key and front: \(windowToActivate.title)")
+                    } else {
+                        print("⚠️ [ACTIVATION SHUFFLE] Could not find a suitable window to make key.")
                     }
                     
                     // Verify activation completed successfully
