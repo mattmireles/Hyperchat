@@ -617,3 +617,72 @@ The systematic approach will quickly reveal whether the issue is menu creation t
 
 **Next debugging step:**
 Ensure the delegate is installed **before** `OverlayController` creates the first window (or delay window creation until after `applicationDidFinishLaunching`).
+
+### Root Cause Identified: NSApp.delegate Timing Issue
+
+**Final Diagnosis:** The AppDelegate is `nil` during the first window creation, causing the entire activation policy and menu setup pipeline to be bypassed.
+
+**Technical Details:**
+- `OverlayController.showOverlay()` correctly calls `updateActivationPolicy()` 
+- However, it attempts to cast `NSApp.delegate as? AppDelegate` when delegate is still `nil`
+- This silent failure means `updateActivationPolicy()` is never actually invoked
+- App later transitions to `.regular` mode through SwiftUI's automatic promotion
+- But without proper menu setup, it uses default SwiftUI menu instead of our custom "AI Services" menu
+
+**Impact on Both Issues:**
+1. **Menu Bar Issue**: No call to `setupMainMenu()` → "AI Services" menu never created
+2. **Space Detection Issue**: Space detection logic works, but incorrect app activation state affects window management
+
+**Solution Path:**
+The fix requires ensuring the AppDelegate is fully initialized before any window creation occurs, or implementing a deferred menu setup mechanism that triggers after the delegate is available.
+
+---
+
+## July 24, 2025 - Activation Shuffle & Delegate Wiring Fixes
+
+### Analysis of Persistent Failures
+The previous fixes (delaying window creation, attempting delegate wiring) did not resolve the core issues. Live debugging with extensive logging revealed the true root cause: a flawed **Activation Shuffle**.
+
+**Smoking Gun from Logs:**
+```
+Warning: -[NSWindow makeKeyWindow] called on <NSStatusBarWindow: ...>
+🔄 [ACTIVATION SHUFFLE] Made first window key and front: HyperchatMenuBarItem
+```
+
+**Final Diagnosis 2.0:**
+1.  **Delegate Timing is Solved:** The direct wiring of the delegate (`overlayController.appDelegate = self`) successfully fixed the initial race condition. The policy update pipeline now runs.
+2.  **Activation Shuffle is Flawed:** The critical step to make the app a "regular" app is failing. Instead of grabbing the main `OverlayWindow`, the shuffle logic was grabbing an invisible `NSStatusBarWindow` associated with the menu bar icon.
+3.  **Resulting Zombie State:** The system correctly refuses to make a menu bar icon the "key" window. The app's policy is set to `.regular` in memory, but it never becomes the true, active foreground application. This leaves it in a zombie state where its custom menu is never displayed on screen.
+
+### Solution Implemented: Intelligent Activation Shuffle
+
+The fix was to make the Activation Shuffle smarter. Instead of blindly grabbing the first window, it now specifically looks for the first *real*, user-visible `OverlayWindow` that is capable of becoming the key window.
+
+**File Modified**: `Sources/Hyperchat/AppDelegate.swift`
+**Method**: `updateActivationPolicy()`
+
+**Code Change**:
+```swift
+// BEFORE (grabbing wrong window):
+if let firstWindow = NSApp.windows.first {
+    firstWindow.makeKeyAndOrderFront(nil)
+}
+
+// AFTER (Intelligent Shuffle):
+if let windowToActivate = NSApp.windows.first(where: { $0 is OverlayWindow && $0.canBecomeKey }) {
+    windowToActivate.makeKeyAndOrderFront(nil)
+}
+```
+
+### Remaining Issue: Space Detection
+The space detection problem remains separate and is confirmed to be a `dlsym` failure:
+- `Failed to find CGSGetWindowsWithOptionsAndTags symbol.`
+This means the private API for space detection is not available on the current system, and the app is correctly falling back to its heuristic. This will be addressed separately.
+
+### Current Status: PARTIALLY FIXED - AWAITING USER VERIFICATION
+
+**Implementation**: The core activation logic, which was the root cause of the menu failure, has been corrected.
+**Expected Outcome**:
+-   ✅ The "AI Services" menu should now appear correctly.
+-   ❌ The space-switching behavior will likely still be incorrect due to the CGS API issue.
+**Next Step**: User to verify if the menu is now functional.
