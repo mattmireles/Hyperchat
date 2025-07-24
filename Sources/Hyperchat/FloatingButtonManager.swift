@@ -436,7 +436,7 @@ class FloatingButtonManager {
     var promptWindowController: PromptWindowController?
     
     /// Reference to overlay controller (set by AppDelegate)
-    /// Currently unused but available for future features
+    /// Used by: floatingButtonClicked() for space-aware window management
     var overlayController: OverlayController?
     
     /// Logger for debugging button behavior
@@ -620,44 +620,92 @@ class FloatingButtonManager {
         }
     }
 
-    /// Handles floating button click events.
+    /// Handles floating button click events with space-aware window management.
     ///
     /// Called by:
     /// - `DraggableView.mouseUp()` when click detected
     ///
-    /// Behavior:
-    /// - If prompt window already visible: brings to front
-    /// - If prompt window hidden: shows on button's screen
-    /// - Never hides overlay (prevents app hanging)
-    /// - Tracks analytics for floating button usage
+    /// Space-aware behavior (MVP approach):
+    /// 1. Check if windows exist on current desktop space (on-demand check)
+    /// 2. If windows on current space: bring most recent to front and focus input
+    /// 3. If no windows on current space: show prompt window (original behavior)
+    /// 4. Fallback: if space detection fails, use simple first-window logic
     ///
-    /// Screen selection priority:
-    /// 1. Screen containing the button
-    /// 2. Screen containing the mouse
-    /// 3. Main screen as fallback
+    /// Analytics and screen selection:
+    /// - Tracks floating button usage for metrics
+    /// - Uses button's screen, mouse screen, or main screen as fallback
     private func floatingButtonClicked() {
+        logger.log("🎯 [FLOATING] >>> floatingButtonClicked() called")
+        
         // Track floating button click for analytics
         AnalyticsManager.shared.trackFloatingButtonClicked()
         
         // Set prompt source for subsequent prompt submission attribution
         AnalyticsManager.shared.setPromptSource(.floatingButton)
+        logger.log("🎯 [FLOATING] Analytics tracking complete")
         
-        // Don't hide overlay if it's visible - just show prompt window
-        // This prevents the hanging issue
+        // CORE FEATURE: Space-aware window management
+        // Check if we have windows on the current desktop space
+        guard let overlayController = overlayController else {
+            logger.error("🎯 [FLOATING] OverlayController not available - falling back to prompt window")
+            showPromptWindow()
+            return
+        }
         
-        // The controller is now persistent and passed in from the AppDelegate.
-        // DO NOT re-create it here.
+        logger.log("🎯 [FLOATING] OverlayController available - checking for windows on current space")
         
-        // Use the screen the button is on, or the one with the mouse, or fallback to main.
-        guard let controller = promptWindowController else { return }
+        // On-demand space check: are there windows on the current space?
+        let windowsOnCurrentSpace = overlayController.getWindowsOnCurrentSpace()
+        logger.log("🎯 [FLOATING] Space check complete: found \(windowsOnCurrentSpace.count) windows on current space")
+        
+        if !windowsOnCurrentSpace.isEmpty {
+            // SUCCESS CASE: Windows exist on current space
+            // Bring the most recent window to front and focus input bar
+            logger.log("🎯 [FLOATING] *** DECISION: Bringing existing window to front ***")
+            logger.log("🎯 [FLOATING] Found \(windowsOnCurrentSpace.count) windows on current space")
+            
+            let success = overlayController.bringCurrentSpaceWindowToFront()
+            logger.log("🎯 [FLOATING] bringCurrentSpaceWindowToFront() result: \(success)")
+            
+            if success {
+                logger.log("🎯 [FLOATING] ✅ Successfully brought window to front on current space")
+                return
+            } else {
+                logger.log("🎯 [FLOATING] ⚠️ Failed to bring window to front - falling back to prompt")
+            }
+        } else {
+            logger.log("🎯 [FLOATING] *** DECISION: No windows on current space - showing prompt ***")
+        }
+        
+        // FALLBACK CASE: No windows on current space OR space detection failed
+        // Show prompt window (original behavior)
+        logger.log("🎯 [FLOATING] Executing fallback: showPromptWindow()")
+        showPromptWindow()
+    }
+    
+    /// Shows the prompt window using the original logic.
+    ///
+    /// This is the fallback behavior when:
+    /// - No windows exist on current desktop space
+    /// - Space detection fails for any reason
+    /// - AppDelegate reference is unavailable
+    ///
+    /// Maintains the original user experience as graceful degradation.
+    private func showPromptWindow() {
+        guard let controller = promptWindowController else { 
+            logger.error("PromptWindowController not available")
+            return 
+        }
 
         if let window = controller.window, window.isVisible {
-            // If the window is already visible, just bring it to the front.
+            // If prompt window already visible, bring it to front
             window.orderFront(nil)
+            logger.log("Brought existing prompt window to front")
         } else {
-            // Otherwise, show it on the correct screen.
+            // Show prompt window on appropriate screen
             let screen = buttonWindow?.screen ?? NSScreen.screenWithMouse() ?? NSScreen.main!
             controller.showWindow(on: screen)
+            logger.log("Showed new prompt window on screen")
         }
     }
     
