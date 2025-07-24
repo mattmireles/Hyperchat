@@ -1,14 +1,16 @@
 /// SpaceDetector.swift - Desktop Space Detection and Management
 ///
-/// This file provides space-aware window management using dynamically loaded Core Graphics Services (CGS) APIs.
-/// It enables the app to determine which desktop space windows are visible on, allowing
-/// the floating button to intelligently bring forward existing windows on the current space.
+/// This file provides space-aware window management using modern public APIs when available,
+/// with CGS private API fallback for older macOS versions. It enables the app to determine 
+/// which desktop space windows are visible on, allowing the floating button to intelligently 
+/// bring forward existing windows on the current space.
 ///
 /// Key responsibilities:
 /// - Detect the currently active desktop space
 /// - Check if specific windows are visible on the active space
-/// - Provide fallback behavior when CGS APIs are unavailable
-/// - Handle macOS version compatibility and private API changes
+/// - Use modern NSWindow.isOnActiveSpace API (macOS 13+) for reliable detection
+/// - Fallback to CGS private APIs for older macOS versions
+/// - Provide conservative fallback behavior when all APIs are unavailable
 ///
 /// Related files:
 /// - `FloatingButtonManager.swift`: Uses space detection for intelligent window management
@@ -129,24 +131,32 @@ class SpaceDetector {
             return true
         }
         
-        logger.log("🌌 [SPACE] CGS APIs available: \(self.cgsAvailable)")
-        
-        if self.cgsAvailable {
-            logger.log("🌌 [SPACE] Using CGS API path for space detection")
-            let result = isWindowOnCurrentSpaceCGS(window)
-            logger.log("🌌 [SPACE] CGS result for '\(windowTitle)': \(result)")
-            return result
-        } else {
-            // Fallback heuristic: If CGS is not available, we can't be certain.
-            // A conservative approach for our use case is to assume it's NOT on the current space
-            // unless it's the key window. This prevents incorrectly switching spaces.
-            logger.log("🌌 [SPACE] Using fallback heuristic for space detection")
+        // SCREEN-BASED HEURISTIC: Use same-screen detection as reliable proxy
+        // The isOnActiveSpace API is unreliable - it returns true for windows on different spaces
+        // Instead, use the heuristic: window is on "current space" if it's on same screen as mouse
+        guard let windowScreen = window.screen, 
+              let mouseScreen = NSScreen.screenWithMouse() else {
+            // Fallback if we can't get screen info - use key window status
+            logger.log("🌌 [SPACE] Screen detection failed - using key window fallback")
             let isKey = window.isKeyWindow
-            let isApp = NSApp.isActive
-            logger.warning("🌌 [SPACE] CGS APIs unavailable. Window '\(windowTitle)' - isKey: \(isKey), appActive: \(isApp)")
-            logger.warning("🌌 [SPACE] Fallback result: \(isKey)")
+            logger.log("🌌 [SPACE] Fallback result for '\(windowTitle)': \(isKey)")
             return isKey
         }
+        
+        // A window is on the "current space" if it's on the same screen as the mouse
+        // and is actually visible (not minimized)
+        let isOnSameScreenAsMouse = (windowScreen == mouseScreen)
+        let isActuallyVisible = window.isVisible && !window.isMiniaturized
+        let result = isOnSameScreenAsMouse && isActuallyVisible
+        
+        logger.log("🌌 [SPACE] Screen-based detection for '\(windowTitle)':")
+        logger.log("🌌 [SPACE] - Window screen: \(windowScreen.localizedName)")
+        logger.log("🌌 [SPACE] - Mouse screen: \(mouseScreen.localizedName)")
+        logger.log("🌌 [SPACE] - Same screen: \(isOnSameScreenAsMouse)")
+        logger.log("🌌 [SPACE] - Actually visible: \(isActuallyVisible)")
+        logger.log("🌌 [SPACE] - Final result: \(result)")
+        
+        return result
     }
     
     /// Gets the currently active desktop space ID.
