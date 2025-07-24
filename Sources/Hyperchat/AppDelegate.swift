@@ -97,19 +97,46 @@ class MenuBarManager: NSObject {
         print("🍎 [MENUBAR] promptWindowController available: \(promptWindowController != nil)")
         print("🍎 [MENUBAR] overlayController available: \(overlayController != nil)")
         
-        if let promptWindowController = promptWindowController {
-            print("🍎 [MENUBAR] *** DECISION: Using promptWindowController to show window ***")
-            // Determine the correct screen like FloatingButtonManager does
-            let screen = NSScreen.screenWithMouse() ?? NSScreen.main ?? NSScreen.screens.first
-            print("🍎 [MENUBAR] Target screen: \(screen?.localizedName ?? "unknown")")
-            promptWindowController.showWindow(on: screen)
-            print("🍎 [MENUBAR] promptWindowController.showWindow() called")
-        } else if let overlayController = overlayController {
-            print("🍎 [MENUBAR] *** DECISION: Using overlayController to show overlay ***")
-            overlayController.showOverlay()
-            print("🍎 [MENUBAR] overlayController.showOverlay() called")
+        // SPACE-AWARE LOGIC: Match FloatingButtonManager behavior exactly
+        // 1. Check if overlay windows exist on current space
+        // 2. If found: bring existing window to front
+        // 3. If not found: show new prompt window
+        guard let overlayController = overlayController else {
+            print("🍎 [MENUBAR] *** ERROR: No overlayController available! ***")
+            print("🍎 [MENUBAR] <<< menuBarIconClicked() complete")
+            return
+        }
+        
+        print("🍎 [MENUBAR] OverlayController available - checking for windows on current space")
+        let windowsOnCurrentSpace = overlayController.getWindowsOnCurrentSpace()
+        print("🍎 [MENUBAR] Space check complete: found \(windowsOnCurrentSpace.count) windows on current space")
+        
+        if !windowsOnCurrentSpace.isEmpty {
+            print("🍎 [MENUBAR] *** DECISION: Bringing existing window to front ***")
+            print("🍎 [MENUBAR] Found \(windowsOnCurrentSpace.count) windows on current space")
+            let success = overlayController.bringCurrentSpaceWindowToFront()
+            if success {
+                print("🍎 [MENUBAR] ✅ Successfully brought window to front on current space")
+            } else {
+                print("🍎 [MENUBAR] ❌ Failed to bring window to front - falling back to new window")
+                // Fallback: show new prompt window if bring-to-front fails
+                if let promptWindowController = promptWindowController {
+                    let screen = NSScreen.screenWithMouse() ?? NSScreen.main ?? NSScreen.screens.first
+                    print("🍎 [MENUBAR] Fallback: showing new prompt window on \(screen?.localizedName ?? "unknown")")
+                    promptWindowController.showWindow(on: screen)
+                }
+            }
         } else {
-            print("🍎 [MENUBAR] *** ERROR: No controllers available! ***")
+            print("🍎 [MENUBAR] *** DECISION: No windows on current space - showing new prompt window ***")
+            if let promptWindowController = promptWindowController {
+                // Determine the correct screen like FloatingButtonManager does
+                let screen = NSScreen.screenWithMouse() ?? NSScreen.main ?? NSScreen.screens.first
+                print("🍎 [MENUBAR] Target screen: \(screen?.localizedName ?? "unknown")")
+                promptWindowController.showWindow(on: screen)
+                print("🍎 [MENUBAR] promptWindowController.showWindow() called")
+            } else {
+                print("🍎 [MENUBAR] *** ERROR: No promptWindowController available for new window! ***")
+            }
         }
         print("🍎 [MENUBAR] <<< menuBarIconClicked() complete")
     }
@@ -406,9 +433,6 @@ class AppDelegate: NSObject, NSApplicationDelegate, SPUUpdaterDelegate {
     /// Settings window controller (created on demand)
     var settingsWindowController: SettingsWindowController?
     
-    /// Tracks whether the first activation policy has been set during launch
-    /// This prevents redundant policy changes during the initial launch sequence
-    private var firstPolicySet = false
     
     /// Reference to AI Services menu for dynamic updates
     var aiServicesMenu: NSMenu?
@@ -435,13 +459,11 @@ class AppDelegate: NSObject, NSApplicationDelegate, SPUUpdaterDelegate {
     }
 
     func applicationWillFinishLaunching(_ notification: Notification) {
-        // Set initial activation policy to .accessory (background agent)
-        // This ensures app starts hidden from Dock and Cmd+Tab switcher
-        NSApp.setActivationPolicy(.accessory)
-        print("✅ Initial activation policy set to .accessory (hidden)")
-        
-        // Menu setup moved to applicationDidFinishLaunching with async dispatch
-        // to avoid conflicts with SwiftUI
+        // CANONICAL PATTERN: Prohibited-to-Accessory launch sequence
+        // Step 1: Prevent the default activation and the Dock icon flash.
+        // This is critical to ensure a clean launch into accessory mode.
+        NSApp.setActivationPolicy(.prohibited)
+        print("🔄 [CANONICAL] Set activation policy to .prohibited (prevents dock flash)")
     }
     
     /// Main application initialization point.
@@ -460,10 +482,34 @@ class AppDelegate: NSObject, NSApplicationDelegate, SPUUpdaterDelegate {
     /// - Update checker delayed to prevent conflicts
     /// - Notifications connect components loosely
     func applicationDidFinishLaunching(_ aNotification: Notification) {
+        // CANONICAL PATTERN: Prohibited-to-Accessory launch sequence  
+        // Step 2: Now set the desired initial state to be an accessory app.
+        // The app is now running in the background with a menu bar icon.
+        NSApp.setActivationPolicy(.accessory)
+        print("🔄 [CANONICAL] Set activation policy to .accessory (background mode)")
+        
         // Use async deferral to ensure proper timing for window cleanup and menu setup
         // This avoids race conditions with SwiftUI's initial window creation
         DispatchQueue.main.async { [weak self] in
             self?.setupApplicationAfterSwiftUIInit()
+        }
+    }
+    
+    /// Handles application becoming active (gaining focus).
+    ///
+    /// Called when:
+    /// - User switches to the app via Cmd+Tab
+    /// - User activates the app from Dock
+    /// - User clicks on menu bar icon
+    ///
+    /// Defensive fix for menu bar stability:
+    /// - Refreshes main menu to prevent "AI Services" menu from disappearing
+    /// - Only runs in .regular mode (when menu exists)
+    /// - Preserves all existing menu state and configuration
+    func applicationDidBecomeActive(_ notification: Notification) {
+        // Only refresh menu when in regular mode (when menu bar should be visible)
+        if NSApp.activationPolicy() == .regular {
+            setupMainMenu()
         }
     }
     
@@ -602,137 +648,52 @@ class AppDelegate: NSObject, NSApplicationDelegate, SPUUpdaterDelegate {
         return false
     }
     
-    /// Updates the application's activation policy based on window count.
+    /// Switches the app to regular mode (with dock icon and menu bar).
+    /// 
+    /// Called when a window becomes main. This follows the canonical dual-mode pattern
+    /// where window events drive activation policy changes directly.
+    func switchToRegularMode() {
+        guard NSApp.activationPolicy() != .regular else { return }
+        
+        print("🔄 [CANONICAL] Switching to .regular mode")
+        NSApp.setActivationPolicy(.regular)
+        NSApp.activate(ignoringOtherApps: true)
+        
+        // Setup menu bar for regular mode
+        setupMainMenu()
+        
+        print("🔄 [CANONICAL] App is now in .regular mode with menu bar")
+    }
+    
+    /// Switches the app to accessory mode (menu bar only, no dock icon).
     ///
-    /// Called by:
-    /// - OverlayController when windows are created or destroyed
-    ///
-    /// Policy logic:
-    /// - Windows exist: Set to .regular (visible in Dock and Cmd+Tab)
-    /// - No windows: Set to .accessory (menu bar only, hidden from Dock/Cmd+Tab)
-    ///
-    /// This creates dynamic application personality where the app behaves as:
-    /// - Standard application when windows are open
-    /// - Background menu bar utility when no windows are open
+    /// Called when the last window closes. This follows the canonical dual-mode pattern
+    /// where window events drive activation policy changes directly.
+    func switchToAccessoryMode() {
+        guard NSApp.activationPolicy() != .accessory else { return }
+        
+        print("🔄 [CANONICAL] Switching to .accessory mode")
+        NSApp.setActivationPolicy(.accessory)
+        
+        // Remove menu bar for accessory mode
+        NSApp.mainMenu = nil
+        aiServicesMenu = nil
+        
+        print("🔄 [CANONICAL] App is now in .accessory mode (background only)")
+    }
+    
+    /// DEPRECATED: Legacy method kept for compatibility during transition.
+    /// Will be removed once OverlayController is updated to use the canonical pattern.
     public func updateActivationPolicy(source: String = "unknown") {
+        print("⚠️ [DEPRECATED] updateActivationPolicy called from: \(source)")
+        print("⚠️ [DEPRECATED] This method will be removed - using simple fallback")
+        
+        // Simple fallback: switch based on window count
         let windowCount = overlayController.windowCount
-        let appKitWindowCount = NSApp.visibleRegularWindows.count
-        let currentPolicy = NSApp.activationPolicy()
-        
-        // Determine target policy based on window count
-        let wantsRegular = windowCount > 0
-        let targetPolicy: NSApplication.ActivationPolicy = wantsRegular ? .regular : .accessory
-        
-        // Guard against redundant policy changes, especially during launch
-        guard currentPolicy != targetPolicy else {
-            print("🔄 [POLICY DEBUG] === EARLY RETURN: No policy change needed ===")
-            print("🔄 [POLICY DEBUG] Current policy matches target: \(currentPolicy == .regular ? ".regular" : ".accessory")")
-            print("🔄 [POLICY DEBUG] wantsRegular: \(wantsRegular), menu exists: \(NSApp.mainMenu != nil)")
-            
-            // Even if policy is the same, if we want regular and have no menu, rebuild it.
-            // This catches edge cases where the menu was torn down but the policy didn't change.
-            if wantsRegular && NSApp.mainMenu == nil {
-                print("🔄 [POLICY DEBUG] *** EDGE CASE: Policy is .regular but menu is missing. Rebuilding menu.")
-                setupMainMenu()
-                print("🔄 [POLICY DEBUG] Menu rebuild complete. Menu now exists: \(NSApp.mainMenu != nil)")
-            } else {
-                print("🔄 [POLICY DEBUG] No action needed. Exiting updateActivationPolicy()")
-            }
-            return
-        }
-        
-        // Log current state before policy change
-        print("🔄 [POLICY DEBUG] >>> updateActivationPolicy() called from: \(source)")
-        print("🔄 [POLICY DEBUG] Internal window count: \(windowCount)")
-        print("🔄 [POLICY DEBUG] AppKit visible windows: \(appKitWindowCount)")
-        print("🔄 [POLICY DEBUG] Current policy: \(currentPolicy == .regular ? ".regular" : currentPolicy == .accessory ? ".accessory" : "unknown")")
-        print("🔄 [POLICY DEBUG] Target policy: \(targetPolicy == .regular ? ".regular" : ".accessory")")
-        print("🔄 [POLICY DEBUG] First policy set: \(firstPolicySet)")
-        print("🔄 [POLICY DEBUG] Current menu state: \(NSApp.mainMenu != nil ? "exists" : "nil")")
-        if let menu = NSApp.mainMenu {
-            print("🔄 [POLICY DEBUG] Current menu items: \(menu.items.map { $0.title })")
-        }
-        
-        // Log window titles for debugging stray windows, especially when dropping to .accessory
-        if appKitWindowCount != windowCount {
-            print("⚠️ [POLICY DEBUG] Window count mismatch! Internal: \(windowCount), AppKit: \(appKitWindowCount)")
-            for (index, window) in NSApp.visibleRegularWindows.enumerated() {
-                print("   AppKit window \(index): \(window.title.isEmpty ? "<untitled>" : window.title) (\(type(of: window)))")
-            }
-        }
-        
-        // Log all AppKit windows when dropping to .accessory to spot stray windows
-        if !wantsRegular && appKitWindowCount > 0 {
-            print("🔍 [POLICY DEBUG] Dropping to .accessory but AppKit reports \(appKitWindowCount) windows:")
-            for (index, window) in NSApp.visibleRegularWindows.enumerated() {
-                print("   Stray window \(index): '\(window.title.isEmpty ? "<untitled>" : window.title)' (\(type(of: window)))")
-            }
-        }
-        
-        // Mark that we've set the first policy
-        firstPolicySet = true
-        
-        // Use DispatchQueue.main.async for one run-loop hop to ensure deterministic timing
-        // This guarantees all automatic window restoration has completed
-        DispatchQueue.main.async { [weak self] in
-            guard let self = self else { return }
-            
-            print("🔄 [POLICY DEBUG] === EXECUTING POLICY CHANGE ===")
-            print("🔄 [POLICY DEBUG] Setting activation policy to: \(targetPolicy == .regular ? ".regular" : ".accessory")")
-            
-            NSApp.setActivationPolicy(targetPolicy)
-            
-            print("🔄 [POLICY DEBUG] Policy change complete. Verifying...")
-            let actualPolicy = NSApp.activationPolicy()
-            print("🔄 [POLICY DEBUG] Actual policy now: \(actualPolicy == .regular ? ".regular" : actualPolicy == .accessory ? ".accessory" : "unknown")")
-            
-            if targetPolicy == .regular {
-                print("🔄 [POLICY DEBUG] Entering .regular mode - rebuilding menu...")
-                // Rebuild main menu when switching to .regular policy
-                // This ensures AI services menu is restored after returning from .accessory mode
-                self.setupMainMenu()
-                print("🔄 [POLICY DEBUG] Menu rebuild for .regular policy complete")
-                
-                // CRITICAL: Implement the "Activation Shuffle" pattern from dual-mode guide
-                // Simply setting policy to .regular isn't enough - we need to force activation
-                // to ensure the app becomes truly active and menu bar is responsive
-                DispatchQueue.main.async {
-                    print("🔄 [ACTIVATION SHUFFLE] Starting activation sequence...")
-                    NSApp.activate(ignoringOtherApps: true)
-                    
-                    // Make sure a window is visible and key for proper activation
-                    // Find the first window that is an OverlayWindow and can become key
-                    if let windowToActivate = NSApp.windows.first(where: { $0 is OverlayWindow && $0.canBecomeKey }) {
-                        windowToActivate.makeKeyAndOrderFront(nil)
-                        print("🔄 [ACTIVATION SHUFFLE] Made window key and front: \(windowToActivate.title)")
-                    } else {
-                        print("⚠️ [ACTIVATION SHUFFLE] Could not find a suitable window to make key.")
-                    }
-                    
-                    // Verify activation completed successfully
-                    let isActive = NSApp.isActive
-                    let hasKeyWindow = NSApp.keyWindow != nil
-                    print("🔄 [ACTIVATION SHUFFLE] Activation complete - Active: \(isActive ? "✅" : "❌"), KeyWindow: \(hasKeyWindow ? "✅" : "❌")")
-                }
-            } else {
-                print("🔄 [POLICY DEBUG] Entering .accessory mode - tearing down menu...")
-                // When becoming an accessory app, tear down the main menu
-                // This is the correct behavior for a background agent
-                NSApp.mainMenu = nil
-                self.aiServicesMenu = nil  // Clear the reference as well
-                print("🔄 [POLICY DEBUG] Main menu removed for .accessory policy")
-                print("🔄 [POLICY DEBUG] Menu teardown complete. Menu exists: \(NSApp.mainMenu != nil)")
-            }
-            
-            // Log final state after policy change
-            let newPolicy = NSApp.activationPolicy()
-            print("🔄 [POLICY DEBUG] <<< Policy updated to: \(newPolicy == .regular ? ".regular" : newPolicy == .accessory ? ".accessory" : "unknown")")
-            print("🔄 [POLICY DEBUG] Menu available: \(NSApp.mainMenu != nil ? "✅" : "❌")")
-            if targetPolicy == .regular {
-                print("🔄 [POLICY DEBUG] AI services menu reference: \(self.aiServicesMenu != nil ? "✅" : "❌")")
-            }
-            print("🔄 [POLICY DEBUG] Windows: \(self.overlayController.windowCount) (internal), \(NSApp.visibleRegularWindows.count) (AppKit)")
-            print("🔄 [POLICY DEBUG] updateActivationPolicy() complete\n")
+        if windowCount > 0 {
+            switchToRegularMode()
+        } else {
+            switchToAccessoryMode()
         }
     }
     
