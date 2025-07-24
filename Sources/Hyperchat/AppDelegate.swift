@@ -89,16 +89,29 @@ class MenuBarManager: NSObject {
     }
     
     @objc private func menuBarIconClicked(_ sender: Any?) {
-        print("🍎 MenuBarManager: Menu bar icon clicked")
+        print("🍎 [MENUBAR] >>> menuBarIconClicked() called")
+        print("🍎 [MENUBAR] Activating app to foreground")
         NSApp.activate(ignoringOtherApps: true)
         
+        print("🍎 [MENUBAR] Checking available controllers...")
+        print("🍎 [MENUBAR] promptWindowController available: \(promptWindowController != nil)")
+        print("🍎 [MENUBAR] overlayController available: \(overlayController != nil)")
+        
         if let promptWindowController = promptWindowController {
+            print("🍎 [MENUBAR] *** DECISION: Using promptWindowController to show window ***")
             // Determine the correct screen like FloatingButtonManager does
             let screen = NSScreen.screenWithMouse() ?? NSScreen.main ?? NSScreen.screens.first
+            print("🍎 [MENUBAR] Target screen: \(screen?.localizedName ?? "unknown")")
             promptWindowController.showWindow(on: screen)
+            print("🍎 [MENUBAR] promptWindowController.showWindow() called")
         } else if let overlayController = overlayController {
+            print("🍎 [MENUBAR] *** DECISION: Using overlayController to show overlay ***")
             overlayController.showOverlay()
+            print("🍎 [MENUBAR] overlayController.showOverlay() called")
+        } else {
+            print("🍎 [MENUBAR] *** ERROR: No controllers available! ***")
         }
+        print("🍎 [MENUBAR] <<< menuBarIconClicked() complete")
     }
     
     func showMenuBarIcon() {
@@ -146,7 +159,9 @@ class MenuBarManager: NSObject {
 class MenuBuilder {
     
     static func createMainMenu(appDelegate: AppDelegate?) -> NSMenu {
+        print("🔧 [MENUBUILDER] >>> createMainMenu() called")
         let mainMenu = NSMenu()
+        print("🔧 [MENUBUILDER] Created empty main menu")
         
         // Application menu
         let appMenuItem = NSMenuItem()
@@ -301,6 +316,10 @@ class MenuBuilder {
         helpItem.target = nil // Will find AppDelegate through responder chain
         helpMenu.addItem(helpItem)
         
+        print("🔧 [MENUBUILDER] Main menu creation complete")
+        print("🔧 [MENUBUILDER] Final menu items: \(mainMenu.items.map { $0.title })")
+        print("🔧 [MENUBUILDER] <<< createMainMenu() returning menu")
+        
         return mainMenu
     }
     
@@ -320,7 +339,9 @@ class MenuBuilder {
         let sortedServices = services.sorted { $0.order < $1.order }
         
         // Log what services we're using to create menu items
-        print("🍽️ MenuBuilder.createAIServicesMenu() - Creating menu with services:")
+        print("🔧 [MENUBUILDER] >>> createAIServicesMenu() called")
+        print("🔧 [MENUBUILDER] Clearing existing items from AI Services menu")
+        print("🔧 [MENUBUILDER] Creating menu with \(sortedServices.count) services:")
         for service in sortedServices {
             print("   \(service.name): \(service.enabled ? "✅ enabled" : "❌ disabled") → menu state: \(service.enabled ? ".on" : ".off")")
         }
@@ -342,7 +363,9 @@ class MenuBuilder {
         reorderItem.indentationLevel = 0 // Ensure no indentation
         menu.addItem(reorderItem)
         
-        print("🍽️ MenuBuilder.createAIServicesMenu() - Menu creation completed")
+        print("🔧 [MENUBUILDER] AI Services menu creation completed")
+        print("🔧 [MENUBUILDER] Final AI Services menu items: \(menu.items.map { $0.title })")
+        print("🔧 [MENUBUILDER] <<< createAIServicesMenu() complete")
     }
 }
 
@@ -443,21 +466,18 @@ class AppDelegate: NSObject, NSApplicationDelegate, SPUUpdaterDelegate {
     /// Sets up the application after SwiftUI has completed its initialization.
     ///
     /// Called asynchronously from applicationDidFinishLaunching to ensure:
-    /// - Menu setup happens after any SwiftUI menu interference
     /// - Proper application state setup
+    /// - Menu setup only happens when needed (for regular mode)
     ///
-    /// With LSUIElement=YES and Settings scene, no window cleanup is needed.
+    /// Note: Menu setup is handled by updateActivationPolicy() based on window state
     private func setupApplicationAfterSwiftUIInit() {
-        // Step 1: Set up the main menu (after SwiftUI is done)
-        setupMainMenu()
-        
-        // Step 2: Initialize application components
+        // Step 1: Initialize application components
         initializeAppComponents()
         
-        // Step 3: Show initial window or run onboarding
+        // Step 2: Show initial window or run onboarding (this will trigger policy update)
         showInitialWindow()
         
-        // Step 4: Start background services
+        // Step 3: Start background services
         startBackgroundServices()
     }
     
@@ -466,8 +486,19 @@ class AppDelegate: NSObject, NSApplicationDelegate, SPUUpdaterDelegate {
     ///
     /// This ensures our custom menu isn't overwritten by SwiftUI's menu setup.
     private func setupMainMenu() {
-        NSApp.mainMenu = MenuBuilder.createMainMenu(appDelegate: self)
-        print("🍽️ Main menu created after SwiftUI init, aiServicesMenu reference: \(aiServicesMenu != nil ? "✅ available" : "❌ nil")")
+        print("🛠 setupMainMenu ran")
+        print("🍽️ [MENU DEBUG] >>> setupMainMenu() called")
+        print("🍽️ [MENU DEBUG] Before: NSApp.mainMenu exists = \(NSApp.mainMenu != nil)")
+        
+        let newMenu = MenuBuilder.createMainMenu(appDelegate: self)
+        NSApp.mainMenu = newMenu
+        
+        print("🍽️ [MENU DEBUG] After: NSApp.mainMenu exists = \(NSApp.mainMenu != nil)")
+        print("🍽️ [MENU DEBUG] aiServicesMenu reference: \(aiServicesMenu != nil ? "✅ available" : "❌ nil")")
+        if let menu = NSApp.mainMenu {
+            print("🍽️ [MENU DEBUG] Menu items created: \(menu.items.map { $0.title })")
+        }
+        print("🍽️ [MENU DEBUG] <<< setupMainMenu() complete")
     }
     
     /// Initializes core application components.
@@ -575,7 +606,7 @@ class AppDelegate: NSObject, NSApplicationDelegate, SPUUpdaterDelegate {
     /// This creates dynamic application personality where the app behaves as:
     /// - Standard application when windows are open
     /// - Background menu bar utility when no windows are open
-    public func updateActivationPolicy() {
+    public func updateActivationPolicy(source: String = "unknown") {
         let windowCount = overlayController.windowCount
         let appKitWindowCount = NSApp.visibleRegularWindows.count
         let currentPolicy = NSApp.activationPolicy()
@@ -585,18 +616,34 @@ class AppDelegate: NSObject, NSApplicationDelegate, SPUUpdaterDelegate {
         let targetPolicy: NSApplication.ActivationPolicy = wantsRegular ? .regular : .accessory
         
         // Guard against redundant policy changes, especially during launch
-        guard currentPolicy != targetPolicy || !firstPolicySet else {
-            print("🔄 [POLICY DEBUG] No policy change needed (current: \(currentPolicy == .regular ? ".regular" : ".accessory"), target: \(targetPolicy == .regular ? ".regular" : ".accessory"))")
+        guard currentPolicy != targetPolicy else {
+            print("🔄 [POLICY DEBUG] === EARLY RETURN: No policy change needed ===")
+            print("🔄 [POLICY DEBUG] Current policy matches target: \(currentPolicy == .regular ? ".regular" : ".accessory")")
+            print("🔄 [POLICY DEBUG] wantsRegular: \(wantsRegular), menu exists: \(NSApp.mainMenu != nil)")
+            
+            // Even if policy is the same, if we want regular and have no menu, rebuild it.
+            // This catches edge cases where the menu was torn down but the policy didn't change.
+            if wantsRegular && NSApp.mainMenu == nil {
+                print("🔄 [POLICY DEBUG] *** EDGE CASE: Policy is .regular but menu is missing. Rebuilding menu.")
+                setupMainMenu()
+                print("🔄 [POLICY DEBUG] Menu rebuild complete. Menu now exists: \(NSApp.mainMenu != nil)")
+            } else {
+                print("🔄 [POLICY DEBUG] No action needed. Exiting updateActivationPolicy()")
+            }
             return
         }
         
         // Log current state before policy change
-        print("🔄 [POLICY DEBUG] >>> updateActivationPolicy() called")
+        print("🔄 [POLICY DEBUG] >>> updateActivationPolicy() called from: \(source)")
         print("🔄 [POLICY DEBUG] Internal window count: \(windowCount)")
         print("🔄 [POLICY DEBUG] AppKit visible windows: \(appKitWindowCount)")
         print("🔄 [POLICY DEBUG] Current policy: \(currentPolicy == .regular ? ".regular" : currentPolicy == .accessory ? ".accessory" : "unknown")")
         print("🔄 [POLICY DEBUG] Target policy: \(targetPolicy == .regular ? ".regular" : ".accessory")")
         print("🔄 [POLICY DEBUG] First policy set: \(firstPolicySet)")
+        print("🔄 [POLICY DEBUG] Current menu state: \(NSApp.mainMenu != nil ? "exists" : "nil")")
+        if let menu = NSApp.mainMenu {
+            print("🔄 [POLICY DEBUG] Current menu items: \(menu.items.map { $0.title })")
+        }
         
         // Log window titles for debugging stray windows, especially when dropping to .accessory
         if appKitWindowCount != windowCount {
@@ -622,13 +669,21 @@ class AppDelegate: NSObject, NSApplicationDelegate, SPUUpdaterDelegate {
         DispatchQueue.main.async { [weak self] in
             guard let self = self else { return }
             
+            print("🔄 [POLICY DEBUG] === EXECUTING POLICY CHANGE ===")
+            print("🔄 [POLICY DEBUG] Setting activation policy to: \(targetPolicy == .regular ? ".regular" : ".accessory")")
+            
             NSApp.setActivationPolicy(targetPolicy)
             
+            print("🔄 [POLICY DEBUG] Policy change complete. Verifying...")
+            let actualPolicy = NSApp.activationPolicy()
+            print("🔄 [POLICY DEBUG] Actual policy now: \(actualPolicy == .regular ? ".regular" : actualPolicy == .accessory ? ".accessory" : "unknown")")
+            
             if targetPolicy == .regular {
+                print("🔄 [POLICY DEBUG] Entering .regular mode - rebuilding menu...")
                 // Rebuild main menu when switching to .regular policy
                 // This ensures AI services menu is restored after returning from .accessory mode
                 self.setupMainMenu()
-                print("🔄 [POLICY DEBUG] Menu rebuilt for .regular policy")
+                print("🔄 [POLICY DEBUG] Menu rebuild for .regular policy complete")
                 
                 // CRITICAL: Implement the "Activation Shuffle" pattern from dual-mode guide
                 // Simply setting policy to .regular isn't enough - we need to force activation
@@ -648,6 +703,14 @@ class AppDelegate: NSObject, NSApplicationDelegate, SPUUpdaterDelegate {
                     let hasKeyWindow = NSApp.keyWindow != nil
                     print("🔄 [ACTIVATION SHUFFLE] Activation complete - Active: \(isActive ? "✅" : "❌"), KeyWindow: \(hasKeyWindow ? "✅" : "❌")")
                 }
+            } else {
+                print("🔄 [POLICY DEBUG] Entering .accessory mode - tearing down menu...")
+                // When becoming an accessory app, tear down the main menu
+                // This is the correct behavior for a background agent
+                NSApp.mainMenu = nil
+                self.aiServicesMenu = nil  // Clear the reference as well
+                print("🔄 [POLICY DEBUG] Main menu removed for .accessory policy")
+                print("🔄 [POLICY DEBUG] Menu teardown complete. Menu exists: \(NSApp.mainMenu != nil)")
             }
             
             // Log final state after policy change
@@ -988,6 +1051,7 @@ extension NSNotification.Name {
     /// Posted when menu bar icon setting is toggled
     static let menuBarIconToggled = NSNotification.Name("menuBarIconToggled")
 }
+
 
 // MARK: - NSApplication Extension
 

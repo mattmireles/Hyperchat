@@ -365,6 +365,104 @@ class OverlayController: NSObject, NSWindowDelegate, ObservableObject {
     public var windowCount: Int {
         return windows.count
     }
+    
+    /// Returns all managed overlay windows as NSWindows.
+    ///
+    /// Used by:
+    /// - `AppDelegate.getWindowsOnCurrentSpace()` for space-aware filtering
+    /// - Space-aware window management throughout the app
+    ///
+    /// - Returns: Array of all NSWindow instances managed by this controller
+    public func getAllWindows() -> [NSWindow] {
+        return windows.map { $0 as NSWindow }
+    }
+    
+    /// Focuses the unified input bar in the most recent window.
+    ///
+    /// Used by:
+    /// - `bringCurrentSpaceWindowToFront()` after bringing window to front
+    /// - Keyboard shortcuts and other focus management
+    ///
+    /// This triggers the focus publisher that UnifiedInputBar listens to
+    /// for immediate text input after window activation.
+    public func focusInputBar() {
+        // Get the most recent window's ServiceManager and trigger focus
+        if let firstWindow = windows.first,
+           let serviceManager = windowServiceManagers[firstWindow] {
+            serviceManager.focusInputPublisher.send()
+            print("🎯 Focused input bar for window '\(firstWindow.title)'")
+        }
+    }
+    
+    /// Returns all overlay windows that are visible on the current desktop space.
+    ///
+    /// This method provides space-aware window filtering for the floating button
+    /// to determine if there are existing windows on the user's current space.
+    ///
+    /// Used by:
+    /// - `FloatingButtonManager` to check for existing windows before showing prompt
+    /// - Space-aware window management throughout the app
+    ///
+    /// Process:
+    /// 1. Gets all overlay windows from this controller
+    /// 2. Filters to only visible, non-miniaturized windows
+    /// 3. Uses SpaceDetector to check if each window is on current space
+    /// 4. Returns filtered list of space-visible windows
+    ///
+    /// - Returns: Array of NSWindows visible on current desktop space
+    public func getWindowsOnCurrentSpace() -> [NSWindow] {
+        let allOverlayWindows = getAllWindows()
+        let visibleWindows = allOverlayWindows.filter { $0.isVisible && !$0.isMiniaturized }
+        
+        // Filter to only windows on current space
+        let spaceVisibleWindows = visibleWindows.filter { window in
+            SpaceDetector.shared.isWindowOnCurrentSpace(window)
+        }
+        
+        print("🏠 Space-aware window check: \(allOverlayWindows.count) total, \(visibleWindows.count) visible, \(spaceVisibleWindows.count) on current space")
+        
+        return spaceVisibleWindows
+    }
+    
+    /// Brings the most recently used window on the current space to the front.
+    ///
+    /// This method implements the core functionality for the floating button's
+    /// space-aware behavior. When there are existing windows on the current space,
+    /// it brings the most recent one to the front instead of showing the prompt.
+    ///
+    /// Used by:
+    /// - `FloatingButtonManager` when windows exist on current space
+    ///
+    /// Process:
+    /// 1. Gets windows on current space
+    /// 2. Selects the first (most recent) window
+    /// 3. Brings it to front and makes it key
+    /// 4. Focuses the unified input bar for immediate typing
+    ///
+    /// - Returns: true if a window was brought to front, false if no windows on current space
+    @discardableResult
+    public func bringCurrentSpaceWindowToFront() -> Bool {
+        let windowsOnSpace = getWindowsOnCurrentSpace()
+        
+        guard let mostRecentWindow = windowsOnSpace.first else {
+            print("🏠 No windows on current space - cannot bring to front")
+            return false
+        }
+        
+        print("🏠 Bringing window '\(mostRecentWindow.title)' to front on current space")
+        
+        // Bring window to front and make it key
+        mostRecentWindow.orderFront(nil)
+        mostRecentWindow.makeKeyAndOrderFront(nil)
+        
+        // Activate the app to ensure it's in the foreground
+        NSApp.activate(ignoringOtherApps: true)
+        
+        // Focus the unified input bar for immediate typing
+        focusInputBar()
+        
+        return true
+    }
 
     /// Initializes the overlay controller.
     ///
@@ -578,8 +676,9 @@ class OverlayController: NSObject, NSWindowDelegate, ObservableObject {
         windows.append(window)
         
         // Update activation policy now that we have a window
+        print("🪟 showOverlay: calling updateActivationPolicy")
         if let appDelegate = NSApp.delegate as? AppDelegate {
-            appDelegate.updateActivationPolicy()
+            appDelegate.updateActivationPolicy(source: "OverlayController.showOverlay")
         }
         
         // Store the window-specific ServiceManager
@@ -763,8 +862,9 @@ class OverlayController: NSObject, NSWindowDelegate, ObservableObject {
         // Use DispatchQueue.main.async to defer policy update to next run loop
         // This ensures the window is fully closed before evaluating policy
         DispatchQueue.main.async {
+            print("🪟 removeWindow: calling updateActivationPolicy")
             if let appDelegate = NSApp.delegate as? AppDelegate {
-                appDelegate.updateActivationPolicy()
+                appDelegate.updateActivationPolicy(source: "OverlayController.closeWindow")
             }
         }
         
