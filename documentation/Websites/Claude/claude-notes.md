@@ -187,39 +187,49 @@ input.dispatchEvent(reactEvent);
 setTimeout(() => { /* submission logic */ }, 200);
 ```
 
-## 4. Current Status (Latest Logs Analysis)
+## 4. Current Status ✅ (2024/2025)
 
-### Working ✅
-- Text injection: "Text successfully inserted" in logs
-- Sequential execution: No more clipboard race conditions
-- Service loading: Both ChatGPT and Claude load properly
-- Favicon extraction: Working for both services
-- **JavaScript execution**: Fixed return type issues by removing async/await
-- **Build success**: No compilation errors after synchronous JavaScript fix
+**Fully Operational:**
+- ✅ **Text injection**: Synchronous `document.execCommand('insertText')` method working
+- ✅ **Sequential execution**: Clipboard race conditions eliminated 
+- ✅ **Submit automation**: Spatial validation prevents wrong button clicks
+- ✅ **Multi-service support**: Works alongside ChatGPT, Perplexity, Google
+- ✅ **WebKit compatibility**: All async operation issues resolved
+- ✅ **Diagnostic reporting**: JSON format parsing working correctly
+- ✅ **Service loading**: Proper initialization and favicon extraction
+- ✅ **Build success**: No compilation or runtime errors
 
-### Final Implementation Status ✅
-- **Text injection**: Using synchronous `document.execCommand('insertText')` 
-- **Submit automation**: Spatial validation prevents sidebar button clicks
-- **Multi-service support**: Sequential execution prevents clipboard conflicts
-- **WebKit compatibility**: Removed all async operations
-- **Diagnostic response**: Returns JSON string format expected by Swift parser
-- **Build success**: All compilation and runtime issues resolved
+### Recent Improvements (2024/2025)
 
-### Implementation Complete ✅
-All issues have been resolved:
-1. ✅ **Sequential execution**: Prevents clipboard race conditions
-2. ✅ **JavaScript return type**: Fixed async/await Promise issues  
-3. ✅ **Diagnostic response**: Fixed JSON format parsing in Swift
-4. ✅ **Submit targeting**: Spatial validation prevents wrong button clicks
-5. ✅ **Build success**: Code compiles without errors
-6. ✅ **Multi-service support**: Claude works alongside ChatGPT, Perplexity, Google
+#### Sequential Service Loading (`ServiceManager.swift`)
+- **Problem**: Multiple WebViews starting simultaneously caused GPU process conflicts
+- **Solution**: Services load one at a time via sequential queue
+- **Implementation**: 
+  ```swift
+  /// Services are loaded sequentially to prevent:
+  /// - GPU process conflicts (multiple WebViews starting simultaneously)
+  /// - Memory spikes from parallel loading  
+  /// - Race conditions in WebKit initialization
+  private func loadNextServiceFromQueue() {
+      // Load one service at a time with 0.5s delay
+  }
+  ```
 
-**Solution Applied**: 
-- `/Users/mattmireles/Documents/GitHub/hyperchat/hyperchat-macos/Sources/Hyperchat/JavaScriptProvider.swift:605`
-- Changed from: `return report.textInserted && (report.enterDispatched || report.submitButtonFound);`
-- Changed to: `return JSON.stringify(report);`
+#### Enhanced Clipboard Service Execution
+- **Problem**: Multiple clipboard services conflicting when executed in parallel
+- **Solution**: Sequential execution with completion handlers
+- **Implementation**:
+  ```swift
+  /// Execute clipboard services sequentially to prevent race conditions
+  executeClipboardServicesSequentially(clipboardServices, prompt: prompt, replyToAll: replyToAll, currentIndex: 0)
+  ```
 
-Ready for testing with multiple services enabled - should now show detailed diagnostic logs instead of "Invalid diagnostic response".
+#### Improved JavaScript Diagnostics  
+- **Problem**: "Invalid diagnostic response" errors from Swift parser
+- **Solution**: Return JSON string format instead of boolean
+- **Before**: `return report.textInserted && (report.enterDispatched || report.submitButtonFound);`
+- **After**: `return JSON.stringify(report);`
+- **Location**: `JavaScriptProvider.swift:605`
 
 ## 5. Testing Commands
 ```bash
@@ -231,12 +241,36 @@ grep -E "\[Claude\]|Claude:" /path/to/logs
 ```
 
 ## 6. Related Files
-- `ServiceManager.swift:1078-1174` - Sequential execution implementation
-- `JavaScriptProvider.swift:397-631` - Claude-specific JavaScript
-- `SettingsManager.swift:111-123` - Service activation method definitions
+- `ServiceManager.swift` - Sequential execution and service loading logic
+  - Lines 1078-1174: Sequential clipboard execution 
+  - Lines 200-300: Sequential service loading queue
+- `JavaScriptProvider.swift:397-631` - Claude-specific JavaScript automation
+- `ServiceConfiguration.swift` - Service URL configurations and activation methods
+- `WebViewFactory.swift` - WebView creation and initialization
+- `BrowserViewController.swift` - WebView delegate handoff after loading
 
-## 7. WebKit Gotchas
-- Cannot return complex objects from JavaScript
-- Promises must be resolved to simple values
-- Async functions automatically return Promises
-- Use synchronous operations or await async results before returning 
+## 7. WebKit Gotchas & Lessons Learned
+
+### JavaScript Execution Constraints
+- **Cannot return complex objects**: WebKit only accepts primitive values from JS
+- **Promise handling**: Async functions automatically return Promises (unsupported)
+- **Return type consistency**: Must return same type (string, number, boolean) consistently
+- **Solution**: Use synchronous operations or convert complex objects to JSON strings
+
+### Multi-Service Architecture Lessons
+- **Clipboard conflicts**: Multiple services accessing clipboard simultaneously causes failures
+- **Sequential execution**: Clipboard-based services must execute one at a time
+- **GPU process limits**: Multiple WebViews starting simultaneously causes crashes
+- **Solution**: Service categorization with sequential queues
+
+### Timing and Race Conditions
+- **JavaScript state sync**: React/modern frameworks need event firing for state updates
+- **WebView initialization**: Services need proper loading delays before automation
+- **Focus management**: Input focus must be handled carefully to avoid UI disruption
+- **Solution**: Comprehensive event sequences and appropriate delays
+
+### Debugging Best Practices
+- **Diagnostic reporting**: Return structured JSON for detailed error analysis
+- **Console logging**: Extensive logging for tracing automation steps
+- **Selector validation**: Test element visibility and interactability before use
+- **Error handling**: Graceful fallbacks when primary methods fail 
