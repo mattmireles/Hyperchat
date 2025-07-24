@@ -191,6 +191,196 @@ func switchToRegularMode() {
 ```
 This pragmatic solution overcomes a long-standing system idiosyncrasy and ensures a smooth transition for the user.
 
+## **Section 3.5: Putting It All Together: A Complete Example**
+
+The following is a minimal but complete implementation that correctly incorporates the patterns discussed above, including the "Prohibited-to-Accessory" launch sequence and the "Temporary Promotion" pattern for showing windows.
+
+This provides a robust foundation for a dual-mode application.
+
+```swift
+// AppDelegate.swift
+import Cocoa
+
+@main
+class AppDelegate: NSObject, NSApplicationDelegate {
+    // Keep a strong reference to the MenuBarManager
+    private var menuBarManager: MenuBarManager?
+
+    func applicationWillFinishLaunching(_ notification: Notification) {
+        // Step 1: Prevent the default activation and the Dock icon flash.
+        // This is critical to ensure a clean launch into accessory mode.
+        NSApp.setActivationPolicy(.prohibited)
+    }
+    
+    func applicationDidFinishLaunching(_ aNotification: Notification) {
+        // Step 2: Initialize the menu bar manager, which creates the NSStatusItem.
+        menuBarManager = MenuBarManager()
+        
+        // Step 3: Now, set the desired initial state to be an accessory app.
+        // The app is now running in the background with a menu bar icon.
+        NSApp.setActivationPolicy(.accessory)
+    }
+    
+    func applicationShouldTerminateAfterLastWindowClosed(_ sender: NSApplication) -> Bool {
+        // The app should not terminate when the last window is closed.
+        // It should remain alive in accessory mode.
+        return false
+    }
+    
+    func applicationShouldHandleReopen(_ sender: NSApplication, hasVisibleWindows flag: Bool) -> Bool {
+        // This is called when the user clicks the Dock icon (when app is in regular mode).
+        // If no windows are visible, show the main window.
+        // Add authentication or state checks as needed.
+        if !flag {
+            // Optional: Add state validation before showing
+            // guard isUserAuthenticated() else { return false }
+            MainWindowController.shared.show()
+        }
+        return false  // Return false to prevent default system behavior
+    }
+    
+    func applicationDidBecomeActive(_ aNotification: Notification) {
+        // Ensure proper window focus when app becomes active
+        // This handles cases where the app is activated programmatically
+        if let mainWindow = NSApp.windows.first(where: { $0.isVisible }) {
+            mainWindow.makeKeyAndOrderFront(nil)
+        }
+    }
+}
+
+// MainWindowController.swift
+import Cocoa
+
+class MainWindowController: NSWindowController, NSWindowDelegate {
+    static let shared = MainWindowController()
+    
+    // Use a private initializer to enforce singleton pattern
+    private override init(window: NSWindow?) {
+        let window = NSWindow(
+            contentRect: NSRect(x: 0, y: 0, width: 800, height: 600),
+            styleMask: [.titled, .closable, .resizable, .miniaturizable],
+            backing: .buffered,
+            defer: false
+        )
+        
+        super.init(window: window)
+        
+        window.delegate = self
+        window.title = "My App"
+        window.setFrameAutosaveName("MainWindow")
+        window.center()
+        // You would set your window's content view here, e.g., with a SwiftUI view
+        // window.contentViewController = NSHostingController(rootView: MyMainView())
+    }
+    
+    required init?(coder: NSCoder) {
+        fatalError("init(coder:) has not been implemented")
+    }
+    
+    // This is the "Temporary Promotion" pattern in action.
+    func show() {
+        // Optional: Add state validation before showing
+        guard canShowWindow() else { return }
+        guard window?.isVisible != true else { return }  // Already visible
+        
+        // Step 1: Promote to .regular BEFORE showing the window.
+        NSApp.setActivationPolicy(.regular)
+        
+        // Step 2: Show the window and activate the app.
+        window?.makeKeyAndOrderFront(nil)
+        NSRunningApplication.current.activate(options: [.activateAllWindows, .activateIgnoringOtherApps])
+    }
+    
+    private func canShowWindow() -> Bool {
+        // Add your authentication or state checks here
+        // return BackendManager.tokenAvailable
+        return true
+    }
+    
+    func hide() {
+        // This could be called from a "Hide" menu item, for example.
+        window?.orderOut(nil)
+        NSApp.setActivationPolicy(.accessory)
+    }
+    
+    // MARK: - NSWindowDelegate
+    
+    func windowWillClose(_ notification: Notification) {
+        // Check if other windows remain visible before switching to accessory mode
+        let visibleWindows = NSApp.windows.filter { window in
+            return window.isVisible && window != notification.object as? NSWindow
+        }
+        
+        if visibleWindows.isEmpty {
+            // No other windows - safe to return to accessory mode
+            NSApp.setActivationPolicy(.accessory)
+        }
+        // Otherwise stay in regular mode for remaining windows
+    }
+    
+    func windowDidBecomeMain(_ notification: Notification) {
+        // This ensures that if the window is brought to the front by other means
+        // (e.g. Mission Control), the app is correctly in .regular mode.
+        NSApp.setActivationPolicy(.regular)
+    }
+    
+    func windowDidBecomeKey(_ notification: Notification) {
+        // Enhanced tracking for key window changes
+        // Useful for analytics, UI state updates, etc.
+        NSApp.setActivationPolicy(.regular)
+    }
+    
+    func windowDidResignKey(_ notification: Notification) {
+        // Handle key window resignation
+        // Useful for dismissing modals, saving state, etc.
+    }
+    
+    func windowDidResignMain(_ notification: Notification) {
+        // Handle main window resignation
+        // Consider whether to stay in regular mode based on other windows
+    }
+}
+
+// MenuBarManager.swift
+import Cocoa
+
+class MenuBarManager {
+    // Keep a strong reference to the status item
+    private let statusItem: NSStatusItem
+    
+    init() {
+        // Initialize the status item
+        statusItem = NSStatusBar.system.statusItem(withLength: NSStatusItem.variableLength)
+        setupMenuBarItem()
+    }
+    
+    private func setupMenuBarItem() {
+        if let button = statusItem.button {
+            // A template image will automatically adapt to light/dark mode.
+            button.image = NSImage(systemSymbolName: "star.fill", accessibilityDescription: "My App")
+        }
+        
+        let menu = NSMenu()
+        
+        let showItem = NSMenuItem(title: "Show Window", action: #selector(showWindow), keyEquivalent: "")
+        showItem.target = self // Route the action to this object
+        menu.addItem(showItem)
+        
+        menu.addItem(NSMenuItem.separator())
+        
+        // Use the standard quit action from NSApplication
+        menu.addItem(NSMenuItem(title: "Quit", action: #selector(NSApplication.terminate(_:)), keyEquivalent: "q"))
+        
+        statusItem.menu = menu
+    }
+    
+    @objc private func showWindow() {
+        // Call the singleton to show the main window
+        MainWindowController.shared.show()
+    }
+}
+```
+
 ## **Section 4: Advanced Challenges and Edge Cases**
 
 ### **4.1 State Management and Synchronization**
@@ -267,7 +457,35 @@ An outdated pattern involves bundling a separate helper `LSUIElement` applicatio
     - `Models/`: Data models used across both modes.
     - `Services/`: Network clients, business logic.
 
-### **5.4 Developer's Final Checklist**
+### **5.4 Alternative Architecture: Dock-Centric Approach**
+
+While the unified dual-mode architecture is recommended, some applications may benefit from a dock-centric approach that maintains permanent dock presence:
+
+```swift
+// Alternative AppDelegate for permanent dock presence
+class AppDelegateDock: NSObject, NSApplicationDelegate {
+    private var canShowMainWindow = false
+    
+    func applicationDidFinishLaunching(_ aNotification: Notification) {
+        // Stay in regular mode permanently
+        NSApp.setActivationPolicy(.regular)
+        
+        // Control window visibility through state management
+        canShowMainWindow = checkAuthenticationState()
+    }
+    
+    func applicationShouldHandleReopen(_ sender: NSApplication, hasVisibleWindows flag: Bool) -> Bool {
+        if canShowMainWindow && !flag {
+            MainWindowController.shared.show()
+        }
+        return false
+    }
+}
+```
+
+This approach trades the clean accessory-mode experience for simpler state management and may be appropriate for apps that frequently show windows or where dock presence is desired.
+
+### **5.5 Developer's Final Checklist**
 
 Before shipping, review this checklist:
 
@@ -278,5 +496,10 @@ Before shipping, review this checklist:
 - [ ]  **Is the "Temporary Promotion" pattern used for presenting windows from accessory mode?**
 - [ ]  **Is all shared mutable state protected by a synchronization mechanism (e.g., an `actor`)?**
 - [ ]  **Has the "Activation Shuffle" been implemented if the main menu is unresponsive after switching to regular mode?**
+- [ ]  **Does `applicationShouldHandleReopen` properly handle dock icon clicks with state validation?**
+- [ ]  **Are multiple window delegate methods implemented for comprehensive state tracking?**
+- [ ]  **Does `windowWillClose` check for other visible windows before switching to accessory mode?**
+- [ ]  **Are state validation guards implemented in the `show()` method?**
+- [ ]  **Is `applicationDidBecomeActive` implemented to ensure proper window focus?**
 
 Following these patterns will help you build high-quality, dual-mode macOS applications that are both powerful and seamlessly integrated into the user's workflow.
