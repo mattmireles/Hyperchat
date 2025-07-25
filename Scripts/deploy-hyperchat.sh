@@ -60,7 +60,7 @@ if [[ "$USER_INPUT" != "n" ]]; then
 fi
 
 # --- Manual Release Notes Confirmation Step ---
-RELEASE_NOTES_FILE="${MACOS_DIR}/hyperchat-macos/RELEASE_NOTES.html"
+RELEASE_NOTES_FILE="${MACOS_DIR}/RELEASE_NOTES.html"
 
 echo -e "${YELLOW}🔔 Release Notes Check${NC}"
 echo -e "The release notes for the appcast are read from:"
