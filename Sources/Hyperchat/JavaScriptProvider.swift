@@ -174,11 +174,25 @@ struct JavaScriptProvider {
                         try {
                             // Direct text insertion instead of clipboard paste
                             if (inputType === 'div') {
-                                // For contenteditable divs
-                                input.textContent = promptText;
-                                input.innerHTML = promptText; // Fallback
+                                // For contenteditable divs, simulate a paste event, which is more robust
+                                // for frameworks like React that have controlled components.
+                                console.log('PASTE SIM: Attempting simulated paste for contenteditable div.');
+                                try {
+                                    const dataTransfer = new DataTransfer();
+                                    dataTransfer.setData('text/plain', promptText);
+                                    const pasteEvent = new ClipboardEvent('paste', {
+                                        clipboardData: dataTransfer,
+                                        bubbles: true,
+                                        cancelable: true
+                                    });
+                                    input.dispatchEvent(pasteEvent);
+                                } catch (e) {
+                                    console.log('PASTE SIM: Paste event failed, falling back to execCommand.', e);
+                                    // Fallback for older browsers or different editors
+                                    document.execCommand('insertText', false, promptText);
+                                }
                             } else {
-                                // For input/textarea elements
+                                // For standard input/textarea elements, setting .value is usually sufficient.
                                 input.value = promptText;
                             }
                             
@@ -752,6 +766,211 @@ struct JavaScriptProvider {
     }
     
     // MARK: - Debug Scripts
+    
+    /// Generates comprehensive Perplexity DOM diagnostic script.
+    ///
+    /// This script analyzes the current Perplexity page state to understand:
+    /// - Available input field selectors (initial vs follow-up)
+    /// - Submit button selectors and their current state
+    /// - Page context (initial query, follow-up query, results page)
+    /// - Element visibility and interaction states
+    ///
+    /// Used for debugging follow-up query automation issues.
+    /// Run this script on Perplexity.ai to gather diagnostic information.
+    ///
+    /// - Returns: JavaScript string for comprehensive Perplexity DOM analysis
+    static func perplexityDiagnosticScript() -> String {
+        return """
+        (function() {
+            console.log('[Perplexity Diagnostic] Starting comprehensive DOM analysis...');
+            
+            const report = {
+                pageURL: window.location.href,
+                timestamp: new Date().toISOString(),
+                pageContext: 'unknown',
+                inputElements: [],
+                submitElements: [],
+                recommendedSelectors: {
+                    input: [],
+                    submit: []
+                }
+            };
+            
+            // Determine page context
+            const url = window.location.href;
+            const hasQuery = url.includes('?q=') || document.querySelector('[data-testid="search-result"]');
+            const hasFollowUpArea = document.querySelector('[placeholder*="follow"]') || 
+                                    document.querySelector('[aria-label*="follow"]') ||
+                                    document.querySelector('.follow-up');
+                                    
+            if (url === 'https://www.perplexity.ai/' || url === 'https://perplexity.ai/') {
+                report.pageContext = 'initial_landing';
+            } else if (hasQuery && !hasFollowUpArea) {
+                report.pageContext = 'results_no_followup';
+            } else if (hasQuery && hasFollowUpArea) {
+                report.pageContext = 'results_with_followup';
+            } else {
+                report.pageContext = 'unknown';
+            }
+            
+            console.log('[Perplexity Diagnostic] Page context:', report.pageContext);
+            
+            // Analyze all input elements
+            const allInputs = document.querySelectorAll('input, textarea, div[contenteditable], [role="textbox"]');
+            console.log('[Perplexity Diagnostic] Found', allInputs.length, 'potential input elements');
+            
+            allInputs.forEach((element, index) => {
+                const rect = element.getBoundingClientRect();
+                const style = window.getComputedStyle(element);
+                const isVisible = rect.width > 0 && rect.height > 0 && 
+                                 style.display !== 'none' && 
+                                 style.visibility !== 'hidden' &&
+                                 style.opacity !== '0';
+                
+                const inputInfo = {
+                    index: index,
+                    tagName: element.tagName.toLowerCase(),
+                    type: element.type || 'N/A',
+                    placeholder: element.placeholder || 'N/A',
+                    ariaLabel: element.getAttribute('aria-label') || 'N/A',
+                    dataTestId: element.getAttribute('data-testid') || 'N/A',
+                    className: element.className || 'N/A',
+                    id: element.id || 'N/A',
+                    isVisible: isVisible,
+                    isEnabled: !element.disabled && !element.readOnly,
+                    rect: {
+                        width: rect.width,
+                        height: rect.height,
+                        top: rect.top,
+                        left: rect.left
+                    },
+                    value: (element.value || element.textContent || '').substring(0, 50),
+                    parent: element.parentElement ? element.parentElement.tagName.toLowerCase() : 'N/A',
+                    parentClass: element.parentElement ? element.parentElement.className : 'N/A'
+                };
+                
+                report.inputElements.push(inputInfo);
+                
+                // Generate recommended selectors for visible, enabled inputs
+                if (isVisible && inputInfo.isEnabled) {
+                    const selectors = [];
+                    
+                    if (inputInfo.placeholder !== 'N/A') {
+                        selectors.push(`${inputInfo.tagName}[placeholder*="${inputInfo.placeholder.substring(0, 20)}"]`);
+                    }
+                    if (inputInfo.ariaLabel !== 'N/A') {
+                        selectors.push(`${inputInfo.tagName}[aria-label*="${inputInfo.ariaLabel.substring(0, 20)}"]`);
+                    }
+                    if (inputInfo.dataTestId !== 'N/A') {
+                        selectors.push(`${inputInfo.tagName}[data-testid="${inputInfo.dataTestId}"]`);
+                    }
+                    if (inputInfo.id !== 'N/A') {
+                        selectors.push(`#${inputInfo.id}`);
+                    }
+                    
+                    report.recommendedSelectors.input.push(...selectors);
+                }
+                
+                console.log(`[Perplexity Diagnostic] Input ${index}:`, inputInfo);
+            });
+            
+            // Analyze all potential submit buttons
+            const allButtons = document.querySelectorAll('button, input[type="submit"], [role="button"]');
+            console.log('[Perplexity Diagnostic] Found', allButtons.length, 'potential submit elements');
+            
+            allButtons.forEach((element, index) => {
+                const rect = element.getBoundingClientRect();
+                const style = window.getComputedStyle(element);
+                const isVisible = rect.width > 0 && rect.height > 0 && 
+                                 style.display !== 'none' && 
+                                 style.visibility !== 'hidden' &&
+                                 style.opacity !== '0';
+                
+                const buttonInfo = {
+                    index: index,
+                    tagName: element.tagName.toLowerCase(),
+                    type: element.type || 'N/A',
+                    ariaLabel: element.getAttribute('aria-label') || 'N/A',
+                    dataTestId: element.getAttribute('data-testid') || 'N/A',
+                    className: element.className || 'N/A',
+                    id: element.id || 'N/A',
+                    textContent: (element.textContent || '').trim().substring(0, 30),
+                    isVisible: isVisible,
+                    isEnabled: !element.disabled,
+                    rect: {
+                        width: rect.width,
+                        height: rect.height,
+                        top: rect.top,
+                        left: rect.left
+                    },
+                    hasSVG: element.querySelector('svg') !== null,
+                    svgContent: element.querySelector('svg') ? element.querySelector('svg').outerHTML.substring(0, 100) : 'N/A'
+                };
+                
+                report.submitElements.push(buttonInfo);
+                
+                // Generate recommended selectors for visible, enabled buttons that might be submit buttons
+                if (isVisible && buttonInfo.isEnabled) {
+                    const selectors = [];
+                    
+                    // Look for submit-like characteristics
+                    const isLikelySubmit = buttonInfo.ariaLabel.toLowerCase().includes('submit') ||
+                                          buttonInfo.ariaLabel.toLowerCase().includes('send') ||
+                                          buttonInfo.textContent.toLowerCase().includes('submit') ||
+                                          buttonInfo.textContent.toLowerCase().includes('send') ||
+                                          buttonInfo.hasSVG;
+                    
+                    if (isLikelySubmit) {
+                        if (buttonInfo.ariaLabel !== 'N/A') {
+                            selectors.push(`button[aria-label="${buttonInfo.ariaLabel}"]`);
+                        }
+                        if (buttonInfo.dataTestId !== 'N/A') {
+                            selectors.push(`button[data-testid="${buttonInfo.dataTestId}"]`);
+                        }
+                        if (buttonInfo.className !== 'N/A') {
+                            // Extract meaningful class names
+                            const classes = buttonInfo.className.split(' ').filter(c => 
+                                c.length > 2 && !c.startsWith('css-') && !c.match(/^[a-f0-9]{6,}$/)
+                            );
+                            classes.forEach(cls => {
+                                selectors.push(`button.${cls}`);
+                            });
+                        }
+                        if (buttonInfo.hasSVG) {
+                            selectors.push('button:has(svg)');
+                        }
+                        
+                        report.recommendedSelectors.submit.push(...selectors);
+                    }
+                }
+                
+                console.log(`[Perplexity Diagnostic] Button ${index}:`, buttonInfo);
+            });
+            
+            // Summary and recommendations
+            const visibleInputs = report.inputElements.filter(el => el.isVisible && el.isEnabled);
+            const likelySubmitButtons = report.submitElements.filter(el => 
+                el.isVisible && el.isEnabled && (
+                    el.ariaLabel.toLowerCase().includes('submit') ||
+                    el.ariaLabel.toLowerCase().includes('send') ||
+                    el.textContent.toLowerCase().includes('submit') ||
+                    el.textContent.toLowerCase().includes('send') ||
+                    el.hasSVG
+                )
+            );
+            
+            console.log('[Perplexity Diagnostic] Summary:');
+            console.log('- Page context:', report.pageContext);
+            console.log('- Visible/enabled inputs:', visibleInputs.length);
+            console.log('- Likely submit buttons:', likelySubmitButtons.length);
+            console.log('- Recommended input selectors:', report.recommendedSelectors.input);
+            console.log('- Recommended submit selectors:', report.recommendedSelectors.submit);
+            
+            // Return comprehensive report
+            return JSON.stringify(report, null, 2);
+        })();
+        """
+    }
     
     /// JavaScript to check if URL query parameter was processed.
     ///
