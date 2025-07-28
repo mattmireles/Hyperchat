@@ -106,36 +106,25 @@ Here is the step-by-step flow of a typical user interaction:
 - **Delegate Handoff**: ServiceManager manages initial load with sequential queue, then hands navigation control to BrowserViewController for ongoing interaction.
 - **JavaScript Isolation**: All JavaScript code is centralized in JavaScriptProvider, making it easier to maintain and test complex browser automation scripts.
 
-**Core Technologies & Practices**
-
-- **State Management**: Uses Apple's Combine framework for reactive state updates and publisher-subscriber patterns alongside traditional NotificationCenter for cross-module events.
-- **Dependency Management**: The project uses Swift Package Manager (SPM) to manage third-party libraries like Sparkle, KeyboardShortcuts, and AmplitudeSwift.
-- **Automated Testing**: A suite of unit and UI tests runs automatically via GitHub Actions to ensure stability. The testing strategy is detailed in `Testing.md`.
-- **Automated Deployment**: The release process is fully automated via the `./deploy-hyperchat.sh` script, which handles signing, notarization, and DMG creation.
-- **Direct Distribution (Not Sandboxed)**: Hyperchat is distributed directly and is not sandboxed. This simplifies development and enables more powerful system-level features.
-- **Automatic Updates (Sparkle)**: The Sparkle framework is integrated to provide seamless, automatic updates to users.
-- **Analytics (Amplitude)**: Usage analytics are collected by default to help improve the product, with user option to disable via settings.
-
 **Documentation Structure**
 
 The project documentation is organized as follows:
 
-- **Documentation/**: Core project documentation
-  - `architecture-map.md` (this file) - System overview and component relationships
-  - `Testing.md` - Testing strategy and automated test suite details
-  - `deploy.md` - Deployment and release process documentation
-  - `SPM-Development.md` - Swift Package Manager configuration
-  - `README_LOGGING.md` - Logging configuration and usage
-  - `Hyperchat-product-spec.md` - Product requirements and specifications
+- **Documentation/**: Core project documentation.
+  - `architecture-map.md` (this file) - System overview and component relationships.
+  - `Testing.md` - Testing strategy and automated test suite details.
+  - `README_LOGGING.md` - Logging configuration and usage.
+  - `Hyperchat-product-spec.md` - Product requirements and specifications.
 
-- **Documentation/Websites/**: Browser automation guides and service-specific notes
-  - `browser-automation-guide.md` - General browser automation patterns and best practices
-  - `ChatGPT/` - ChatGPT-specific automation documentation
-  - `Claude/` - Claude automation notes and ProseMirror/React integration guides
-  - `Google/` - Google Search automation documentation  
-  - `Perplexity/` - Perplexity automation notes
+- **Documentation/Guides/**: How-to guides for specific technical challenges.
+  - `deploy-outside-the-app-store.md` - Deployment and release process documentation.
+  - `SPM-Development.md` - Swift Package Manager configuration.
+  - ... and other guides for macOS development patterns.
 
-- **Documentation/Archive/**: Historical debugging documentation and resolved issues
-  - Various crash fix summaries and WebKit debugging guides (archived for reference)
+- **Documentation/Websites/**: Browser automation guides and service-specific notes.
+  - `browser-automation-guide.md` - General browser automation patterns and best practices.
+  - `ChatGPT/`, `Claude/`, `Google/`, `Perplexity/` - Service-specific notes.
+
+- **Documentation/Notes/**: A collection of development notes, logs from debugging sessions, and thoughts on specific features or architectural decisions.
 
 For browser automation work, start with `Documentation/Websites/browser-automation-guide.md` and then refer to the service-specific directories for detailed implementation notes.
