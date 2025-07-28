@@ -6,7 +6,7 @@
 set -e
 
 SCRIPT_DIR="$( cd "$( dirname "${BASH_SOURCE[0]}" )" && pwd )"
-PROJECT_DIR="$SCRIPT_DIR"
+PROJECT_DIR="$SCRIPT_DIR/.."
 BUILD_DIR="$PROJECT_DIR/build"
 APP_NAME="Hyperchat"
 LOG_FILE="$PROJECT_DIR/menu-test-results.log"
