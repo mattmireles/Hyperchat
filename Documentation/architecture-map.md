@@ -1,4 +1,4 @@
-# Hyperchat Codebase Map
+# Hyperchat Architecture Map
 
 ## Table of Contents
 
