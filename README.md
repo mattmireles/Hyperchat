@@ -1,4 +1,4 @@
-# Hyperchat Architecture Map
+# Hyperchat for  macOS -- All Your AIs. All At Once. 
 
 ## Table of Contents
 
@@ -235,7 +235,7 @@ The project maintains comprehensive documentation organized by purpose and audie
 
 ### Core Documentation (`Documentation/`)
 
-- **`architecture-map.md`** (this file): Complete system overview covering runtime architecture, development infrastructure, testing, and build processes
+- **`README.md`** (this file): Complete system overview covering runtime architecture, development infrastructure, testing, and build processes
 - **`Testing.md`**: Detailed testing guide with execution instructions, test organization, and best practices
 - **`README_LOGGING.md`**: Logging configuration, debug output management, and troubleshooting workflows
 - **`Hyperchat-product-spec.md`**: Product requirements, feature specifications, and design decisions
@@ -285,7 +285,7 @@ The documentation follows an **LLM-First approach** where every comment and docu
 
 ### Getting Started Workflow
 
-1. **New Developers**: Start with this `architecture-map.md` for system overview
+1. **New Developers**: Start with this `README.md` for system overview
 2. **Browser Automation**: Begin with `Documentation/Websites/browser-automation-guide.md`
 3. **Testing**: Use `Documentation/Testing.md` for test execution and development
 4. **Deployment**: Follow `Documentation/Guides/deploy-outside-the-app-store.md` for release processes

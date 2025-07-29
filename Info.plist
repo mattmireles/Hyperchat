@@ -27,7 +27,7 @@
 	<key>SUFeedURL</key>
 	<string>https://hyperchat.app/appcast.xml</string>
 	<key>SUPublicEDKey</key>
-	<string>YOUR_SPARKLE_PUBLIC_KEY_HERE=</string>
+	<string>Ync3JaopLjJvQFuX4+1wKJzlKYFnXjlyPISL9AsvKPI=</string>
 	<key>SUScheduledCheckInterval</key>
 	<integer>1800</integer>
 </dict>
