@@ -129,11 +129,11 @@ The automation scripts handle the entire development lifecycle:
 
 - **`run-tests.sh`**: Comprehensive test runner that executes both unit and UI tests, generates reports, and provides cleanup options. Supports selective test execution and HTML report generation.
 
-- **`configure-release-build.sh`**: Release build automation that manages version bumping, archive creation, and export configuration for App Store and direct distribution.
-
 - **`sync-sparkle-keys.sh`**: Sparkle update key management that synchronizes EdDSA public keys in Info.plist with private keys to prevent signature mismatches.
 
-- **Testing Scripts**: Various utilities including `quick-menu-test.sh`, `test-clean.sh`, `test-settings.sh` for targeted testing and debugging workflows.
+- **`menu-test.sh`**: Quick menu functionality testing for debugging menu bar interactions and accessibility settings.
+
+- **`swift-test.sh`**: Swift testing utilities for targeted test execution and debugging workflows.
 
 - **`cleanup-tests.sh`**: Cleans test artifacts and temporary files to maintain a clean development environment.
 
@@ -308,7 +308,7 @@ xcodebuild test -scheme Hyperchat -only-testing:HyperchatTests
 ./Scripts/cleanup-tests.sh
 
 # Quick menu functionality test
-./Scripts/quick-menu-test.sh
+./Scripts/menu-test.sh
 ```
 
 ### Testing & Quality Assurance
@@ -330,24 +330,21 @@ xcodebuild test -scheme Hyperchat -only-testing:HyperchatTests/ServiceConfigurat
 ### Build & Release Process
 
 ```bash
-# Configure release build with version bumping
-./Scripts/configure-release-build.sh "1.2.3"
-
 # Full deployment pipeline (build, sign, notarize, create DMG)
 ./Scripts/deploy-hyperchat.sh
 
 # Sync Sparkle keys (run automatically during build)
 ./Scripts/sync-sparkle-keys.sh
 
-# Test settings and configuration
-./Scripts/test-settings.sh
+# Swift testing utilities
+./Scripts/swift-test.sh
 ```
 
 ### Debugging & Development
 
 ```bash
 # Clean test artifacts and derived data
-./Scripts/test-clean.sh
+./Scripts/cleanup-tests.sh
 
 # Build for testing (without running tests)
 xcodebuild build-for-testing -scheme Hyperchat -destination 'platform=macOS'
