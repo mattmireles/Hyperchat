@@ -17,6 +17,7 @@ Tests.log
 # Configuration files with sensitive data
 Sources/Hyperchat/Config.swift
 ExportOptions.plist
+Info.plist
 .env
 
 # Logs and raw data
