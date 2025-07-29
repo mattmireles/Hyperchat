@@ -13,18 +13,19 @@ set -x  # Print commands as they execute (full logging)
 SCRIPT_DIR=$(cd -- "$(dirname -- "${BASH_SOURCE[0]}")" &> /dev/null && pwd)
 PROJECT_DIR=$(dirname "$(dirname "$SCRIPT_DIR")")
 
-# Configuration
+# --- Configuration ---
+# Sensitive values are read from environment variables to keep them out of source control.
+# See the project's README for instructions on how to set these up for contributors.
 APP_NAME="Hyperchat"
 BUNDLE_ID="com.transcendence.hyperchat"
-TEAM_ID="$(APPLE_TEAM_ID)"
-APPLE_ID="your-apple-id@example.com"
-# Using specific certificate hash to avoid ambiguity (you have 2 certs with same name)
-CERTIFICATE_IDENTITY="YOUR_CERTIFICATE_HASH_HERE"
-# This is "Developer ID Application: Matt Mireles ($(APPLE_TEAM_ID))"
+TEAM_ID="${APPLE_TEAM_ID}"
+APPLE_ID="${APPLE_ID_EMAIL}"
+# Using specific certificate hash to avoid ambiguity if you have multiple certs with the same name.
+CERTIFICATE_IDENTITY="${APPLE_CERTIFICATE_IDENTITY}"
 MACOS_DIR="${PROJECT_DIR}/hyperchat-macos"
 WEB_DIR="${PROJECT_DIR}/hyperchat-web"
-NOTARIZE_PROFILE="hyperchat-notarize"  # Keychain profile name
-SPARKLE_PRIVATE_KEY="${HOME}/.keys/sparkle_ed_private_key.pem"
+NOTARIZE_PROFILE="hyperchat-notarize"  # Keychain profile name for `xcrun notarytool`
+SPARKLE_PRIVATE_KEY="${SPARKLE_PRIVATE_KEY_PATH}"
 
 # Enable debug logging
 DEBUG_LOG="${MACOS_DIR}/deploy-debug.log"
@@ -37,6 +38,36 @@ GREEN='\033[0;32m'
 YELLOW='\033[1;33m'
 BLUE='\033[0;34m'
 NC='\033[0m'
+
+# --- Prerequisite Validation ---
+# Ensure all required environment variables are set before starting.
+echo -e "${YELLOW}🔑 Validating required secrets...${NC}"
+REQUIRED_VARS=(
+    "APPLE_TEAM_ID"
+    "APPLE_ID_EMAIL"
+    "APPLE_CERTIFICATE_IDENTITY"
+    "SPARKLE_PRIVATE_KEY_PATH"
+)
+missing_vars=false
+for var_name in "${REQUIRED_VARS[@]}"; do
+    if [ -z "${!var_name-}" ]; then  # Use - to handle unbound variables gracefully
+        echo -e "${RED}❌ Missing required environment variable: ${var_name}${NC}"
+        missing_vars=true
+    fi
+done
+
+if [ "$missing_vars" = true ]; then
+    echo ""
+    echo -e "${RED}FATAL: One or more secrets are not set in your environment.${NC}"
+    echo -e "${YELLOW}Please create a .env file in the project root or export these variables.${NC}"
+    echo "Example for your .env file (DO NOT COMMIT THIS FILE):"
+    echo "  export APPLE_TEAM_ID=\"YOUR_TEAM_ID_HERE\""
+    echo "  export APPLE_ID_EMAIL=\"YOUR_APPLE_ID_EMAIL_HERE\""
+    echo "  export APPLE_CERTIFICATE_IDENTITY=\"YOUR_CERTIFICATE_HASH_HERE\""
+    echo "  export SPARKLE_PRIVATE_KEY_PATH=\"\${HOME}/.keys/sparkle_ed_private_key.pem\""
+    exit 1
+fi
+echo -e "${GREEN}✅ All secrets found.${NC}\n"
 
 # Version info - increment build number
 CURRENT_BUILD=$(/usr/libexec/PlistBuddy -c "Print CFBundleVersion" "${MACOS_DIR}/Info.plist")

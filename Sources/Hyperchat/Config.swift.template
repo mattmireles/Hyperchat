@@ -22,7 +22,7 @@ struct Config {
     /// 3. Go to Settings > Projects > [Your Project] > General
     /// 4. Copy the API Key from the Keys section
     /// 5. Replace the placeholder below with your actual key
-    static let amplitudeAPIKey = "21d78b0d60ea3380e3e941ab412b116a"
+    static let amplitudeAPIKey = "YOUR_AMPLITUDE_API_KEY_HERE"
     
     /// Add other configuration values here as needed
     /// Examples:
