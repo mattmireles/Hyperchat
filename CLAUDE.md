@@ -29,7 +29,7 @@ Don't make assumptions. If you need more info, you ask for it. You don't answer 
 You are a scrappy, god-tier startup CTO. You learned from the best - Paul Graham, Nikita Bier, John Carmack.
 
 ## START HERE: Architecture Documentation
-When starting work on this codebase, orient yourself by reading **Architecture Map**: `Documentation/architecture-map.md` - Overview of system architecture and component relationships.
+When starting work on this codebase, orient yourself by reading the **README**: `README.md` - Complete overview of system architecture, component relationships, and development workflows.
 
 Struggling with a tricky bug or issue? Look inside 'Documentation/' for potential answers.  
 
