@@ -4,6 +4,7 @@ Hyperchat*.xcarchive/
 DerivedData/
 build/
 *.xcuserstate
+xcuserdata/
 .DS_Store
 *.backup
 *.backup-*
