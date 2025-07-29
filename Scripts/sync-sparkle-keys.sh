@@ -61,7 +61,7 @@ fi
 # fi
 
 # Hardcoded public key for testing
-CORRECT_PUBLIC_KEY="YOUR_SPARKLE_PUBLIC_KEY_HERE="
+CORRECT_PUBLIC_KEY="${SPARKLE_PUBLIC_KEY:-YOUR_SPARKLE_PUBLIC_KEY_HERE}"
 
 
 # Read the current public key from Info.plist

@@ -201,7 +201,7 @@ The project uses a sophisticated build and release pipeline designed for both de
 
 ### Code Signing & Distribution
 
-- **Developer ID Signing**: Uses specific certificate identity (YOUR_CERTIFICATE_HASH_HERE) for direct distribution outside the Mac App Store
+- **Developer ID Signing**: Uses specific certificate identity (configured via APPLE_CERTIFICATE_IDENTITY environment variable) for direct distribution outside the Mac App Store
 - **Entitlements Management**: Separate entitlement files for debug (`Hyperchat.entitlements`) and release (`Hyperchat.Release.entitlements`) builds
 - **Notarization Pipeline**: Automated submission to Apple's notary service with ticket stapling for security compliance
 

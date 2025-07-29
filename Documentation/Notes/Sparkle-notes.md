@@ -34,7 +34,7 @@ rm ~/.keys/sparkle_ed_private_key.pem
 
 ### Attempt 4: Force Keychain Key into Info.plist
 **What we tried**: Manually update Info.plist with keychain public key
-- Keychain key: `YOUR_SPARKLE_PUBLIC_KEY_HERE=`
+- Keychain key: `[SPARKLE_PUBLIC_KEY]`
 - Updated Info.plist manually
 **Result**: Build failed because sync script detected mismatch
 **What actually happened**: Sync script reverted Info.plist back to file-derived key
@@ -138,7 +138,7 @@ But we didn't need to solve this to fix the actual problem.
 After the "pragmatic solution" above worked temporarily, the error returned because **the appcast.xml on the server was signed with the keychain key**, not the file key. This created a persistent mismatch:
 
 - **App expects**: `rcWwv2W5b6l9pnJdueL18VAGyHzS16fcgXfNmmV9vF1NasUk7zYYbUY+EJsBCbU3gFIlxeoBP66y2FBP23pfCg==` (from file)
-- **Server appcast signed with**: `YOUR_SPARKLE_PUBLIC_KEY_HERE=` (from keychain)
+- **Server appcast signed with**: `[SPARKLE_PUBLIC_KEY]` (from keychain)
 
 ### The Actual Fix (Simple & Correct)
 
@@ -478,7 +478,7 @@ The validate action worked!
 $ spctl -a -vvv -t install Hyperchat-b86.dmg
 Hyperchat-b86.dmg: accepted
 source=Notarized Developer ID
-origin=Developer ID Application: Matt Mireles ($(APPLE_TEAM_ID))
+origin=Developer ID Application: [Developer Name] ([TEAM_ID])
 ```
 
 ### The Perfect Fix Applied

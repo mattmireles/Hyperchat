@@ -1004,9 +1004,9 @@ xattr -l App.app | grep quarantine
 
 Before running the deployment script, ensure:
 
-- **Team ID**: `$(APPLE_TEAM_ID)`
-- **Apple ID**: `your-apple-id@example.com`
-- **Certificate Hash**: `7BAD74A37B393BC810721F8165DA61729FA7B2DE`
+- **Team ID**: `YOUR_TEAM_ID` (configured via APPLE_TEAM_ID environment variable)
+- **Apple ID**: `your-apple-id@example.com` (configured via APPLE_ID_EMAIL environment variable)
+- **Certificate Hash**: `YOUR_CERTIFICATE_HASH` (configured via APPLE_CERTIFICATE_IDENTITY environment variable)
 
 ### One-Time Credential Setup
 
@@ -1014,8 +1014,8 @@ Before running the deployment script, ensure:
 # 1. Create app-specific password at appleid.apple.com
 # 2. Store credentials
 xcrun notarytool store-credentials "hyperchat-notarize" \
-  --apple-id "your-apple-id@example.com" \
-  --team-id "$(APPLE_TEAM_ID)" \
+  --apple-id "$APPLE_ID_EMAIL" \
+  --team-id "$APPLE_TEAM_ID" \
   --password "xxxx-xxxx-xxxx-xxxx"
 ```
 

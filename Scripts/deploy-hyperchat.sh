@@ -47,6 +47,7 @@ REQUIRED_VARS=(
     "APPLE_ID_EMAIL"
     "APPLE_CERTIFICATE_IDENTITY"
     "SPARKLE_PRIVATE_KEY_PATH"
+    "SPARKLE_PUBLIC_KEY"
 )
 missing_vars=false
 for var_name in "${REQUIRED_VARS[@]}"; do
@@ -65,6 +66,7 @@ if [ "$missing_vars" = true ]; then
     echo "  export APPLE_ID_EMAIL=\"YOUR_APPLE_ID_EMAIL_HERE\""
     echo "  export APPLE_CERTIFICATE_IDENTITY=\"YOUR_CERTIFICATE_HASH_HERE\""
     echo "  export SPARKLE_PRIVATE_KEY_PATH=\"\${HOME}/.keys/sparkle_ed_private_key.pem\""
+    echo "  export SPARKLE_PUBLIC_KEY=\"YOUR_SPARKLE_PUBLIC_KEY_HERE\""
     exit 1
 fi
 echo -e "${GREEN}✅ All secrets found.${NC}\n"
@@ -160,7 +162,7 @@ fi
 echo -n "  Verifying key consistency... "
 SPARKLE_SIGN_TOOL="${MACOS_DIR}/DerivedData/SourcePackages/artifacts/sparkle/Sparkle/bin/sign_update"
 PLIST_PUB_KEY=$(/usr/libexec/PlistBuddy -c "Print :SUPublicEDKey" "${MACOS_DIR}/Info.plist")
-DERIVED_PUB_KEY="YOUR_SPARKLE_PUBLIC_KEY_HERE="
+DERIVED_PUB_KEY="${SPARKLE_PUBLIC_KEY}"
 
 
 if [[ "${PLIST_PUB_KEY}" == "${DERIVED_PUB_KEY}" ]]; then
