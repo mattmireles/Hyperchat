@@ -1,0 +1,46 @@
+# Third-Party Assets and Attributions
+
+This project includes the following third-party assets and dependencies:
+
+## Fonts
+
+### Orbitron-Bold.ttf
+- **Source**: Google Fonts
+- **License**: SIL Open Font License 1.1
+- **Usage**: Application UI font for branding elements
+- **Location**: Bundled in application resources
+
+## Swift Package Dependencies
+
+### Sparkle Framework
+- **Version**: 2.6.0+
+- **Purpose**: Automatic application updates for macOS
+- **License**: MIT License
+- **Repository**: https://github.com/sparkle-project/Sparkle
+- **Usage**: Handles automatic update checking and installation
+
+### AmplitudeSwift
+- **Version**: 1.0.0+
+- **Purpose**: Analytics and usage tracking
+- **License**: MIT License
+- **Repository**: https://github.com/amplitude/Amplitude-Swift
+- **Usage**: Optional usage analytics (user-configurable)
+
+## Development Dependencies
+
+### Swift Package Manager
+- **Purpose**: Dependency management and build system
+- **License**: Apache License 2.0
+- **Usage**: Project build and dependency resolution
+
+## Icon Assets
+
+All application icons are original work created specifically for this project.
+
+## Bundled Resources
+
+All other bundled resources (excluding those listed above) are original work created for this project.
+
+---
+
+For complete license information of dependencies, please refer to their respective repositories and the Package.swift file in this project.
