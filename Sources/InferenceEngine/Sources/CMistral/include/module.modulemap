@@ -1,0 +1,5 @@
+module CMistral {
+    header "llama.h"
+    link "llama"
+    export *
+}
