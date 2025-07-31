@@ -168,7 +168,8 @@ struct ServiceRowView: View {
                 .foregroundColor(.secondary.opacity(0.6))
                 .frame(width: 20)
             
-            // Service icon - TODO: Add actual icons later
+            /// Service icon - placeholder system icon used
+            /// Future Enhancement: Service-specific icons (ChatGPT, Claude, etc.)
             /*
             Image(service.iconName)
                 .resizable()

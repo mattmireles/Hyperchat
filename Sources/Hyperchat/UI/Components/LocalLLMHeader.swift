@@ -354,9 +354,16 @@ struct LocalLLMHeader: View {
     // MARK: - Actions
     
     /// Load available models from the system
+    ///
+    /// Future Enhancement: Integration with ModelManager
+    /// This will replace sample data with actual model discovery from:
+    /// - ModelManager.getAvailableModels() for device-compatible models
+    /// - Real-time status updates for download progress
+    /// - Actual model file paths and metadata
+    ///
+    /// Current behavior: Uses sample data for UI development
     private func loadAvailableModels() {
-        // TODO: Integrate with actual model discovery
-        // For now, create sample models
+        // Sample models for UI development - will be replaced with ModelManager integration
         let sampleModels = [
             ModelInfo(name: "llama-2-7b-chat", path: "/models/llama-2-7b-chat.gguf",
                      sizeGB: 3.8, architecture: "Llama", contextLength: 4096, isLoaded: false, loadingProgress: nil),
@@ -418,9 +425,16 @@ struct LocalLLMHeader: View {
     }
     
     /// Start monitoring connection status
+    ///
+    /// Future Enhancement: Real-time status monitoring
+    /// This would observe notifications from InferenceEngine for:
+    /// - Model loading/unloading events
+    /// - Inference engine state changes
+    /// - Error conditions and recovery
+    ///
+    /// Current behavior: Placeholder for future implementation
     private func startStatusMonitoring() {
-        // TODO: Implement actual status monitoring
-        // This would typically observe notifications from InferenceEngine
+        // Status monitoring will integrate with InferenceEngine notifications
     }
 }
 
@@ -432,7 +446,11 @@ private class StatusObserver: ObservableObject {
     private var cancellables = Set<AnyCancellable>()
     
     init() {
-        // TODO: Subscribe to actual status notifications
+        // Future Enhancement: Subscribe to InferenceEngine status notifications
+        // Will implement notification-based status updates when InferenceEngine
+        // provides status change events
+        //
+        // Example implementation:
         // NotificationCenter.default.publisher(for: .localLLMStatusChanged)
         //     .sink { [weak self] notification in
         //         // Update status based on notification

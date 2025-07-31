@@ -347,9 +347,11 @@ struct MessageBubble: View {
     }
     
     /// Trigger response regeneration
+    ///
+    /// Current implementation: Posts notification to LocalChatView
+    /// Future enhancement: Could include regeneration parameters (temperature, etc.)
     private func regenerateResponse() {
-        // TODO: Implement regeneration logic
-        // This would typically send a notification to the parent view
+        // Send notification to parent LocalChatView for handling
         NotificationCenter.default.post(
             name: .regenerateLocalResponse,
             object: nil,
@@ -358,9 +360,14 @@ struct MessageBubble: View {
     }
     
     /// Select all text in message
+    ///
+    /// Future Enhancement: Native text selection
+    /// This would integrate with NSTextView or similar for proper text selection,
+    /// including partial selection and copy functionality
+    ///
+    /// Current behavior: Placeholder - full text copy available via context menu
     private func selectAllText() {
-        // TODO: Implement text selection
-        // This would require integration with the text selection system
+        // Text selection feature deferred - use copy from context menu instead
     }
     
     /// Handle file attachment actions
@@ -381,7 +388,9 @@ struct MessageBubble: View {
                 pasteboard.writeObjects([image])
             }
         case .delete:
-            // TODO: Implement file deletion from message
+            /// Future Enhancement: File attachment deletion
+            /// This would remove the attachment from the message and update the UI
+            /// Current behavior: No-op placeholder
             break
         }
     }

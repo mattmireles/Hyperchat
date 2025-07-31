@@ -27,15 +27,15 @@
 import SwiftUI
 import UniformTypeIdentifiers
 
-// Import our enhanced models and components
-// Note: Enhanced models are available from Models/ChatMessage.swift
-
-// Note: Conversation is defined in Models/ChatMessage.swift
-// Note: MessageBubble is defined in UI/Components/MessageBubble.swift
-// Note: LocalLLMHeader is defined in UI/Components/LocalLLMHeader.swift
-
-// Note: ModelInfo is defined in UI/Components/LocalLLMHeader.swift
-// TODO: Resolve ModelInfo type conflicts - for now, use simple implementation
+/// LocalChatView Dependencies:
+/// - EnhancedChatMessage, Conversation: Models/ChatMessage.swift
+/// - MessageBubble: UI/Components/MessageBubble.swift  
+/// - LocalLLMHeader: UI/Components/LocalLLMHeader.swift
+/// - LocalModel: LocalModel.swift (via ModelManager system)
+///
+/// Architecture Note: LocalLLMHeader uses ModelInfo for UI presentation,
+/// while LocalChatView uses LocalModel for core data. This separation maintains
+/// clean boundaries between data models and UI presentation.
 
 // MARK: - Animation Constants
 
@@ -353,13 +353,21 @@ struct LocalChatView: View {
     }
     
     /// Handle model selection changes
+    ///
+    /// Future Enhancement: Dynamic model switching during conversation
+    /// This would involve:
+    /// 1. Safely disposing of current InferenceEngine
+    /// 2. Loading new model via ModelManager
+    /// 3. Creating new InferenceEngine instance
+    /// 4. Preserving conversation context where possible
+    ///
+    /// Current behavior: Logs selection for debugging
     private func handleModelSelection(_ model: Any) {
-        // TODO: Implement model switching once ModelInfo types are resolved
         print("Model selection requested: \(model)")
         
-        // Add system message about model change for now
+        // Add system message about model change
         let systemMessage = EnhancedChatMessage.systemMessage(
-            "Model selection requested",
+            "Model switching will be available in a future update",
             conversationId: currentConversation?.id
         )
         
@@ -367,9 +375,6 @@ struct LocalChatView: View {
                             dampingFraction: UIAnimations.springDamping)) {
             messages.append(systemMessage)
         }
-        
-        // TODO: Reinitialize inference engine with new model
-        // This would require updating the InferenceEngine to support model switching
     }
     
     /// Handle file drop for attachments (simplified for now)
@@ -494,10 +499,18 @@ struct LocalChatView: View {
     }
     
     /// Regenerate a response for a specific message
+    ///
+    /// Future Enhancement: Response regeneration with different parameters
+    /// Implementation approach:
+    /// 1. Find the message by UUID in the messages array
+    /// 2. Locate the preceding user message for context
+    /// 3. Call InferenceEngine.generate() with adjusted parameters (temperature, top-p)
+    /// 4. Replace the existing response with new generation
+    ///
+    /// Current behavior: Logs the request for debugging
     private func regenerateResponse(for messageId: UUID) {
-        // TODO: Implement response regeneration
-        // This would find the message, get the preceding user message, and regenerate
-        print("Regenerating response for message: \(messageId)")
+        print("Response regeneration requested for message: \(messageId)")
+        // Implementation deferred to future version
     }
     
     // Scroll functionality is now inlined in the ScrollViewReader onChange handler
@@ -513,17 +526,25 @@ struct LocalChatView: View {
     }
     
     /// Refresh available models list
+    ///
+    /// Future Enhancement: Dynamic model discovery and refresh
+    /// This would integrate with ModelManager to:
+    /// 1. Scan for newly downloaded models
+    /// 2. Update model status and availability
+    /// 3. Refresh the LocalLLMHeader model picker
+    /// 4. Handle model deletion/updates
+    ///
+    /// Current behavior: Placeholder for future implementation
     private func refreshAvailableModels() {
-        // TODO: Implement model discovery and refresh
-        print("Refreshing available models...")
+        print("Model refresh requested - will integrate with ModelManager in future version")
     }
 }
 
 // MARK: - Extensions
-// File-related extensions will be added back when full file support is restored
+/// File-related extensions for drag & drop support
+/// Future enhancement: Will implement comprehensive file attachment handling
 
-// MARK: - Custom Notifications
-// Note: localServiceExecutePrompt is already defined in ServiceManager.swift
-
-// MARK: - Legacy Compatibility
-// Note: ChatMessage and MessageView are defined in Models/ChatMessage.swift
+// MARK: - Notifications
+/// Custom notifications for local service coordination:
+/// - .localServiceExecutePrompt: Defined in ServiceManager.swift
+/// - .regenerateLocalResponse: Used for message regeneration
