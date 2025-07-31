@@ -299,7 +299,9 @@ class OverlayController: NSObject, NSWindowDelegate, ObservableObject {
     /// Key: NSWindow, Value: Array of BrowserViewControllers
     private var windowBrowserViewControllers: [NSWindow: [BrowserViewController]] = [:]
     
-    
+    /// LocalChatView hosting controllers for local services.
+    /// Key: Service ID, Value: NSHostingController for LocalChatView
+    private var localViewControllers: [String: NSHostingController<LocalChatView>] = [:]
     
     // MARK: - Window Hibernation
     
@@ -753,6 +755,25 @@ class OverlayController: NSObject, NSWindowDelegate, ObservableObject {
         var browserViews: [NSView] = []
         
         for (index, service) in sortedServices.enumerated() {
+            // Handle local services with LocalChatView
+            if case .local(let modelPath, _) = service.backend {
+                let chatView = LocalChatView(modelPath: modelPath)
+                let hostingController = NSHostingController(rootView: chatView)
+                
+                let view = hostingController.view
+                view.translatesAutoresizingMaskIntoConstraints = false
+                
+                view.wantsLayer = true
+                view.layer?.cornerRadius = 8
+                view.layer?.masksToBounds = true
+                
+                browserViews.append(view)
+                self.localViewControllers[service.id] = hostingController
+                
+                print("✅ Created LocalChatView for \(service.name)")
+                continue // Skip to the next service in the loop
+            }
+            
             if let webService = windowServiceManager.webServices[service.id] {
                 let webView = webService.webView
                 let isFirstService = index == 0

@@ -23,6 +23,7 @@
 		6BFC33F8B0074A25A6FD4DBF /* SpaceDetector.swift in Sources */ = {isa = PBXBuildFile; fileRef = EBF9B55FCC48AA0BC1F8AABD /* SpaceDetector.swift */; };
 		B037998FCEB2498C9615DFBE /* AnalyticsManager.swift in Sources */ = {isa = PBXBuildFile; fileRef = C663B2B952774CA1860EB479 /* AnalyticsManager.swift */; };
 		BE36BC292E3AD889009A84CC /* InferenceEngine in Frameworks */ = {isa = PBXBuildFile; productRef = BE36BC282E3AD889009A84CC /* InferenceEngine */; };
+		BE36BC2B2E3AFEB6009A84CC /* LocalChatView.swift in Sources */ = {isa = PBXBuildFile; fileRef = BE36BC2A2E3AFEB6009A84CC /* LocalChatView.swift */; };
 		BE8135E42E01E24D0059C681 /* Sparkle in Frameworks */ = {isa = PBXBuildFile; productRef = BE8135E32E01E24D0059C681 /* Sparkle */; };
 		BEA4CA412E1BB07D00F810E4 /* ClaudeLoginAlertController.swift in Sources */ = {isa = PBXBuildFile; fileRef = BEA4CA3E2E1BB07D00F810E4 /* ClaudeLoginAlertController.swift */; };
 		BEB355BD2E18A3F7000164A8 /* HyperchatApp.swift in Sources */ = {isa = PBXBuildFile; fileRef = BEB355BC2E18A3F7000164A8 /* HyperchatApp.swift */; };
@@ -80,6 +81,7 @@
 		3EE13BB72C4F6B2900A8A61E /* SettingsWindowController.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = SettingsWindowController.swift; sourceTree = "<group>"; };
 		B132E7AF173A41718E328EEE /* Config.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = Config.swift; sourceTree = "<group>"; };
 		BE36BC262E3AD858009A84CC /* InferenceEngine */ = {isa = PBXFileReference; lastKnownFileType = wrapper; name = InferenceEngine; path = ../InferenceEngine; sourceTree = SOURCE_ROOT; };
+		BE36BC2A2E3AFEB6009A84CC /* LocalChatView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; name = LocalChatView.swift; path = Sources/Hyperchat/UI/LocalChatView.swift; sourceTree = "<group>"; };
 		BEA4CA3E2E1BB07D00F810E4 /* ClaudeLoginAlertController.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ClaudeLoginAlertController.swift; sourceTree = "<group>"; };
 		BEB355BC2E18A3F7000164A8 /* HyperchatApp.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = HyperchatApp.swift; sourceTree = "<group>"; };
 		BEB355C02E18A6F4000164A8 /* UI/ButtonState.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = UI/ButtonState.swift; sourceTree = "<group>"; };
@@ -136,6 +138,7 @@
 		3EE13B862C4F6B2900A8A61E = {
 			isa = PBXGroup;
 			children = (
+				BE36BC2A2E3AFEB6009A84CC /* LocalChatView.swift */,
 				3EE13B8D2C4F6B2900A8A61E /* Sources/Hyperchat */,
 				BEC4679A2E164215007B45D0 /* HyperchatTests */,
 				BEC4679D2E164215007B45D0 /* HyperchatUITests */,
@@ -382,6 +385,7 @@
 			isa = PBXSourcesBuildPhase;
 			buildActionMask = 2147483647;
 			files = (
+				BE36BC2B2E3AFEB6009A84CC /* LocalChatView.swift in Sources */,
 				3EE13B9B2C4F6B2900A8A61E /* AppDelegate.swift in Sources */,
 				B037998FCEB2498C9615DFBE /* AnalyticsManager.swift in Sources */,
 				561E6056A5524A0D938FCA3B /* Config.swift in Sources */,

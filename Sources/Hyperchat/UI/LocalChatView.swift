@@ -1,4 +1,5 @@
 import SwiftUI
+import InferenceEngine
 
 // MARK: - Message Structure
 struct ChatMessage: Identifiable, Equatable {
@@ -15,12 +16,9 @@ struct LocalChatView: View {
     @State private var isGenerating: Bool = false
     
     // --- Engine ---
-    // This will hold our inference engine instance.
-    // We will initialize this properly in the next step.
     private var inferenceEngine: InferenceEngine?
 
     // --- Initializer ---
-    // We'll pass the model path from our AIService.
     init(modelPath: String) {
         do {
             self.inferenceEngine = try InferenceEngine(modelPath: modelPath)
@@ -34,7 +32,6 @@ struct LocalChatView: View {
     // --- Body ---
     var body: some View {
         VStack {
-            // --- Message History ---
             ScrollView {
                 VStack(alignment: .leading, spacing: 12) {
                     ForEach(messages) { message in
@@ -44,7 +41,6 @@ struct LocalChatView: View {
                 .padding()
             }
 
-            // --- Input Area ---
             HStack {
                 TextField("Type your message...", text: $inputText)
                     .textFieldStyle(RoundedBorderTextFieldStyle())
@@ -67,36 +63,31 @@ struct LocalChatView: View {
     private func sendMessage() {
         guard !inputText.isEmpty, let engine = inferenceEngine else { return }
         
-        // Add user's message to the history
         let userMessage = ChatMessage(isFromUser: true, text: inputText)
         messages.append(userMessage)
         
         let prompt = inputText
-        inputText = "" // Clear the input field
+        inputText = ""
         isGenerating = true
 
-        // Add a placeholder for the bot's response
         let botMessagePlaceholder = ChatMessage(isFromUser: false, text: "")
         messages.append(botMessagePlaceholder)
         let botMessageIndex = messages.count - 1
         
-        // --- Run Inference ---
         Task {
             do {
                 let stream = await engine.generate(for: prompt)
                 for try await token in stream {
                     DispatchQueue.main.async {
-                        // Append the new token to the bot's message text
                         self.messages[botMessageIndex].text += token
                     }
                 }
             } catch {
-                // TODO: Show error to user
                 print("❌ Inference failed: \(error)")
             }
             
             DispatchQueue.main.async {
-                isGenerating = false // Re-enable input
+                isGenerating = false
             }
         }
     }
