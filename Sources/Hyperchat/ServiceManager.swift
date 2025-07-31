@@ -146,7 +146,7 @@ let defaultServices = [
         name: "Local Llama",
         iconName: "llama-icon", // We'll add an icon later
         backend: .local(
-            modelPath: "/Users/your_username/path/to/your_model.gguf", // <-- EDIT THIS
+            modelPath: "/Users/mattmireles/.lmstudio/models/bartowski/Qwen_Qwen3-30B-A3B-Instruct-2507-GGUF/Qwen_Qwen3-30B-A3B-Instruct-2507-Q4_K_S.gguf", // <-- EDIT THIS
             modelName: "Local Llama"
         ),
         enabled: true,
