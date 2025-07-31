@@ -808,18 +808,18 @@ class ServiceManager: NSObject, ObservableObject {
         }
         
         for service in sortedServices {
-            // Create WebView with proper configuration from WebViewFactory
-            let webView = WebViewFactory.shared.createWebView(for: service)
-            
-            // Set ServiceManager as navigation delegate for sequential loading
-            // We'll hand off to BrowserViewController after initial load
-            webView.navigationDelegate = self
-            webView.uiDelegate = self
-            
-            // Create appropriate WebService implementation based on activation method
-            let webService: WebService
             switch service.backend {
-            case .web(let config):
+            case .web:
+                // Create WebView with proper configuration from WebViewFactory
+                let webView = WebViewFactory.shared.createWebView(for: service)
+                
+                // Set ServiceManager as navigation delegate for sequential loading
+                // We'll hand off to BrowserViewController after initial load
+                webView.navigationDelegate = self
+                webView.uiDelegate = self
+                
+                // Create appropriate WebService implementation based on activation method
+                let webService: WebService
                 if service.id == "claude" {
                     webService = ClaudeService(webView: webView, service: service)
                     print("📋 Created ClaudeService for: \(service.name)")
@@ -827,19 +827,23 @@ class ServiceManager: NSObject, ObservableObject {
                     webService = URLParameterService(webView: webView, service: service)
                     print("📱 Created URLParameterService for: \(service.name)")
                 }
-            case .local(let modelPath, let modelName):
-                // TODO: Handle local services when implementing Phase 5
-                print("🏠 Local service not yet supported: \(modelName)")
-                return
+                
+                // Store web-specific references
+                webServices[service.id] = webService
+                
+                // Add to loading queue for sequential loading
+                serviceLoadingQueue.append(service)
+
+            case .local(_, let modelName):
+                print("🏠 Configuring local service: \(modelName)")
+                // Local services don't have a WebView or a WebService object.
+                // They will be handled directly by OverlayController.
             }
             
-            // Store references and initialize state
-            webServices[service.id] = webService
+            // Add to active services list for the UI
             activeServices.append(service)
+            // Initialize loading state (local services will just stay 'false')
             loadingStates[service.id] = false
-            
-            // Add to loading queue for sequential loading
-            serviceLoadingQueue.append(service)
         }
         
         // Start loading the first service
@@ -1105,7 +1109,7 @@ class ServiceManager: NSObject, ObservableObject {
         // Categorize services by execution method to prevent clipboard conflicts
         let urlParameterServices = activeServices.filter { service in
             switch service.backend {
-            case .web(let config):
+            case .web(_):
                 return service.id != "claude"
             case .local:
                 return false
@@ -1114,7 +1118,7 @@ class ServiceManager: NSObject, ObservableObject {
         
         let clipboardServices = activeServices.filter { service in
             switch service.backend {
-            case .web(let config):
+            case .web(_):
                 return service.id == "claude"
             case .local:
                 return false

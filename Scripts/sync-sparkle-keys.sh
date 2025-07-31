@@ -18,7 +18,15 @@ SCRIPT_DIR=$(cd -- "$(dirname -- "${BASH_SOURCE[0]}")" &> /dev/null && pwd)
 MACOS_DIR=$(dirname "$SCRIPT_DIR")
 INFO_PLIST="${MACOS_DIR}/Info.plist"
 PRIVATE_KEY_PATH="${HOME}/.keys/sparkle_ed_private_key.pem"
-SPARKLE_SIGN_TOOL="${MACOS_DIR}/DerivedData/SourcePackages/artifacts/sparkle/Sparkle/bin/sign_update"
+SPARKLE_SIGN_TOOL="${HOME}/Library/Developer/Xcode/DerivedData/Hyperchat-*/SourcePackages/artifacts/sparkle/Sparkle/bin/sign_update"
+# Find the actual path since DerivedData has a random suffix
+SPARKLE_SIGN_TOOL=$(find ${SPARKLE_SIGN_TOOL} 2>/dev/null | head -1)
+
+# Load environment variables from .env file
+ENV_FILE="${MACOS_DIR}/.env"
+if [[ -f "$ENV_FILE" ]]; then
+    source "$ENV_FILE"
+fi
 
 # Colors for output
 RED='\033[0;31m'
@@ -51,17 +59,24 @@ if [[ ! -f "$INFO_PLIST" ]]; then
     die "Info.plist not found at: $INFO_PLIST"
 fi
 
-if [[ ! -f "$SPARKLE_SIGN_TOOL" ]]; then
-    die "Sparkle sign_update tool not found at: $SPARKLE_SIGN_TOOL (run xcodebuild first to download dependencies)"
-fi
+# Note: The sign_update tool is not currently used since we have the public key in .env
+# Commenting out this check to allow the script to proceed without the tool
+# if [[ ! -f "$SPARKLE_SIGN_TOOL" ]]; then
+#     die "Sparkle sign_update tool not found at: $SPARKLE_SIGN_TOOL (run xcodebuild first to download dependencies)"
+# fi
 
 # Derive the correct public key from the private key
 # if ! CORRECT_PUBLIC_KEY=$("$SPARKLE_SIGN_TOOL" -p "$PRIVATE_KEY_PATH" 2>/dev/null); then
 #     die "Failed to derive public key from private key"
 # fi
 
-# Hardcoded public key for testing
-CORRECT_PUBLIC_KEY="${SPARKLE_PUBLIC_KEY:-YOUR_SPARKLE_PUBLIC_KEY_HERE}"
+# Use public key from environment variable (loaded from .env file)
+CORRECT_PUBLIC_KEY="${SPARKLE_PUBLIC_KEY:-}"
+
+# Verify we have a valid public key
+if [[ -z "$CORRECT_PUBLIC_KEY" ]]; then
+    die "SPARKLE_PUBLIC_KEY environment variable not set. Check .env file."
+fi
 
 
 # Read the current public key from Info.plist

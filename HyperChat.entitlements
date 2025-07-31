@@ -39,5 +39,8 @@
 	<true/>
 	<key>com.apple.security.files.user-selected.read-write</key>
 	<true/>
+	<!-- TEMPORARY: Disable sandbox for local model development -->
+	<key>com.apple.security.app-sandbox</key>
+	<false/>
 </dict>
 </plist>
