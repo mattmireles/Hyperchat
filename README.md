@@ -3,6 +3,7 @@
 ## Table of Contents
 
 - [High-Level Overview](#high-level-overview)
+- [Local LLM Inference Support](#local-llm-inference-support)
 - [Core Components & Interaction Flow](#core-components--interaction-flow)
 - [Key Architectural Patterns](#key-architectural-patterns)
 - [Development Infrastructure](#development-infrastructure)
@@ -13,7 +14,159 @@
 
 ## High-Level Overview
 
-Hyperchat is a native macOS application that provides a multi-service interface to various AIs. The user can summon a prompt window via a floating button, enter a query, and see the results across multiple services simultaneously in a unified overlay window. The architecture is event-driven, using a combination of NSNotificationCenter for cross-module communication and Combine publishers for direct state updates between related components.
+Hyperchat is a native macOS application that provides a unified multi-service interface to both web-based and local AI services. Users can summon a prompt window via a floating button, enter a query, and see results across multiple services simultaneously in a unified overlay window. The application supports both web-based services (ChatGPT, Claude, Perplexity, Google) via WKWebView automation and local language models via native inference engines with llama.cpp integration.
+
+The architecture is event-driven, using a combination of NSNotificationCenter for cross-module communication and Combine publishers for direct state updates between related components. The dual-backend architecture allows seamless integration of cloud and local AI services within the same interface.
+
+## Local LLM Inference Support
+
+Hyperchat includes comprehensive support for running local language models directly on the user's machine, providing privacy, offline capability, and full control over AI interactions alongside web-based services.
+
+### Architecture Overview
+
+The local inference system is built around a clean separation of concerns:
+
+- **InferenceEngine Module**: A dedicated Swift Package that encapsulates all local inference logic
+- **Dual-Backend ServiceManager**: Intelligently routes prompts to either web services or local inference
+- **Native UI Integration**: LocalChatView provides a native SwiftUI interface for local model interactions
+- **Unified User Experience**: Local and web services appear seamlessly in the same horizontal layout
+
+### Core Components
+
+#### 1. InferenceEngine Swift Package (`Sources/InferenceEngine/`)
+
+A self-contained local Swift Package that provides the inference infrastructure:
+
+**InferenceEngine.swift**:
+- **Thread-Safe Actor**: Implements Swift's `actor` pattern for safe concurrent access to the inference engine
+- **llama.cpp Integration**: Clean Swift wrapper around the llama.cpp C API with proper memory management
+- **Streaming Interface**: Returns `AsyncThrowingStream<String, Error>` for real-time token generation
+- **Resource Management**: Automatic cleanup of model and context resources via `deinit`
+- **Error Handling**: Comprehensive error types for model loading, context creation, and inference failures
+
+**CMistral Module**:
+- **Static Library**: Pre-compiled `libllama.a` with Metal acceleration for Apple Silicon
+- **Header Bridge**: Complete C header bridge including `llama.h`, `ggml.h`, and related headers
+- **Module Map**: Proper module definition for Swift interoperability
+
+#### 2. ServiceBackend Architecture
+
+**ServiceBackend Enum** (`ServiceConfiguration.swift`):
+```swift
+public enum ServiceBackend {
+    case web(config: ServiceURLConfig)    // Web-based services
+    case local(modelPath: String, modelName: String)  // Local inference
+}
+```
+
+This architectural foundation enables:
+- **Type Safety**: Compile-time guarantees about service capabilities
+- **Unified Configuration**: Both service types managed through the same configuration system
+- **Clean Separation**: Web and local services have distinct but parallel implementation paths
+
+#### 3. Native Chat Interface
+
+**LocalChatView** (`Sources/Hyperchat/UI/LocalChatView.swift`):
+- **SwiftUI Native**: Pure SwiftUI implementation with no web dependencies
+- **Real-Time Streaming**: Handles token streaming from InferenceEngine with live UI updates
+- **Message Management**: Chat history with user/assistant message bubbles
+- **Error Handling**: Graceful handling of inference failures and model loading errors
+- **Accessibility**: Full VoiceOver support and keyboard navigation
+
+**UI Integration** (`OverlayController.swift`):
+- **Intelligent Switching**: Automatically displays LocalChatView for `.local` services and WKWebView for `.web` services
+- **Consistent Styling**: Local chat views receive the same visual treatment (corner radius, constraints) as web services
+- **Layout Parity**: Local services appear in the same horizontal stack as web services
+- **Lifecycle Management**: Proper creation, retention, and cleanup of NSHostingController instances
+
+### Usage & Configuration
+
+#### Adding Local Models
+
+1. **Obtain GGUF Model**: Download or convert a model to GGUF format
+2. **Update Service Configuration**: Edit the `local_llama` service in `ServiceManager.swift`:
+   ```swift
+   AIService(
+       id: "local_llama",
+       name: "Local Llama",
+       iconName: "llama-icon",
+       backend: .local(
+           modelPath: "/path/to/your/model.gguf", // Update this path
+           modelName: "Your Model Name"
+       ),
+       enabled: true,
+       order: 99
+   )
+   ```
+3. **Model Requirements**: GGUF format models compatible with llama.cpp
+
+#### Performance Characteristics
+
+- **Apple Silicon Optimized**: Metal acceleration for M1/M2/M3 processors
+- **Memory Efficient**: Automatic context management with configurable limits
+- **Concurrent Safe**: Actor-based design prevents race conditions
+- **Resource Cleanup**: Automatic memory cleanup prevents leaks
+
+#### Model Compatibility
+
+The inference engine supports:
+- **GGUF Format**: Modern llama.cpp model format
+- **Various Architectures**: Llama, Mistral, CodeLlama, and compatible models
+- **Quantization Levels**: Q4, Q5, Q8, F16, and other quantization formats
+- **Context Sizes**: Configurable context windows up to model limits
+
+### Integration Flow
+
+#### Local Service Execution Path
+
+1. **Service Detection**: ServiceManager identifies `.local` backend in service configuration
+2. **UI Creation**: OverlayController creates LocalChatView instead of WKWebView
+3. **Engine Initialization**: InferenceEngine loads model from specified path
+4. **User Interaction**: Native SwiftUI interface handles user input
+5. **Inference Execution**: Streaming token generation via AsyncThrowingStream
+6. **Real-Time Display**: UI updates with each generated token
+7. **Message Management**: Chat history maintained in SwiftUI state
+
+#### Error Handling & Recovery
+
+- **Model Loading Failures**: Clear error messages for missing or invalid models
+- **Memory Issues**: Graceful handling of insufficient memory conditions
+- **Inference Errors**: Retry mechanisms and user-friendly error display
+- **Path Validation**: File system checks before attempting model loads
+
+### Development & Debugging
+
+#### Local Inference Development
+
+```swift
+// Create inference engine
+let engine = try InferenceEngine(modelPath: "/path/to/model.gguf")
+
+// Generate streaming response
+let stream = await engine.generate(for: "Your prompt here")
+for try await token in stream {
+    print(token, terminator: "")
+}
+```
+
+#### Debugging Tools
+
+- **Console Logging**: Comprehensive logging throughout the inference pipeline
+- **Error Messages**: Detailed error information for troubleshooting
+- **Performance Monitoring**: Token generation speed and memory usage tracking
+- **Model Validation**: File existence and format checking
+
+### Future Enhancements
+
+The local inference architecture is designed for extensibility:
+
+- **Multiple Model Support**: Framework supports multiple concurrent local models
+- **Advanced Sampling**: Temperature, top-p, and other sampling parameters
+- **Fine-Tuning Integration**: Potential for local model fine-tuning workflows
+- **Model Management**: Automatic downloading and model library management
+- **Performance Optimization**: Batch processing and advanced caching strategies
+
+This local inference support represents a significant architectural achievement, providing users with complete control over their AI interactions while maintaining the unified, seamless experience that defines Hyperchat.
 
 ## Core Components & Interaction Flow
 
@@ -50,13 +203,19 @@ Here is the step-by-step flow of a typical user interaction:
 
 ### 5. ServiceManager (The Engine)
 
-- **Job:** Core orchestration unit that manages AI services and executes prompts. Refactored to focus solely on service management (reduced from 1600+ to under 900 lines).
+- **Job:** Core orchestration unit that manages both web-based and local AI services. Implements dual-backend architecture to seamlessly handle different service types.
 - **Interaction:**
-- **Service Setup**: Uses WebViewFactory to create WKWebViews, manages sequential loading of services
+- **Service Setup**: 
+  - **Web Services**: Uses WebViewFactory to create WKWebViews, manages sequential loading
+  - **Local Services**: Currently skipped in setup phase (handled directly by OverlayController)
 - **State Updates**: Publishes loading state via Combine (`@Published var areAllServicesLoaded`) and input focus events via `focusInputPublisher`
-- **Executes Prompt**: It iterates through its list of active services and tells each one to execute the prompt. The method of execution depends on the service type:
-- **URLParameterService (Google, Perplexity, etc.)**: Constructs a URL with the prompt as a query parameter (e.g., google.com/search?q=...) and tells the corresponding WKWebView to load it.
-- **ClaudeService (and "Reply to All" mode)**: Navigates to the service's base URL and uses JavaScriptProvider to inject scripts that find the chat input, paste the prompt, and programmatically click the "submit" button.
+- **Backend-Aware Execution**: Routes prompts based on ServiceBackend type:
+  - **`.web` Services**: Creates URLParameterService or ClaudeService implementations
+  - **`.local` Services**: Handled by OverlayController with LocalChatView integration
+- **Prompt Execution Methods**:
+  - **URLParameterService (Google, Perplexity, etc.)**: Constructs URLs with query parameters
+  - **ClaudeService**: Uses JavaScriptProvider for clipboard paste automation
+  - **Local Services**: Direct integration with InferenceEngine via LocalChatView
 - **Delegate Handoff**: After initial load, hands navigation control to BrowserViewController
 
 ### 6. WebViewFactory (The Builder)
@@ -82,7 +241,17 @@ Here is the step-by-step flow of a typical user interaction:
 - **Layout Only**: Manages visual arrangement of WebView, toolbar, and URL field
 - **No Logic**: Delegates all actions to BrowserViewController
 
-### 9. UI Components (The Toolkit)
+### 9. LocalChatView (The Native Interface)
+
+- **Job:** Native SwiftUI interface for local language model interactions
+- **Interaction:**
+- **Message Management**: Maintains chat history with user/assistant message bubbles
+- **Real-Time Streaming**: Handles token streaming from InferenceEngine with live UI updates
+- **Direct Integration**: Communicates directly with InferenceEngine actor for inference
+- **Error Handling**: Graceful handling of model loading failures and inference errors
+- **Native Experience**: Pure SwiftUI implementation with accessibility support
+
+### 10. UI Components (The Toolkit)
 
 - **ButtonState**: Observable state model for toolbar buttons
 - **GradientToolbarButton**: SwiftUI component for animated toolbar buttons
@@ -107,11 +276,17 @@ Here is the step-by-step flow of a typical user interaction:
 
 ## Key Architectural Patterns
 
+- **Dual-Backend Architecture**: 
+  - **ServiceBackend Enum**: Type-safe separation between `.web` and `.local` services
+  - **Unified Configuration**: Both backend types managed through the same AIService configuration system
+  - **Intelligent UI Switching**: OverlayController automatically displays WKWebView for web services and LocalChatView for local services
+  - **Clean Separation**: Web automation and local inference have distinct but parallel implementation paths
 - **Hybrid Communication Model**: 
   - **NSNotificationCenter**: Used for cross-module events where loose coupling is beneficial (e.g., .showOverlay, .overlayDidHide)
   - **Combine Publishers**: Used for direct state updates between tightly related components (e.g., ServiceManager to OverlayController loading states)
 - **Dedicated ServiceManager per Window**: Each OverlayWindow gets its own ServiceManager. This is a critical design choice for stability, isolating the web environments from each other and preventing crashes in one window from affecting others.
 - **Shared WKProcessPool**: While each window has its own ServiceManager, all WKWebViews share a single WKProcessPool. This is a key memory optimization that significantly reduces the app's overall footprint.
+- **Actor-Based Concurrency**: InferenceEngine uses Swift's actor pattern for thread-safe local model access
 - **Factory Pattern**: WebViewFactory centralizes all WKWebView configuration, ensuring consistency and easier maintenance.
 - **MVC Separation**: BrowserViewController (controller) handles browser logic while BrowserView (view) handles pure UI layout.
 - **Delegate Handoff**: ServiceManager manages initial load with sequential queue, then hands navigation control to BrowserViewController for ongoing interaction.
@@ -143,7 +318,15 @@ The project uses Swift Package Manager with key dependencies:
 
 - **Sparkle** (2.6.0+): Automatic update framework for macOS applications
 - **AmplitudeSwift** (1.0.0+): Analytics and usage tracking
+- **InferenceEngine** (Local): Local Swift Package for LLM inference with llama.cpp integration
 - **Test Targets**: Separate test targets for unit tests (`HyperchatTests`) and UI tests (`HyperchatUITests`)
+
+#### Local Package Structure
+
+- **InferenceEngine Package** (`Sources/InferenceEngine/`):
+  - **CMistral Module**: C wrapper with pre-compiled `libllama.a` and header bridge
+  - **InferenceEngine Module**: Swift actor implementation for local model inference
+  - **Metal Acceleration**: Optimized for Apple Silicon with GPU acceleration
 
 ### Build System Integration
 
@@ -354,11 +537,35 @@ xcodebuild build-for-testing -scheme Hyperchat -destination 'platform=macOS'
 ./Export/Hyperchat.app/Contents/MacOS/Hyperchat
 ```
 
+### Local Inference Development
+
+```bash
+# Test local inference in isolation
+# 1. Build the InferenceEngine package
+xcodebuild -scheme InferenceEngine -destination 'platform=macOS'
+
+# 2. Test with a sample model (requires GGUF model file)
+# Update the modelPath in ServiceManager.swift first
+```
+
+#### Model Setup
+1. **Obtain GGUF Model**: Download from Hugging Face or convert existing model
+2. **Update Service Configuration**: Edit `local_llama` service in `ServiceManager.swift`
+3. **Verify Model Path**: Ensure file exists and is accessible
+4. **Test Integration**: Enable local service and test in UI
+
+#### Local Inference Debugging
+- **Model Loading**: Check console for InferenceEngine initialization messages
+- **Memory Usage**: Monitor memory consumption during inference
+- **Performance**: Track token generation speed and inference latency
+- **Error Handling**: Test with invalid model paths and formats
+
 ### Configuration Management
 
 1. **Set up Config.swift**: Copy `Config.swift.template` to `Config.swift` and add API keys
 2. **Development vs Release**: Use appropriate entitlements file for target environment
 3. **Sparkle Setup**: Ensure private key exists at `~/.keys/sparkle_ed_private_key.pem`
+4. **Local Models**: Configure GGUF model paths for local inference services
 
 ### Common Troubleshooting
 
@@ -367,6 +574,11 @@ xcodebuild build-for-testing -scheme Hyperchat -destination 'platform=macOS'
 - **WebView Issues**: Enable WebViewLogger and check console output
 - **Menu Problems**: Use menu debugging scripts and check accessibility settings
 - **Signing Issues**: Verify certificate identity and provisioning profiles
+- **Local Inference Issues**: 
+  - Check model file exists at specified path
+  - Verify GGUF format compatibility
+  - Monitor memory usage (models can require 4-16GB RAM)
+  - Check console for InferenceEngine error messages
 
 ### Performance Optimization
 
