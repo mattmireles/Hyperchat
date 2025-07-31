@@ -144,8 +144,8 @@ class WebViewCoordinator: NSObject, ObservableObject, WKScriptMessageHandler, WK
     private func loadLocalHTML() {
         guard let webView = webView else { return }
         
-        // Get path to local HTML file
-        guard let htmlPath = Bundle.main.path(forResource: "local_chat", ofType: "html", inDirectory: "UI/LocalChatView"),
+        // Get path to local HTML file from bundle
+        guard let htmlPath = Bundle.main.path(forResource: "local_chat", ofType: "html"),
               let htmlURL = URL(string: "file://\(htmlPath)") else {
             print("❌ Could not find local_chat.html in app bundle")
             loadFallbackHTML()
@@ -156,7 +156,7 @@ class WebViewCoordinator: NSObject, ObservableObject, WKScriptMessageHandler, WK
         let request = URLRequest(url: htmlURL)
         webView.load(request)
         
-        print("✅ Loading local chat HTML from: \(htmlPath)")
+        print("✅ Loading local chat HTML from bundle: \(htmlPath)")
     }
     
     private func loadFallbackHTML() {
