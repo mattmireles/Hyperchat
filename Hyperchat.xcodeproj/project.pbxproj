@@ -20,9 +20,8 @@
 		3EE13BB42C4F6B2900A8A61E /* SettingsManager.swift in Sources */ = {isa = PBXBuildFile; fileRef = 3EE13BB52C4F6B2900A8A61E /* SettingsManager.swift */; };
 		3EE13BB62C4F6B2900A8A61E /* SettingsWindowController.swift in Sources */ = {isa = PBXBuildFile; fileRef = 3EE13BB72C4F6B2900A8A61E /* SettingsWindowController.swift */; };
 		561E6056A5524A0D938FCA3B /* Config.swift in Sources */ = {isa = PBXBuildFile; fileRef = B132E7AF173A41718E328EEE /* Config.swift */; };
-		LM001001LOCALMODEL001234 /* LocalModel.swift in Sources */ = {isa = PBXBuildFile; fileRef = LM001002LOCALMODEL001234 /* LocalModel.swift */; };
-		MM001001MODELMANAG001234 /* ModelManager.swift in Sources */ = {isa = PBXBuildFile; fileRef = MM001002MODELMANAG001234 /* ModelManager.swift */; };
 		6BFC33F8B0074A25A6FD4DBF /* SpaceDetector.swift in Sources */ = {isa = PBXBuildFile; fileRef = EBF9B55FCC48AA0BC1F8AABD /* SpaceDetector.swift */; };
+		ANIMATIONHELPERS2E3AFEB6009A84CD /* UI/Components/AnimationHelpers.swift in Sources */ = {isa = PBXBuildFile; fileRef = ANIMATIONHELPERS2E3AFEB6009A84CC /* UI/Components/AnimationHelpers.swift */; };
 		B037998FCEB2498C9615DFBE /* AnalyticsManager.swift in Sources */ = {isa = PBXBuildFile; fileRef = C663B2B952774CA1860EB479 /* AnalyticsManager.swift */; };
 		BE36BC2B2E3AFEB6009A84CC /* LocalChatView.swift in Sources */ = {isa = PBXBuildFile; fileRef = BE36BC2A2E3AFEB6009A84CC /* LocalChatView.swift */; };
 		BE8135E42E01E24D0059C681 /* Sparkle in Frameworks */ = {isa = PBXBuildFile; productRef = BE8135E32E01E24D0059C681 /* Sparkle */; };
@@ -54,12 +53,8 @@
 		LIBGGMLCPU2E3AFEB6009A84CD /* libggml-cpu.a in Frameworks */ = {isa = PBXBuildFile; fileRef = LIBGGMLCPU2E3AFEB6009A84CC /* libggml-cpu.a */; };
 		LIBGGMLMETAL2E3AFEB6009A84CD /* libggml-metal.a in Frameworks */ = {isa = PBXBuildFile; fileRef = LIBGGMLMETAL2E3AFEB6009A84CC /* libggml-metal.a */; };
 		LIBLLAMA2E3AFEB6009A84CD /* libllama.a in Frameworks */ = {isa = PBXBuildFile; fileRef = LIBLLAMA2E3AFEB6009A84CC /* libllama.a */; };
-		CHATMESSAGE2E3AFEB6009A84CD /* ChatMessage.swift in Sources */ = {isa = PBXBuildFile; fileRef = CHATMESSAGE2E3AFEB6009A84CC /* ChatMessage.swift */; };
-		LOCALLMMHEADER2E3AFEB6009A84CD /* LocalLLMHeader.swift in Sources */ = {isa = PBXBuildFile; fileRef = LOCALLMMHEADER2E3AFEB6009A84CC /* LocalLLMHeader.swift */; };
-		MESSAGEBUBBLE2E3AFEB6009A84CD /* MessageBubble.swift in Sources */ = {isa = PBXBuildFile; fileRef = MESSAGEBUBBLE2E3AFEB6009A84CC /* MessageBubble.swift */; };
-		MARKDOWNVIEW2E3AFEB6009A84CD /* MarkdownView.swift in Sources */ = {isa = PBXBuildFile; fileRef = MARKDOWNVIEW2E3AFEB6009A84CC /* MarkdownView.swift */; };
-		FILEATTACHMENTVIEW2E3AFEB6009A84CD /* FileAttachmentView.swift in Sources */ = {isa = PBXBuildFile; fileRef = FILEATTACHMENTVIEW2E3AFEB6009A84CC /* FileAttachmentView.swift */; };
-		ANIMATIONHELPERS2E3AFEB6009A84CD /* AnimationHelpers.swift in Sources */ = {isa = PBXBuildFile; fileRef = ANIMATIONHELPERS2E3AFEB6009A84CC /* AnimationHelpers.swift */; };
+		LM001001LOCALMODEL001234 /* LocalModel.swift in Sources */ = {isa = PBXBuildFile; fileRef = LM001002LOCALMODEL001234 /* LocalModel.swift */; };
+		MM001001MODELMANAG001234 /* ModelManager.swift in Sources */ = {isa = PBXBuildFile; fileRef = MM001002MODELMANAG001234 /* ModelManager.swift */; };
 /* End PBXBuildFile section */
 
 /* Begin PBXContainerItemProxy section */
@@ -92,10 +87,9 @@
 		3EE13BA72C4F6B2900A8A61E /* NSScreen+Extensions.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = "NSScreen+Extensions.swift"; sourceTree = "<group>"; };
 		3EE13BA82C4F6B2900A8A61E /* ServiceConfiguration.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ServiceConfiguration.swift; sourceTree = "<group>"; };
 		3EE13BB32C4F6B2900A8A61E /* Orbitron-Bold.ttf */ = {isa = PBXFileReference; lastKnownFileType = file; path = "Orbitron-Bold.ttf"; sourceTree = "<group>"; };
-		LM001002LOCALMODEL001234 /* LocalModel.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = LocalModel.swift; sourceTree = "<group>"; };
-		MM001002MODELMANAG001234 /* ModelManager.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ModelManager.swift; sourceTree = "<group>"; };
 		3EE13BB52C4F6B2900A8A61E /* SettingsManager.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = SettingsManager.swift; sourceTree = "<group>"; };
 		3EE13BB72C4F6B2900A8A61E /* SettingsWindowController.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = SettingsWindowController.swift; sourceTree = "<group>"; };
+		ANIMATIONHELPERS2E3AFEB6009A84CC /* UI/Components/AnimationHelpers.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = UI/Components/AnimationHelpers.swift; sourceTree = "<group>"; };
 		B132E7AF173A41718E328EEE /* Config.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = Config.swift; sourceTree = "<group>"; };
 		BE36BC2A2E3AFEB6009A84CC /* LocalChatView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; name = LocalChatView.swift; path = Sources/Hyperchat/LocalChatView.swift; sourceTree = "<group>"; };
 		BEA4CA3E2E1BB07D00F810E4 /* ClaudeLoginAlertController.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ClaudeLoginAlertController.swift; sourceTree = "<group>"; };
@@ -129,12 +123,8 @@
 		LIBGGMLCPU2E3AFEB6009A84CC /* libggml-cpu.a */ = {isa = PBXFileReference; lastKnownFileType = archive.ar; name = "libggml-cpu.a"; path = "llama.cpp/build/ggml/src/libggml-cpu.a"; sourceTree = SOURCE_ROOT; };
 		LIBGGMLMETAL2E3AFEB6009A84CC /* libggml-metal.a */ = {isa = PBXFileReference; lastKnownFileType = archive.ar; name = "libggml-metal.a"; path = "llama.cpp/build/ggml/src/ggml-metal/libggml-metal.a"; sourceTree = SOURCE_ROOT; };
 		LIBLLAMA2E3AFEB6009A84CC /* libllama.a */ = {isa = PBXFileReference; lastKnownFileType = archive.ar; name = libllama.a; path = llama.cpp/build/src/libllama.a; sourceTree = SOURCE_ROOT; };
-		CHATMESSAGE2E3AFEB6009A84CC /* ChatMessage.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = "Models/ChatMessage.swift"; sourceTree = "<group>"; };
-		LOCALLMMHEADER2E3AFEB6009A84CC /* LocalLLMHeader.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = "UI/Components/LocalLLMHeader.swift"; sourceTree = "<group>"; };
-		MESSAGEBUBBLE2E3AFEB6009A84CC /* MessageBubble.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = "UI/Components/MessageBubble.swift"; sourceTree = "<group>"; };
-		MARKDOWNVIEW2E3AFEB6009A84CC /* MarkdownView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = "UI/Components/MarkdownView.swift"; sourceTree = "<group>"; };
-		FILEATTACHMENTVIEW2E3AFEB6009A84CC /* FileAttachmentView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = "UI/Components/FileAttachmentView.swift"; sourceTree = "<group>"; };
-		ANIMATIONHELPERS2E3AFEB6009A84CC /* AnimationHelpers.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = "UI/Components/AnimationHelpers.swift"; sourceTree = "<group>"; };
+		LM001002LOCALMODEL001234 /* LocalModel.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = LocalModel.swift; sourceTree = "<group>"; };
+		MM001002MODELMANAG001234 /* ModelManager.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ModelManager.swift; sourceTree = "<group>"; };
 /* End PBXFileReference section */
 
 /* Begin PBXFileSystemSynchronizedRootGroup section */
@@ -229,11 +219,6 @@
 				BEE13BB12C4F6B2900A8A61E /* AutoInstaller.swift */,
 				EB2CF06672284D57B0FCBCA6 /* FaviconFetcher.swift */,
 				INFENGINE2E3AFEB6009A84CC /* InferenceEngine.swift */,
-				CHATMESSAGE2E3AFEB6009A84CC /* Models/ChatMessage.swift */,
-				LOCALLMMHEADER2E3AFEB6009A84CC /* UI/Components/LocalLLMHeader.swift */,
-				MESSAGEBUBBLE2E3AFEB6009A84CC /* UI/Components/MessageBubble.swift */,
-				MARKDOWNVIEW2E3AFEB6009A84CC /* UI/Components/MarkdownView.swift */,
-				FILEATTACHMENTVIEW2E3AFEB6009A84CC /* UI/Components/FileAttachmentView.swift */,
 				ANIMATIONHELPERS2E3AFEB6009A84CC /* UI/Components/AnimationHelpers.swift */,
 				3EE13BB52C4F6B2900A8A61E /* SettingsManager.swift */,
 				3EE13BB72C4F6B2900A8A61E /* SettingsWindowController.swift */,
@@ -473,12 +458,7 @@
 				BEC2A9A32E18A24500785B53 /* JavaScriptProvider.swift in Sources */,
 				3EE13BB42C4F6B2900A8A61E /* SettingsManager.swift in Sources */,
 				3EE13BB62C4F6B2900A8A61E /* SettingsWindowController.swift in Sources */,
-				CHATMESSAGE2E3AFEB6009A84CD /* ChatMessage.swift in Sources */,
-				LOCALLMMHEADER2E3AFEB6009A84CD /* LocalLLMHeader.swift in Sources */,
-				MESSAGEBUBBLE2E3AFEB6009A84CD /* MessageBubble.swift in Sources */,
-				MARKDOWNVIEW2E3AFEB6009A84CD /* MarkdownView.swift in Sources */,
-				FILEATTACHMENTVIEW2E3AFEB6009A84CD /* FileAttachmentView.swift in Sources */,
-				ANIMATIONHELPERS2E3AFEB6009A84CD /* AnimationHelpers.swift in Sources */,
+				ANIMATIONHELPERS2E3AFEB6009A84CD /* UI/Components/AnimationHelpers.swift in Sources */,
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 		};
@@ -561,6 +541,7 @@
 					"$(PROJECT_DIR)/llama.cpp/build/ggml/src/ggml-blas",
 					"$(PROJECT_DIR)/llama.cpp/build/ggml/src/ggml-metal",
 					"$(PROJECT_DIR)/llama.cpp/build/common",
+					"$(PROJECT_DIR)/llama.cpp/build-macos/common/Release",
 				);
 				MACOSX_DEPLOYMENT_TARGET = 14.0;
 				MARKETING_VERSION = 1.0;
@@ -626,6 +607,7 @@
 					"$(PROJECT_DIR)/llama.cpp/build/ggml/src/ggml-blas",
 					"$(PROJECT_DIR)/llama.cpp/build/ggml/src/ggml-metal",
 					"$(PROJECT_DIR)/llama.cpp/build/common",
+					"$(PROJECT_DIR)/llama.cpp/build-macos/common/Release",
 				);
 				MACOSX_DEPLOYMENT_TARGET = 14.0;
 				MARKETING_VERSION = 1.0;

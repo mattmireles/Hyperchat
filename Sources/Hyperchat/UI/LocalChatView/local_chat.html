@@ -1,0 +1,645 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Local LLM Chat</title>
+    
+    <!-- External Libraries -->
+    <script src="https://cdn.jsdelivr.net/npm/marked@9.1.6/marked.min.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/highlight.js@11.9.0/lib/highlight.min.js"></script>
+    <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/highlight.js@11.9.0/styles/github-dark.min.css">
+
+    <style>
+        /* CSS Variables for Theme Support */
+        :root {
+            --primary-gradient-start: rgb(255, 0, 204);  /* Pink */
+            --primary-gradient-mid: rgb(153, 51, 204);   /* Purple */
+            --primary-gradient-end: rgb(0, 153, 255);    /* Blue */
+            
+            --background-primary: rgb(245, 245, 247);    /* Light background */
+            --background-secondary: rgba(255, 255, 255, 0.8);
+            --text-primary: rgb(28, 30, 33);
+            --text-secondary: rgb(99, 102, 112);
+            --border-color: rgba(0, 0, 0, 0.1);
+            
+            --message-max-width: 75%;
+            --message-padding: 16px;
+            --message-border-radius: 16px;
+            --content-padding: 20px;
+            --message-spacing: 16px;
+        }
+
+        /* Dark mode support */
+        @media (prefers-color-scheme: dark) {
+            :root {
+                --background-primary: rgb(28, 30, 33);
+                --background-secondary: rgba(42, 45, 50, 0.8);
+                --text-primary: rgb(245, 245, 247);
+                --text-secondary: rgb(152, 157, 172);
+                --border-color: rgba(255, 255, 255, 0.1);
+            }
+        }
+
+        /* Base Styles */
+        * {
+            box-sizing: border-box;
+            margin: 0;
+            padding: 0;
+        }
+
+        body {
+            font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+            background: var(--background-primary);
+            color: var(--text-primary);
+            height: 100vh;
+            overflow: hidden;
+        }
+
+        #app {
+            display: flex;
+            flex-direction: column;
+            height: 100vh;
+            width: 100%;
+        }
+
+        /* Chat History Container */
+        #chat-history {
+            flex: 1;
+            overflow-y: auto;
+            padding: var(--content-padding);
+            scroll-behavior: smooth;
+        }
+
+        /* Message Styles */
+        .message {
+            display: flex;
+            margin-bottom: var(--message-spacing);
+            animation: messageAppear 0.6s ease-out;
+        }
+
+        .message.user {
+            justify-content: flex-end;
+        }
+
+        .message.assistant {
+            justify-content: flex-start;
+        }
+
+        .message-bubble {
+            max-width: var(--message-max-width);
+            padding: var(--message-padding);
+            border-radius: var(--message-border-radius);
+            word-wrap: break-word;
+            position: relative;
+            transition: transform 0.2s ease, box-shadow 0.2s ease;
+        }
+
+        .message-bubble:hover {
+            transform: scale(1.02);
+            box-shadow: 0 8px 25px rgba(0, 0, 0, 0.15);
+        }
+
+        /* User Message Styling - Gradient Background */
+        .message.user .message-bubble {
+            background: linear-gradient(135deg, 
+                var(--primary-gradient-start), 
+                var(--primary-gradient-mid), 
+                var(--primary-gradient-end)
+            );
+            color: white;
+        }
+
+        /* Assistant Message Styling - Glass Morphism */
+        .message.assistant .message-bubble {
+            background: var(--background-secondary);
+            backdrop-filter: blur(10px);
+            border: 1px solid var(--border-color);
+            color: var(--text-primary);
+        }
+
+        /* Typing Indicator */
+        .typing-indicator {
+            display: flex;
+            align-items: center;
+            gap: 8px;
+            color: var(--text-secondary);
+            font-size: 14px;
+            font-weight: 500;
+        }
+
+        .typing-dots {
+            display: flex;
+            gap: 4px;
+        }
+
+        .typing-dot {
+            width: 6px;
+            height: 6px;
+            border-radius: 50%;
+            background: var(--text-secondary);
+            animation: typingDot 1.5s infinite;
+        }
+
+        .typing-dot:nth-child(2) {
+            animation-delay: 0.2s;
+        }
+
+        .typing-dot:nth-child(3) {
+            animation-delay: 0.4s;
+        }
+
+        /* Input Form */
+        #chat-form {
+            padding: var(--content-padding);
+            background: var(--background-secondary);
+            border-top: 1px solid var(--border-color);
+            backdrop-filter: blur(10px);
+        }
+
+        #message-input {
+            width: 100%;
+            min-height: 44px;
+            max-height: 120px;
+            padding: 12px 16px;
+            border: 1px solid var(--border-color);
+            border-radius: 12px;
+            background: var(--background-primary);
+            color: var(--text-primary);
+            font-family: inherit;
+            font-size: 14px;
+            resize: vertical;
+            outline: none;
+            transition: border-color 0.2s ease;
+        }
+
+        #message-input:focus {
+            border-color: var(--primary-gradient-end);
+        }
+
+        #message-input::placeholder {
+            color: var(--text-secondary);
+        }
+
+        #submit-button {
+            display: none; /* Hidden, form submits on Enter */
+        }
+
+        /* Empty State */
+        .empty-state {
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            justify-content: center;
+            height: 100%;
+            text-align: center;
+            gap: 24px;
+        }
+
+        .empty-state-icon {
+            font-size: 72px;
+            background: linear-gradient(135deg, 
+                var(--primary-gradient-start), 
+                var(--primary-gradient-mid), 
+                var(--primary-gradient-end)
+            );
+            -webkit-background-clip: text;
+            -webkit-text-fill-color: transparent;
+            background-clip: text;
+        }
+
+        .empty-state-title {
+            font-size: 28px;
+            font-weight: 300;
+            background: linear-gradient(90deg, 
+                var(--primary-gradient-start), 
+                var(--primary-gradient-end)
+            );
+            -webkit-background-clip: text;
+            -webkit-text-fill-color: transparent;
+            background-clip: text;
+        }
+
+        .empty-state-subtitle {
+            font-size: 16px;
+            color: var(--text-secondary);
+            opacity: 0.8;
+        }
+
+        /* Markdown Styles */
+        .message-content h1, .message-content h2, .message-content h3 {
+            margin-top: 16px;
+            margin-bottom: 8px;
+        }
+
+        .message-content h1:first-child,
+        .message-content h2:first-child,
+        .message-content h3:first-child {
+            margin-top: 0;
+        }
+
+        .message-content p {
+            margin-bottom: 12px;
+            line-height: 1.5;
+        }
+
+        .message-content p:last-child {
+            margin-bottom: 0;
+        }
+
+        .message-content ul, .message-content ol {
+            margin-left: 20px;
+            margin-bottom: 12px;
+        }
+
+        .message-content li {
+            margin-bottom: 4px;
+        }
+
+        .message-content pre {
+            background: rgba(0, 0, 0, 0.1);
+            border-radius: 8px;
+            padding: 12px;
+            margin: 12px 0;
+            overflow-x: auto;
+        }
+
+        .message-content code {
+            background: rgba(0, 0, 0, 0.1);
+            padding: 2px 4px;
+            border-radius: 4px;
+            font-family: 'SF Mono', Monaco, 'Cascadia Code', 'Roboto Mono', Consolas, 'Courier New', monospace;
+        }
+
+        .message-content pre code {
+            background: none;
+            padding: 0;
+        }
+
+        .message-content blockquote {
+            border-left: 3px solid var(--text-secondary);
+            padding-left: 12px;
+            margin: 12px 0;
+            opacity: 0.8;
+        }
+
+        /* Animations */
+        @keyframes messageAppear {
+            from {
+                opacity: 0;
+                transform: translateY(20px);
+            }
+            to {
+                opacity: 1;
+                transform: translateY(0);
+            }
+        }
+
+        @keyframes typingDot {
+            0%, 60%, 100% {
+                transform: scale(1);
+            }
+            30% {
+                transform: scale(1.2);
+            }
+        }
+
+        /* Scrollbar Styling */
+        #chat-history::-webkit-scrollbar {
+            width: 6px;
+        }
+
+        #chat-history::-webkit-scrollbar-track {
+            background: transparent;
+        }
+
+        #chat-history::-webkit-scrollbar-thumb {
+            background: var(--border-color);
+            border-radius: 3px;
+        }
+
+        #chat-history::-webkit-scrollbar-thumb:hover {
+            background: var(--text-secondary);
+        }
+    </style>
+</head>
+<body>
+    <div id="app">
+        <div id="chat-history">
+            <div class="empty-state">
+                <div class="empty-state-icon">🧠</div>
+                <div class="empty-state-title">Ready to Chat</div>
+                <div class="empty-state-subtitle">Start a conversation with your local AI model</div>
+            </div>
+        </div>
+        
+        <form id="chat-form">
+            <textarea 
+                id="message-input" 
+                placeholder="Type your message here... (Press Enter to send)"
+                rows="1"
+                autofocus
+            ></textarea>
+            <button type="submit" id="submit-button">Send</button>
+        </form>
+    </div>
+
+    <script>
+        // Global state
+        let messageCount = 0;
+        let isGenerating = false;
+        let currentAssistantMessageId = null;
+
+        // Initialize marked.js for markdown rendering
+        if (typeof marked !== 'undefined') {
+            marked.setOptions({
+                highlight: function(code, lang) {
+                    if (typeof hljs !== 'undefined' && lang && hljs.getLanguage(lang)) {
+                        try {
+                            return hljs.highlight(code, {language: lang}).value;
+                        } catch (err) {}
+                    }
+                    return code;
+                },
+                breaks: true,
+                gfm: true
+            });
+        }
+
+        // DOM Elements
+        const chatHistory = document.getElementById('chat-history');
+        const chatForm = document.getElementById('chat-form');
+        const messageInput = document.getElementById('message-input');
+
+        // Initialize the interface
+        function init() {
+            setupEventListeners();
+            setupTextareaAutoResize();
+            
+            // Hide empty state initially (will show if no messages)
+            updateEmptyState();
+        }
+
+        // Event Listeners
+        function setupEventListeners() {
+            chatForm.addEventListener('submit', handleFormSubmit);
+            
+            // Handle Enter key (submit) vs Shift+Enter (new line)
+            messageInput.addEventListener('keydown', handleKeyDown);
+        }
+
+        // Auto-resize textarea
+        function setupTextareaAutoResize() {
+            messageInput.addEventListener('input', function() {
+                this.style.height = 'auto';
+                this.style.height = Math.min(this.scrollHeight, 120) + 'px';
+            });
+        }
+
+        // Handle form submission
+        function handleFormSubmit(e) {
+            e.preventDefault();
+            
+            const message = messageInput.value.trim();
+            if (!message || isGenerating) return;
+            
+            // Display user message
+            displayUserMessage(message);
+            
+            // Clear input
+            messageInput.value = '';
+            messageInput.style.height = 'auto';
+            
+            // Send to Swift
+            sendToSwift('submit_prompt', { prompt: message });
+        }
+
+        // Handle keyboard shortcuts
+        function handleKeyDown(e) {
+            if (e.key === 'Enter' && !e.shiftKey) {
+                e.preventDefault();
+                chatForm.dispatchEvent(new Event('submit'));
+            }
+        }
+
+        // Display user message
+        function displayUserMessage(text) {
+            messageCount++;
+            updateEmptyState();
+            
+            const messageDiv = document.createElement('div');
+            messageDiv.className = 'message user';
+            messageDiv.innerHTML = `
+                <div class="message-bubble">
+                    <div class="message-content">${escapeHtml(text)}</div>
+                </div>
+            `;
+            
+            chatHistory.appendChild(messageDiv);
+            scrollToBottom();
+        }
+
+        // Start assistant response
+        function startAssistantMessage() {
+            if (isGenerating) return;
+            
+            isGenerating = true;
+            messageCount++;
+            updateEmptyState();
+            
+            // Create message container
+            const messageDiv = document.createElement('div');
+            messageDiv.className = 'message assistant';
+            currentAssistantMessageId = 'assistant-' + Date.now();
+            messageDiv.id = currentAssistantMessageId;
+            
+            messageDiv.innerHTML = `
+                <div class="message-bubble">
+                    <div class="typing-indicator">
+                        <div class="typing-dots">
+                            <div class="typing-dot"></div>
+                            <div class="typing-dot"></div>
+                            <div class="typing-dot"></div>
+                        </div>
+                        <span>AI is thinking...</span>
+                    </div>
+                </div>
+            `;
+            
+            chatHistory.appendChild(messageDiv);
+            scrollToBottom();
+            
+            return currentAssistantMessageId;
+        }
+
+        // Append token to current assistant message
+        function appendTokenToLastMessage(token) {
+            if (!currentAssistantMessageId) {
+                startAssistantMessage();
+            }
+            
+            const messageDiv = document.getElementById(currentAssistantMessageId);
+            if (!messageDiv) return;
+            
+            const bubble = messageDiv.querySelector('.message-bubble');
+            if (!bubble) return;
+            
+            // Replace typing indicator with content if first token
+            let contentDiv = bubble.querySelector('.message-content');
+            if (!contentDiv) {
+                bubble.innerHTML = '<div class="message-content"></div>';
+                contentDiv = bubble.querySelector('.message-content');
+            }
+            
+            // Get current text and append token
+            const currentText = contentDiv.getAttribute('data-raw-text') || '';
+            const newText = currentText + token;
+            contentDiv.setAttribute('data-raw-text', newText);
+            
+            // For now, just display raw text (will render markdown on completion)
+            contentDiv.textContent = newText;
+            
+            scrollToBottom();
+        }
+
+        // Finish assistant message (render markdown)
+        function finishAssistantMessage() {
+            if (!currentAssistantMessageId) return;
+            
+            const messageDiv = document.getElementById(currentAssistantMessageId);
+            if (!messageDiv) return;
+            
+            const contentDiv = messageDiv.querySelector('.message-content');
+            if (!contentDiv) return;
+            
+            const rawText = contentDiv.getAttribute('data-raw-text') || contentDiv.textContent;
+            
+            // Render markdown
+            if (typeof marked !== 'undefined' && rawText.trim()) {
+                try {
+                    const htmlContent = marked.parse(rawText);
+                    contentDiv.innerHTML = htmlContent;
+                } catch (err) {
+                    console.error('Markdown parsing error:', err);
+                    contentDiv.textContent = rawText;
+                }
+            } else {
+                contentDiv.textContent = rawText;
+            }
+            
+            // Highlight code blocks
+            if (typeof hljs !== 'undefined') {
+                contentDiv.querySelectorAll('pre code').forEach(block => {
+                    hljs.highlightElement(block);
+                });
+            }
+            
+            isGenerating = false;
+            currentAssistantMessageId = null;
+            scrollToBottom();
+        }
+
+        // Show error message
+        function showErrorMessage(errorText) {
+            messageCount++;
+            updateEmptyState();
+            
+            const messageDiv = document.createElement('div');
+            messageDiv.className = 'message assistant';
+            messageDiv.innerHTML = `
+                <div class="message-bubble" style="border-color: #ff4444; background: rgba(255, 68, 68, 0.1);">
+                    <div class="message-content" style="color: #ff4444;">
+                        ⚠️ ${escapeHtml(errorText)}
+                    </div>
+                </div>
+            `;
+            
+            chatHistory.appendChild(messageDiv);
+            scrollToBottom();
+            
+            isGenerating = false;
+            currentAssistantMessageId = null;
+        }
+
+        // Update empty state visibility
+        function updateEmptyState() {
+            const emptyState = chatHistory.querySelector('.empty-state');
+            if (emptyState) {
+                emptyState.style.display = messageCount > 0 ? 'none' : 'flex';
+            }
+        }
+
+        // Scroll to bottom
+        function scrollToBottom(smooth = true) {
+            chatHistory.scrollTo({
+                top: chatHistory.scrollHeight,
+                behavior: smooth ? 'smooth' : 'auto'
+            });
+        }
+
+        // Send message to Swift
+        function sendToSwift(action, data) {
+            if (window.webkit && window.webkit.messageHandlers && window.webkit.messageHandlers.localLLM) {
+                window.webkit.messageHandlers.localLLM.postMessage({
+                    action: action,
+                    ...data
+                });
+            } else {
+                console.warn('WebKit message handler not available');
+                
+                // Fallback for testing - simulate response
+                if (action === 'submit_prompt') {
+                    simulateResponse(data.prompt);
+                }
+            }
+        }
+
+        // Simulate response for testing without Swift
+        function simulateResponse(prompt) {
+            const responses = [
+                "I understand you're testing the local chat interface! This is a simulated response.",
+                "The WebView-based approach is working well. Here's some **markdown** with `code` formatting.",
+                "# This is a heading\n\nAnd here's a code block:\n\n```javascript\nconsole.log('Hello from local LLM!');\n```"
+            ];
+            
+            const response = responses[Math.floor(Math.random() * responses.length)];
+            
+            setTimeout(() => {
+                startAssistantMessage();
+                
+                // Simulate streaming
+                let i = 0;
+                const streamInterval = setInterval(() => {
+                    if (i < response.length) {
+                        appendTokenToLastMessage(response[i]);
+                        i++;
+                    } else {
+                        clearInterval(streamInterval);
+                        finishAssistantMessage();
+                    }
+                }, 50);
+            }, 500);
+        }
+
+        // Utility function to escape HTML
+        function escapeHtml(text) {
+            const div = document.createElement('div');
+            div.textContent = text;
+            return div.innerHTML;
+        }
+
+        // Initialize when DOM is ready
+        if (document.readyState === 'loading') {
+            document.addEventListener('DOMContentLoaded', init);
+        } else {
+            init();
+        }
+
+        // Make functions available globally for Swift to call
+        window.startAssistantMessage = startAssistantMessage;
+        window.appendTokenToLastMessage = appendTokenToLastMessage;
+        window.finishAssistantMessage = finishAssistantMessage;
+        window.showErrorMessage = showErrorMessage;
+    </script>
+</body>
+</html>
