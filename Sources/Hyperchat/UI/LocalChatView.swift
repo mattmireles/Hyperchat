@@ -11,14 +11,17 @@ struct ChatMessage: Identifiable, Equatable {
 struct LocalChatView: View {
     // --- State ---
     @State private var messages: [ChatMessage] = []
-    @State private var inputText: String = ""
     @State private var isGenerating: Bool = false
     
     // --- Engine ---
     private var inferenceEngine: InferenceEngine?
+    
+    // --- Service Info ---
+    private let serviceId: String
 
     // --- Initializer ---
-    init(modelPath: String) {
+    init(modelPath: String, serviceId: String = "local_llama") {
+        self.serviceId = serviceId
         do {
             self.inferenceEngine = try InferenceEngine(modelPath: modelPath)
         } catch {
@@ -31,42 +34,71 @@ struct LocalChatView: View {
     // --- Body ---
     var body: some View {
         VStack {
-            ScrollView {
-                VStack(alignment: .leading, spacing: 12) {
-                    ForEach(messages) { message in
-                        MessageView(message: message)
-                    }
+            if messages.isEmpty {
+                // Show placeholder when no messages
+                VStack {
+                    Image(systemName: "brain.head.profile")
+                        .font(.system(size: 48))
+                        .foregroundColor(.secondary.opacity(0.6))
+                    Text("Local AI Ready")
+                        .font(.title2)
+                        .foregroundColor(.secondary)
+                    Text("Use the unified input bar below to chat")
+                        .font(.caption)
+                        .foregroundColor(.secondary.opacity(0.8))
                 }
-                .padding()
-            }
-
-            HStack {
-                TextField("Type your message...", text: $inputText)
-                    .textFieldStyle(RoundedBorderTextFieldStyle())
-                    .disabled(isGenerating)
-
-                Button(action: sendMessage) {
-                    if isGenerating {
-                        ProgressView()
-                    } else {
-                        Text("Send")
+                .frame(maxWidth: .infinity, maxHeight: .infinity)
+            } else {
+                // Show messages when conversation exists
+                ScrollView {
+                    VStack(alignment: .leading, spacing: 12) {
+                        ForEach(messages) { message in
+                            MessageView(message: message)
+                        }
+                        
+                        // Show generating indicator
+                        if isGenerating {
+                            HStack {
+                                ProgressView()
+                                    .scaleEffect(0.8)
+                                Text("Generating...")
+                                    .font(.caption)
+                                    .foregroundColor(.secondary)
+                                Spacer()
+                            }
+                            .padding(.leading, 12)
+                        }
                     }
+                    .padding()
                 }
-                .disabled(inputText.isEmpty || isGenerating)
             }
-            .padding()
+        }
+        .onReceive(NotificationCenter.default.publisher(for: .localServiceExecutePrompt)) { notification in
+            handlePromptNotification(notification)
         }
     }
     
     // --- Actions ---
-    private func sendMessage() {
-        guard !inputText.isEmpty, let engine = inferenceEngine else { return }
+    
+    /// Handles prompt execution notifications from ServiceManager
+    private func handlePromptNotification(_ notification: Notification) {
+        guard let userInfo = notification.userInfo,
+              let notificationServiceId = userInfo["serviceId"] as? String,
+              let prompt = userInfo["prompt"] as? String,
+              notificationServiceId == serviceId else {
+            return // This notification is not for this service instance
+        }
         
-        let userMessage = ChatMessage(isFromUser: true, text: inputText)
+        executePrompt(prompt)
+    }
+    
+    /// Executes a prompt using the local inference engine
+    private func executePrompt(_ prompt: String) {
+        guard !prompt.isEmpty, let engine = inferenceEngine else { return }
+        
+        let userMessage = ChatMessage(isFromUser: true, text: prompt)
         messages.append(userMessage)
         
-        let prompt = inputText
-        inputText = ""
         isGenerating = true
 
         let botMessagePlaceholder = ChatMessage(isFromUser: false, text: "")
@@ -83,6 +115,9 @@ struct LocalChatView: View {
                 }
             } catch {
                 print("❌ Inference failed: \(error)")
+                DispatchQueue.main.async {
+                    self.messages[botMessageIndex].text = "Error: Failed to generate response"
+                }
             }
             
             DispatchQueue.main.async {

@@ -1125,6 +1125,15 @@ class ServiceManager: NSObject, ObservableObject {
             }
         }
         
+        let localServices = activeServices.filter { service in
+            switch service.backend {
+            case .web(_):
+                return false
+            case .local:
+                return true
+            }
+        }
+        
         // Execute URL parameter services in parallel (no clipboard conflicts)
         for service in urlParameterServices {
             if let webService = webServices[service.id] {
@@ -1145,6 +1154,9 @@ class ServiceManager: NSObject, ObservableObject {
         
         // Execute clipboard services sequentially to prevent race conditions
         executeClipboardServicesSequentially(clipboardServices, prompt: prompt, replyToAll: replyToAll, currentIndex: 0)
+        
+        // Execute local services sequentially
+        executeLocalServicesSequentially(localServices, prompt: prompt, replyToAll: replyToAll, currentIndex: 0)
         
         // Refocus the prompt input field after a delay to ensure paste operations complete
         DispatchQueue.main.asyncAfter(deadline: .now() + ServiceTimings.promptRefocusDelay) { [weak self] in
@@ -1197,6 +1209,43 @@ class ServiceManager: NSObject, ObservableObject {
             // Skip to next service if current one is not found
             executeClipboardServicesSequentially(services, prompt: prompt, replyToAll: replyToAll, currentIndex: currentIndex + 1)
         }
+    }
+    
+    /// Executes local services one by one.
+    ///
+    /// This method ensures that each local service receives the prompt and can
+    /// handle it appropriately. Local services don't have clipboard conflicts
+    /// but we execute them sequentially for consistency and proper logging.
+    ///
+    /// - Parameters:
+    ///   - services: Array of local services to execute
+    ///   - prompt: The user's text to send to local services
+    ///   - replyToAll: If true, continues existing conversation; if false, starts new conversation
+    ///   - currentIndex: Current index in the services array (for recursion)
+    private func executeLocalServicesSequentially(_ services: [AIService], prompt: String, replyToAll: Bool, currentIndex: Int) {
+        // Base case: all services have been executed
+        guard currentIndex < services.count else {
+            return
+        }
+        
+        let service = services[currentIndex]
+        
+        print("🎯 Executing prompt on local service: \(service.name) (id: \(service.id))")
+        
+        // For now, we need a way to communicate with LocalChatView instances
+        // This will be implemented in the next step via OverlayController bridging
+        NotificationCenter.default.post(
+            name: .localServiceExecutePrompt,
+            object: nil,
+            userInfo: [
+                "serviceId": service.id,
+                "prompt": prompt,
+                "replyToAll": replyToAll
+            ]
+        )
+        
+        // Execute next service immediately (no need for delays like clipboard services)
+        executeLocalServicesSequentially(services, prompt: prompt, replyToAll: replyToAll, currentIndex: currentIndex + 1)
     }
     
     /// Executes the current shared prompt based on submission mode.
@@ -1968,4 +2017,11 @@ extension ServiceManager: WKUIDelegate {
             return
         }
     }
+}
+
+// MARK: - Notification Extensions
+
+extension Notification.Name {
+    /// Notification sent when a local service should execute a prompt
+    static let localServiceExecutePrompt = Notification.Name("localServiceExecutePrompt")
 } 
