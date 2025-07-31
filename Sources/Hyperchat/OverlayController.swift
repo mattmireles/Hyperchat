@@ -756,8 +756,8 @@ class OverlayController: NSObject, NSWindowDelegate, ObservableObject {
         
         for (index, service) in sortedServices.enumerated() {
             // Handle local services with LocalChatView
-            if case .local(let modelPath, _) = service.backend {
-                let chatView = LocalChatView(modelPath: modelPath, serviceId: service.id)
+            if case .local(let model) = service.backend {
+                let chatView = LocalChatView(model: model, serviceId: service.id)
                 let hostingController = NSHostingController(rootView: chatView)
                 
                 let view = hostingController.view

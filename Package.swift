@@ -22,7 +22,8 @@ let package = Package(
             ],
             resources: [
                 .process("Assets.xcassets"),
-                .process("Orbitron-Bold.ttf")
+                .process("Orbitron-Bold.ttf"),
+                .process("model_manifest.json")
             ]
         ),
         .testTarget(

@@ -35,7 +35,28 @@ The local inference system is built around a clean separation of concerns:
 
 ### Core Components
 
-#### 1. InferenceEngine (`Sources/Hyperchat/InferenceEngine.swift`)
+#### 1. Model Management System
+
+**LocalModel** (`Sources/Hyperchat/LocalModel.swift`):
+- **Comprehensive Metadata**: Stores technical names, pretty names, maker information, and hardware requirements
+- **Device Compatibility**: Hardware requirements (RAM, storage) for device-specific filtering
+- **Download Status Tracking**: Tracks model download progress and installation status
+- **Hugging Face Integration**: Direct repository references for model downloading
+- **Chat Template Support**: Stores model-specific chat templates and parameters
+
+**ModelManager Actor** (`Sources/Hyperchat/ModelManager.swift`):
+- **Thread-Safe Management**: Swift actor for concurrent model operations
+- **Manifest-Based Catalog**: Uses `model_manifest.json` for device-specific model whitelisting
+- **Device Filtering**: Automatically filters models based on system RAM and storage
+- **Download Management**: Handles Hugging Face downloads with progress tracking
+- **Model Lifecycle**: Complete model installation, updating, and removal workflows
+
+**Model Manifest** (`Sources/Hyperchat/model_manifest.json`):
+- **Device Tiers**: Organizes models by hardware requirements (4GB/8GB/16GB+ RAM)
+- **Curated Selection**: 7 high-quality models from Meta, Microsoft, Google, and others
+- **Simple Structure**: JSON catalog for easy model addition and maintenance
+
+#### 2. InferenceEngine (`Sources/Hyperchat/InferenceEngine.swift`)
 
 A thread-safe Swift actor that provides the local inference infrastructure:
 
@@ -57,7 +78,7 @@ A thread-safe Swift actor that provides the local inference infrastructure:
 ```swift
 public enum ServiceBackend {
     case web(config: ServiceURLConfig)    // Web-based services
-    case local(modelPath: String, modelName: String)  // Local inference
+    case local(model: LocalModel)         // Local inference with managed model
 }
 ```
 
@@ -68,7 +89,7 @@ This architectural foundation enables:
 
 #### 3. Native Chat Interface
 
-**LocalChatView** (`Sources/Hyperchat/UI/LocalChatView.swift`):
+**LocalChatView** (`Sources/Hyperchat/LocalChatView.swift`):
 - **SwiftUI Native**: Pure SwiftUI implementation with no web dependencies
 - **Real-Time Streaming**: Handles token streaming from InferenceEngine with live UI updates
 - **Message Management**: Chat history with user/assistant message bubbles
@@ -85,22 +106,47 @@ This architectural foundation enables:
 
 #### Adding Local Models
 
-1. **Obtain GGUF Model**: Download or convert a model to GGUF format
-2. **Update Service Configuration**: Edit the `local_llama` service in `ServiceManager.swift`:
+**Via Model Management System**:
+1. **Add to Manifest**: Edit `model_manifest.json` to include new model:
+   ```json
+   {
+     "models": {
+       "my-custom-model": {
+         "technical_name": "username/my-model-7b-instruct",
+         "pretty_name": "My Custom 7B",
+         "maker": "Custom",
+         "hugging_face_repo": "username/my-model-7b-instruct-GGUF",
+         "model_file_name": "my-model-7b-instruct-q4_k_m.gguf",
+         "description": "Custom 7B model for specialized tasks",
+         "requirements": {
+           "minimum_ram": 8,
+           "disk_space_gb": 5,
+           "recommends_gpu": true
+         },
+         "context_size": 4096
+       }
+     }
+   }
+   ```
+
+2. **Create Service Configuration**: Update `ServiceManager.swift`:
    ```swift
+   // ModelManager will handle model discovery and management
+   let availableModels = await modelManager.getAvailableModels()
+   let myModel = availableModels.first { $0.id == "my-custom-model" }
+   
    AIService(
-       id: "local_llama",
-       name: "Local Llama",
-       iconName: "llama-icon",
-       backend: .local(
-           modelPath: "/path/to/your/model.gguf", // Update this path
-           modelName: "Your Model Name"
-       ),
+       id: "local_custom",
+       name: "My Custom Model",
+       iconName: "brain",
+       backend: .local(model: myModel!),
        enabled: true,
        order: 99
    )
    ```
-3. **Model Requirements**: GGUF format models compatible with llama.cpp
+
+3. **Model Download**: The ModelManager handles automatic downloading from Hugging Face
+4. **Model Requirements**: GGUF format models compatible with llama.cpp
 
 #### Performance Characteristics
 
@@ -121,13 +167,15 @@ The inference engine supports:
 
 #### Local Service Execution Path
 
-1. **Service Detection**: ServiceManager identifies `.local` backend in service configuration
-2. **UI Creation**: OverlayController creates LocalChatView instead of WKWebView
-3. **Engine Initialization**: InferenceEngine loads model from specified path
-4. **User Interaction**: Native SwiftUI interface handles user input
-5. **Inference Execution**: Streaming token generation via AsyncThrowingStream
-6. **Real-Time Display**: UI updates with each generated token
-7. **Message Management**: Chat history maintained in SwiftUI state
+1. **Model Management**: ModelManager loads available models from manifest and filters by device compatibility
+2. **Service Detection**: ServiceManager identifies `.local` backend with LocalModel configuration
+3. **Model Validation**: System verifies model is downloaded and ready for inference
+4. **UI Creation**: OverlayController creates LocalChatView with LocalModel instead of WKWebView
+5. **Engine Initialization**: InferenceEngine loads model from LocalModel's path
+6. **User Interaction**: Enhanced SwiftUI interface with model selection and status display
+7. **Inference Execution**: Streaming token generation via AsyncThrowingStream
+8. **Real-Time Display**: UI updates with each generated token and model information
+9. **Message Management**: Enhanced chat history with markdown rendering and model attribution
 
 #### Error Handling & Recovery
 
@@ -168,7 +216,52 @@ The local inference architecture is designed for extensibility:
 - **Model Management**: Automatic downloading and model library management
 - **Performance Optimization**: Batch processing and advanced caching strategies
 
-This local inference support represents a significant architectural achievement, providing users with complete control over their AI interactions while maintaining the unified, seamless experience that defines Hyperchat.
+### Model Management Architecture
+
+The model management system provides a sophisticated yet simple approach to handling local LLMs:
+
+**Three-Component Design** (per CLAUDE.md "SIMPLER IS BETTER" philosophy):
+1. **LocalModel.swift**: Pure data structure for model metadata
+2. **ModelManager.swift**: Single actor handling all model operations  
+3. **model_manifest.json**: Simple JSON catalog with device-specific whitelisting
+
+**Key Design Principles**:
+- **Device-Aware Filtering**: Models are automatically filtered based on system RAM and storage
+- **Pretty Names for Users**: Technical model names (e.g., "llama-2-7b-chat-gguf") become user-friendly names (e.g., "Llama 2 Chat 7B")
+- **Maker Attribution**: Displays model creators (Meta, Microsoft, Google, etc.) with optional logos
+- **Hardware Requirements**: Each model specifies minimum RAM/storage for informed selection
+- **Download Progress**: Real-time tracking of Hugging Face downloads with status updates
+
+**Model Catalog Structure**:
+```json
+{
+  "models": {
+    "llama-3.2-1b": {
+      "technical_name": "meta-llama/Llama-3.2-1B-Instruct",
+      "pretty_name": "Llama 3.2 1B Instruct",
+      "maker": "Meta",
+      "hugging_face_repo": "meta-llama/Llama-3.2-1B-Instruct-GGUF",
+      "requirements": {
+        "minimum_ram": 4,
+        "disk_space_gb": 0.8,
+        "recommends_gpu": false
+      }
+    }
+  },
+  "device_tiers": {
+    "low_end": { "max_ram": 8, "recommended_models": ["smollm-1.7b", "llama-3.2-1b"] },
+    "mid_range": { "max_ram": 16, "recommended_models": ["llama-3.2-3b", "phi-3.5-mini"] }
+  }
+}
+```
+
+**Integration with Service Architecture**:
+- **ServiceBackend.local(model: LocalModel)**: Clean integration with existing dual-backend system
+- **Automatic UI Enhancement**: LocalChatView displays model pretty names and status
+- **Zero Configuration**: Models become available as services once downloaded
+- **Thread-Safe Operations**: ModelManager actor prevents concurrent access issues
+
+This model management system represents a significant architectural achievement, providing users with complete control over their AI interactions while maintaining the unified, seamless experience that defines Hyperchat.
 
 ## Core Components & Interaction Flow
 
@@ -540,23 +633,33 @@ xcodebuild build-for-testing -scheme Hyperchat -destination 'platform=macOS'
 ./Export/Hyperchat.app/Contents/MacOS/Hyperchat
 ```
 
-### Local Inference Development
+### Model Management Development
 
 ```bash
 # Build llama.cpp libraries (if not already built)
 cd llama.cpp && cmake -B build && cmake --build build
 
-# Test local inference integration
-# 1. Update model path in ServiceManager.swift 
-# 2. Build and run the application
+# Test model management system
+# 1. Review model_manifest.json for available models
+# 2. Update manifest with desired models for your device tier
+# 3. Build and run the application
 xcodebuild build -scheme Hyperchat -destination 'platform=macOS'
+
+# Test model downloading (in Swift)
+let modelManager = ModelManager()
+let models = await modelManager.getAvailableModels()
+let model = models.first { $0.id == "desired-model-id" }
+if let model = model {
+    try await modelManager.downloadModel(id: model.id)
+}
 ```
 
 #### Model Setup
-1. **Obtain GGUF Model**: Download from Hugging Face or convert existing model
-2. **Update Service Configuration**: Edit `local_llama` service in `ServiceManager.swift`
-3. **Verify Model Path**: Ensure file exists and is accessible
-4. **Test Integration**: Enable local service and test in UI
+1. **Review Manifest**: Check `model_manifest.json` for pre-configured models
+2. **Add Custom Models**: Edit manifest to include additional models
+3. **Device Compatibility**: Ensure models match your system's RAM/storage requirements
+4. **Test Download**: Use ModelManager to download and install models
+5. **Service Configuration**: Models are automatically available once downloaded
 
 #### Local Inference Debugging
 - **Model Loading**: Check console for InferenceEngine initialization messages
@@ -578,13 +681,20 @@ xcodebuild build -scheme Hyperchat -destination 'platform=macOS'
 - **WebView Issues**: Enable WebViewLogger and check console output
 - **Menu Problems**: Use menu debugging scripts and check accessibility settings
 - **Signing Issues**: Verify certificate identity and provisioning profiles
+- **Model Management Issues**:
+  - Check `model_manifest.json` syntax and model entries
+  - Verify ModelManager can load manifest from bundle resources
+  - Check console for model download progress and errors
+  - Verify Hugging Face repository URLs are accessible
+  - Monitor storage space for model downloads
 - **Local Inference Issues**: 
-  - Check model file exists at specified path
-  - Verify GGUF format compatibility
+  - Check model download completed successfully via ModelManager status
+  - Verify GGUF format compatibility with llama.cpp version
   - Monitor memory usage (models can require 4-16GB RAM)
   - Check console for InferenceEngine error messages
   - Verify llama.cpp build completed successfully
   - Check bridging header includes correct llama.h path
+  - Ensure LocalModel.isReady returns true before inference
 
 ### Performance Optimization
 

@@ -43,8 +43,8 @@ public enum ServiceBackend {
     /// Web-based service using WKWebView with specified URL configuration
     case web(config: ServiceURLConfig)
     
-    /// Local inference service using InferenceEngine with specified model
-    case local(modelPath: String, modelName: String)
+    /// Local inference service using InferenceEngine with managed model
+    case local(model: LocalModel)
 }
 
 // MARK: - Service URL Configuration

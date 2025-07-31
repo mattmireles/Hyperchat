@@ -197,12 +197,8 @@ extension AIService: Codable {
             let config = try backendContainer.decode(ServiceURLConfig.self, forKey: .payload)
             backend = .web(config: config)
         case "local":
-            struct LocalPayload: Codable {
-                let modelPath: String
-                let modelName: String
-            }
-            let payload = try backendContainer.decode(LocalPayload.self, forKey: .payload)
-            backend = .local(modelPath: payload.modelPath, modelName: payload.modelName)
+            let model = try backendContainer.decode(LocalModel.self, forKey: .payload)
+            backend = .local(model: model)
         default:
             throw DecodingError.dataCorruptedError(forKey: .type, in: backendContainer, debugDescription: "Invalid backend type '\(backendType)'")
         }
@@ -223,14 +219,9 @@ extension AIService: Codable {
         case .web(let config):
             try backendContainer.encode("web", forKey: .type)
             try backendContainer.encode(config, forKey: .payload)
-        case .local(let modelPath, let modelName):
-            struct LocalPayload: Codable {
-                let modelPath: String
-                let modelName: String
-            }
-            let payload = LocalPayload(modelPath: modelPath, modelName: modelName)
+        case .local(let model):
             try backendContainer.encode("local", forKey: .type)
-            try backendContainer.encode(payload, forKey: .payload)
+            try backendContainer.encode(model, forKey: .payload)
         }
     }
 }

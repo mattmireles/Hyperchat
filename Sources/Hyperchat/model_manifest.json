@@ -1,0 +1,132 @@
+{
+  "version": "1.0",
+  "description": "Whitelisted local language models for Hyperchat",
+  "models": {
+    "llama-3.2-1b": {
+      "technical_name": "meta-llama/Llama-3.2-1B-Instruct",
+      "pretty_name": "Llama 3.2 1B Instruct",
+      "maker": "Meta",
+      "maker_logo": "meta-logo",
+      "hugging_face_repo": "meta-llama/Llama-3.2-1B-Instruct-GGUF",
+      "model_file_name": "Llama-3.2-1B-Instruct-Q4_K_M.gguf",
+      "description": "Compact 1B parameter model optimized for instruction following. Perfect for basic tasks on devices with limited RAM.",
+      "requirements": {
+        "minimum_ram": 4,
+        "disk_space_gb": 0.8,
+        "recommends_gpu": false
+      },
+      "context_size": 2048,
+      "chat_template": "{% set loop_messages = messages %}{% for message in loop_messages %}{% set content = '<|start_header_id|>' + message['role'] + '<|end_header_id|>\n\n'+ message['content'] | trim + '<|eot_id|>' %}{% if loop.index0 == 0 %}{% set content = bos_token + content %}{% endif %}{{ content }}{% endfor %}{% if add_generation_prompt %}{{ '<|start_header_id|>assistant<|end_header_id|>\n\n' }}{% endif %}"
+    },
+    "llama-3.2-3b": {
+      "technical_name": "meta-llama/Llama-3.2-3B-Instruct",
+      "pretty_name": "Llama 3.2 3B Instruct",
+      "maker": "Meta",
+      "maker_logo": "meta-logo",
+      "hugging_face_repo": "meta-llama/Llama-3.2-3B-Instruct-GGUF",
+      "model_file_name": "Llama-3.2-3B-Instruct-Q4_K_M.gguf",
+      "description": "Balanced 3B parameter model with strong performance across many tasks. Good for most users with 8GB+ RAM.",
+      "requirements": {
+        "minimum_ram": 8,
+        "disk_space_gb": 2.1,
+        "recommends_gpu": true
+      },
+      "context_size": 2048,
+      "chat_template": "{% set loop_messages = messages %}{% for message in loop_messages %}{% set content = '<|start_header_id|>' + message['role'] + '<|end_header_id|>\n\n'+ message['content'] | trim + '<|eot_id|>' %}{% if loop.index0 == 0 %}{% set content = bos_token + content %}{% endif %}{{ content }}{% endfor %}{% if add_generation_prompt %}{{ '<|start_header_id|>assistant<|end_header_id|>\n\n' }}{% endif %}"
+    },
+    "mistral-7b": {
+      "technical_name": "mistralai/Mistral-7B-Instruct-v0.3",
+      "pretty_name": "Mistral 7B Instruct v0.3",
+      "maker": "Mistral AI",
+      "maker_logo": "mistral-logo",
+      "hugging_face_repo": "mistralai/Mistral-7B-Instruct-v0.3-GGUF",
+      "model_file_name": "Mistral-7B-Instruct-v0.3.Q4_K_M.gguf",
+      "description": "High-quality 7B parameter model with excellent instruction following and coding capabilities. Requires 16GB+ RAM.",
+      "requirements": {
+        "minimum_ram": 16,
+        "disk_space_gb": 4.1,
+        "recommends_gpu": true
+      },
+      "context_size": 4096,
+      "chat_template": "<s>{% for message in messages %}{% if message['role'] == 'user' %}[INST] {{ message['content'] }} [/INST]{% elif message['role'] == 'assistant' %}{{ message['content'] }}{% endif %}{% endfor %}"
+    },
+    "phi-3.5-mini": {
+      "technical_name": "microsoft/Phi-3.5-mini-instruct",
+      "pretty_name": "Phi-3.5 Mini Instruct",
+      "maker": "Microsoft",
+      "maker_logo": "microsoft-logo",
+      "hugging_face_repo": "microsoft/Phi-3.5-mini-instruct-gguf",
+      "model_file_name": "Phi-3.5-mini-instruct-q4.gguf",
+      "description": "Microsoft's efficient mini model with strong reasoning capabilities. Optimized for performance on smaller devices.",
+      "requirements": {
+        "minimum_ram": 8,
+        "disk_space_gb": 2.3,
+        "recommends_gpu": true
+      },
+      "context_size": 4096,
+      "chat_template": "{% for message in messages %}{% if message['role'] == 'user' %}<|user|>{{ message['content'] }}<|end|>{% elif message['role'] == 'assistant' %}<|assistant|>{{ message['content'] }}<|end|>{% endif %}{% endfor %}{% if add_generation_prompt %}<|assistant|>{% endif %}"
+    },
+    "codegemma-2b": {
+      "technical_name": "google/codegemma-2b-it",
+      "pretty_name": "CodeGemma 2B Instruct",
+      "maker": "Google",
+      "maker_logo": "google-logo",
+      "hugging_face_repo": "google/codegemma-2b-it-GGUF",
+      "model_file_name": "codegemma-2b-it.q4_0.gguf",
+      "description": "Specialized 2B model optimized for code generation and programming tasks. Lightweight but powerful for coding.",
+      "requirements": {
+        "minimum_ram": 8,
+        "disk_space_gb": 1.5,
+        "recommends_gpu": true
+      },
+      "context_size": 2048,
+      "chat_template": "<start_of_turn>user\n{{ message['content'] }}<end_of_turn>\n<start_of_turn>model\n"
+    },
+    "qwen2.5-1.5b": {
+      "technical_name": "Qwen/Qwen2.5-1.5B-Instruct",
+      "pretty_name": "Qwen2.5 1.5B Instruct",
+      "maker": "Alibaba",
+      "maker_logo": "alibaba-logo",
+      "hugging_face_repo": "Qwen/Qwen2.5-1.5B-Instruct-GGUF",
+      "model_file_name": "qwen2.5-1.5b-instruct-q4_k_m.gguf",
+      "description": "Latest Qwen model with improved multilingual capabilities and efficient performance on modest hardware.",
+      "requirements": {
+        "minimum_ram": 4,
+        "disk_space_gb": 1.0,
+        "recommends_gpu": false
+      },
+      "context_size": 2048,
+      "chat_template": "<|im_start|>system\nYou are a helpful assistant.<|im_end|>\n<|im_start|>user\n{{ message['content'] }}<|im_end|>\n<|im_start|>assistant\n"
+    },
+    "smollm-1.7b": {
+      "technical_name": "HuggingFaceTB/SmolLM-1.7B-Instruct",
+      "pretty_name": "SmolLM 1.7B Instruct",
+      "maker": "Hugging Face",
+      "maker_logo": "huggingface-logo",
+      "hugging_face_repo": "HuggingFaceTB/SmolLM-1.7B-Instruct-GGUF",
+      "model_file_name": "SmolLM-1.7B-Instruct-Q4_K_M.gguf",
+      "description": "Ultra-efficient small language model designed for on-device inference. Great for privacy-focused applications.",
+      "requirements": {
+        "minimum_ram": 4,
+        "disk_space_gb": 1.1,
+        "recommends_gpu": false
+      },
+      "context_size": 2048,
+      "chat_template": "<|im_start|>user\n{{ message['content'] }}<|im_end|>\n<|im_start|>assistant\n"
+    }
+  },
+  "device_tiers": {
+    "low_end": {
+      "max_ram": 8,
+      "recommended_models": ["smollm-1.7b", "llama-3.2-1b", "qwen2.5-1.5b"]
+    },
+    "mid_range": {
+      "max_ram": 16,
+      "recommended_models": ["llama-3.2-3b", "phi-3.5-mini", "codegemma-2b"]
+    },
+    "high_end": {
+      "max_ram": 32,
+      "recommended_models": ["mistral-7b", "llama-3.2-3b", "phi-3.5-mini"]
+    }
+  }
+}

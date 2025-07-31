@@ -143,11 +143,18 @@ let defaultServices = [
     ),
     AIService(
         id: "local_llama",
-        name: "Local Llama",
-        iconName: "llama-icon", // We'll add an icon later
+        name: "Local Model",
+        iconName: "llama-icon",
         backend: .local(
-            modelPath: "/Users/mattmireles/.lmstudio/models/bartowski/Qwen_Qwen3-30B-A3B-Instruct-2507-GGUF/Qwen_Qwen3-30B-A3B-Instruct-2507-Q4_K_S.gguf", // <-- EDIT THIS
-            modelName: "Local Llama"
+            model: LocalModel(
+                id: "llama-3.2-1b",
+                technicalName: "meta-llama/Llama-3.2-1B-Instruct",
+                prettyName: "Llama 3.2 1B Instruct",
+                maker: "Meta",
+                huggingFaceRepo: "meta-llama/Llama-3.2-1B-Instruct-GGUF",
+                requirements: ModelRequirements(minimumRAM: 4, diskSpaceGB: 0.8, recommendsGPU: false),
+                description: "Compact 1B parameter model for basic tasks"
+            )
         ),
         enabled: true,
         order: 99
@@ -834,8 +841,8 @@ class ServiceManager: NSObject, ObservableObject {
                 // Add to loading queue for sequential loading
                 serviceLoadingQueue.append(service)
 
-            case .local(_, let modelName):
-                print("🏠 Configuring local service: \(modelName)")
+            case .local(let model):
+                print("🏠 Configuring local service: \(model.prettyName)")
                 // Local services don't have a WebView or a WebService object.
                 // They will be handled directly by OverlayController.
             }
