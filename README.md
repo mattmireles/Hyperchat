@@ -18,6 +18,8 @@ Hyperchat is a native macOS application that provides a unified multi-service in
 
 The architecture is event-driven, using a combination of NSNotificationCenter for cross-module communication and Combine publishers for direct state updates between related components. The dual-backend architecture allows seamless integration of cloud and local AI services within the same interface.
 
+**Local Inference**: Implemented via static library integration with llama.cpp, using Objective-C bridging headers for maximum performance and minimal complexity. This approach provides native-level performance with simple build configuration.
+
 ## Local LLM Inference Support
 
 Hyperchat includes comprehensive support for running local language models directly on the user's machine, providing privacy, offline capability, and full control over AI interactions alongside web-based services.
@@ -26,16 +28,16 @@ Hyperchat includes comprehensive support for running local language models direc
 
 The local inference system is built around a clean separation of concerns:
 
-- **InferenceEngine Module**: A dedicated Swift Package that encapsulates all local inference logic
+- **InferenceEngine Actor**: A thread-safe Swift actor that encapsulates all local inference logic
 - **Dual-Backend ServiceManager**: Intelligently routes prompts to either web services or local inference
 - **Native UI Integration**: LocalChatView provides a native SwiftUI interface for local model interactions
 - **Unified User Experience**: Local and web services appear seamlessly in the same horizontal layout
 
 ### Core Components
 
-#### 1. InferenceEngine Swift Package (`Sources/InferenceEngine/`)
+#### 1. InferenceEngine (`Sources/Hyperchat/InferenceEngine.swift`)
 
-A self-contained local Swift Package that provides the inference infrastructure:
+A thread-safe Swift actor that provides the local inference infrastructure:
 
 **InferenceEngine.swift**:
 - **Thread-Safe Actor**: Implements Swift's `actor` pattern for safe concurrent access to the inference engine
@@ -44,10 +46,10 @@ A self-contained local Swift Package that provides the inference infrastructure:
 - **Resource Management**: Automatic cleanup of model and context resources via `deinit`
 - **Error Handling**: Comprehensive error types for model loading, context creation, and inference failures
 
-**CMistral Module**:
-- **Static Library**: Pre-compiled `libllama.a` with Metal acceleration for Apple Silicon
-- **Header Bridge**: Complete C header bridge including `llama.h`, `ggml.h`, and related headers
-- **Module Map**: Proper module definition for Swift interoperability
+**Static Library Integration**:
+- **Pre-compiled Libraries**: Uses static `libllama.a` and related libraries built via cmake
+- **Objective-C Bridging**: Exposes llama.cpp C API to Swift via `Hyperchat-Bridging-Header.h`
+- **System Framework Integration**: Links Accelerate, Metal, and Foundation frameworks for optimal performance
 
 #### 2. ServiceBackend Architecture
 
@@ -318,15 +320,16 @@ The project uses Swift Package Manager with key dependencies:
 
 - **Sparkle** (2.6.0+): Automatic update framework for macOS applications
 - **AmplitudeSwift** (1.0.0+): Analytics and usage tracking
-- **InferenceEngine** (Local): Local Swift Package for LLM inference with llama.cpp integration
 - **Test Targets**: Separate test targets for unit tests (`HyperchatTests`) and UI tests (`HyperchatUITests`)
 
-#### Local Package Structure
+#### Local Inference Integration
 
-- **InferenceEngine Package** (`Sources/InferenceEngine/`):
-  - **CMistral Module**: C wrapper with pre-compiled `libllama.a` and header bridge
-  - **InferenceEngine Module**: Swift actor implementation for local model inference
+- **Static Library Integration** (`llama.cpp/build/`):
+  - **Pre-compiled Libraries**: Built via cmake with `libllama.a`, `libggml*.a` and backend libraries
+  - **Objective-C Bridging**: `Hyperchat-Bridging-Header.h` exposes C API to Swift
+  - **InferenceEngine Actor**: Swift implementation for thread-safe local model inference (`Sources/Hyperchat/InferenceEngine.swift`)
   - **Metal Acceleration**: Optimized for Apple Silicon with GPU acceleration
+  - **System Framework Integration**: Links Accelerate, Metal, and Foundation frameworks
 
 ### Build System Integration
 
@@ -540,12 +543,13 @@ xcodebuild build-for-testing -scheme Hyperchat -destination 'platform=macOS'
 ### Local Inference Development
 
 ```bash
-# Test local inference in isolation
-# 1. Build the InferenceEngine package
-xcodebuild -scheme InferenceEngine -destination 'platform=macOS'
+# Build llama.cpp libraries (if not already built)
+cd llama.cpp && cmake -B build && cmake --build build
 
-# 2. Test with a sample model (requires GGUF model file)
-# Update the modelPath in ServiceManager.swift first
+# Test local inference integration
+# 1. Update model path in ServiceManager.swift 
+# 2. Build and run the application
+xcodebuild build -scheme Hyperchat -destination 'platform=macOS'
 ```
 
 #### Model Setup
@@ -579,6 +583,8 @@ xcodebuild -scheme InferenceEngine -destination 'platform=macOS'
   - Verify GGUF format compatibility
   - Monitor memory usage (models can require 4-16GB RAM)
   - Check console for InferenceEngine error messages
+  - Verify llama.cpp build completed successfully
+  - Check bridging header includes correct llama.h path
 
 ### Performance Optimization
 
