@@ -31,7 +31,7 @@ import UniformTypeIdentifiers
 
 /// Represents a file attachment within a chat message
 public struct FileAttachment: Identifiable, Codable, Equatable {
-    public let id = UUID()
+    public var id = UUID()
     let originalName: String
     let fileExtension: String
     let mimeType: String

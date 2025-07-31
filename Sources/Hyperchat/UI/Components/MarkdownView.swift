@@ -139,7 +139,7 @@ struct MarkdownParser {
             if line.hasPrefix("- ") || line.hasPrefix("* ") {
                 flushParagraph(&elements, &currentParagraphLines)
                 var listItems: [String] = []
-                var currentLine = line
+                let currentLine = line
                 
                 // Collect consecutive list items
                 repeat {
@@ -176,7 +176,7 @@ struct MarkdownParser {
     /// Parse inline markdown elements (bold, italic, code, links)
     private static func parseInlineElements(_ text: String) -> [InlineElement] {
         var result: [InlineElement] = []
-        var currentText = text
+        let currentText = text
         
         // Simple regex-like parsing for inline elements
         // This is a simplified implementation - a full parser would be more robust

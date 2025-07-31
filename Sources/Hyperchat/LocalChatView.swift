@@ -246,7 +246,7 @@ struct LocalChatView: View {
             .onAppear {
                 // ScrollViewReader proxy is available in this scope
             }
-            .onChange(of: messages.count) { _ in
+            .onChange(of: messages.count) {
                 withAnimation(.easeInOut(duration: UIAnimations.scrollToBottomDuration)) {
                     if let lastMessage = messages.last {
                         proxy.scrollTo(lastMessage.id, anchor: .bottom)
@@ -448,10 +448,11 @@ struct LocalChatView: View {
                     responseText += token
                     tokenCount += 1
                     
+                    let currentResponse = responseText
                     DispatchQueue.main.async {
                         self.messages[aiMessageIndex] = EnhancedChatMessage(
                             isFromUser: false,
-                            contentType: .markdown(responseText),
+                            contentType: .markdown(currentResponse),
                             status: .generating
                         )
                     }
