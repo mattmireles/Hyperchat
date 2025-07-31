@@ -140,6 +140,17 @@ let defaultServices = [
         enabled: false,
         order: 4,
         faviconURL: nil
+    ),
+    AIService(
+        id: "local_llama",
+        name: "Local Llama",
+        iconName: "llama-icon", // We'll add an icon later
+        backend: .local(
+            modelPath: "/Users/your_username/path/to/your_model.gguf", // <-- EDIT THIS
+            modelName: "Local Llama"
+        ),
+        enabled: true,
+        order: 99
     )
 ]
 
