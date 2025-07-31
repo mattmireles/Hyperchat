@@ -169,9 +169,16 @@ extension Notification.Name {
 extension AIService: Codable {
     /// Properties to encode/decode
     enum CodingKeys: String, CodingKey {
-        case id, name, iconName, activationMethod, enabled, order, faviconURL
+        case id, name, iconName, enabled, order, faviconURL
+        case backend
     }
-    
+
+    /// Keys for the nested backend container
+    enum BackendCodingKeys: String, CodingKey {
+        case type
+        case payload
+    }
+
     init(from decoder: Decoder) throws {
         let container = try decoder.container(keyedBy: CodingKeys.self)
         id = try container.decode(String.self, forKey: .id)
@@ -181,22 +188,26 @@ extension AIService: Codable {
         order = try container.decode(Int.self, forKey: .order)
         faviconURL = try container.decodeIfPresent(URL.self, forKey: .faviconURL)
         
-        // For activation method, use the actual configurations from ServiceConfigurations
-        switch id {
-        case "google":
-            activationMethod = .urlParameter(baseURL: ServiceConfigurations.google.baseURL, parameter: ServiceConfigurations.google.queryParam)
-        case "perplexity":
-            activationMethod = .urlParameter(baseURL: ServiceConfigurations.perplexity.baseURL, parameter: ServiceConfigurations.perplexity.queryParam)
-        case "chatgpt":
-            activationMethod = .urlParameter(baseURL: ServiceConfigurations.chatGPT.baseURL, parameter: ServiceConfigurations.chatGPT.queryParam)
-        case "claude":
-            activationMethod = .clipboardPaste(baseURL: ServiceConfigurations.claude.baseURL)
+        // Custom Backend Decoding
+        let backendContainer = try container.nestedContainer(keyedBy: BackendCodingKeys.self, forKey: .backend)
+        let backendType = try backendContainer.decode(String.self, forKey: .type)
+
+        switch backendType {
+        case "web":
+            let config = try backendContainer.decode(ServiceURLConfig.self, forKey: .payload)
+            backend = .web(config: config)
+        case "local":
+            struct LocalPayload: Codable {
+                let modelPath: String
+                let modelName: String
+            }
+            let payload = try backendContainer.decode(LocalPayload.self, forKey: .payload)
+            backend = .local(modelPath: payload.modelPath, modelName: payload.modelName)
         default:
-            // Fallback to URL parameter method
-            activationMethod = .urlParameter(baseURL: "https://\(id).com", parameter: "q")
+            throw DecodingError.dataCorruptedError(forKey: .type, in: backendContainer, debugDescription: "Invalid backend type '\(backendType)'")
         }
     }
-    
+
     func encode(to encoder: Encoder) throws {
         var container = encoder.container(keyedBy: CodingKeys.self)
         try container.encode(id, forKey: .id)
@@ -205,6 +216,21 @@ extension AIService: Codable {
         try container.encode(enabled, forKey: .enabled)
         try container.encode(order, forKey: .order)
         try container.encodeIfPresent(faviconURL, forKey: .faviconURL)
-        // Don't encode activationMethod as it's derived from id
+
+        // Custom Backend Encoding
+        var backendContainer = container.nestedContainer(keyedBy: BackendCodingKeys.self, forKey: .backend)
+        switch backend {
+        case .web(let config):
+            try backendContainer.encode("web", forKey: .type)
+            try backendContainer.encode(config, forKey: .payload)
+        case .local(let modelPath, let modelName):
+            struct LocalPayload: Codable {
+                let modelPath: String
+                let modelName: String
+            }
+            let payload = LocalPayload(modelPath: modelPath, modelName: modelName)
+            try backendContainer.encode("local", forKey: .type)
+            try backendContainer.encode(payload, forKey: .payload)
+        }
     }
 }

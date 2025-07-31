@@ -88,8 +88,8 @@ struct AIService {
     /// Asset catalog name for the service's icon
     var iconName: String
     
-    /// How this service accepts prompt input (URL params vs clipboard paste)
-    var activationMethod: ServiceActivationMethod
+    /// The backend type and configuration for this service
+    var backend: ServiceBackend
     
     /// Whether this service is currently active and should be displayed
     var enabled: Bool
@@ -109,10 +109,7 @@ let defaultServices = [
         id: "chatgpt",
         name: "ChatGPT",
         iconName: "chatgpt-icon",
-        activationMethod: .urlParameter(
-            baseURL: ServiceConfigurations.chatGPT.baseURL,
-            parameter: ServiceConfigurations.chatGPT.queryParam
-        ),
+        backend: .web(config: ServiceConfigurations.chatGPT),
         enabled: true,
         order: 1,
         faviconURL: nil
@@ -121,10 +118,7 @@ let defaultServices = [
         id: "perplexity",
         name: "Perplexity",
         iconName: "perplexity-icon",
-        activationMethod: .urlParameter(
-            baseURL: ServiceConfigurations.perplexity.baseURL,
-            parameter: ServiceConfigurations.perplexity.queryParam
-        ),
+        backend: .web(config: ServiceConfigurations.perplexity),
         enabled: true,
         order: 2,
         faviconURL: nil
@@ -133,10 +127,7 @@ let defaultServices = [
         id: "google",
         name: "Google",
         iconName: "google-icon",
-        activationMethod: .urlParameter(
-            baseURL: ServiceConfigurations.google.baseURL,
-            parameter: ServiceConfigurations.google.queryParam
-        ),
+        backend: .web(config: ServiceConfigurations.google),
         enabled: true,
         order: 3,  // Third position from left
         faviconURL: nil
@@ -145,9 +136,7 @@ let defaultServices = [
         id: "claude",
         name: "Claude",
         iconName: "claude-icon",
-        activationMethod: .clipboardPaste(
-            baseURL: ServiceConfigurations.claude.baseURL
-        ),
+        backend: .web(config: ServiceConfigurations.claude),
         enabled: false,
         order: 4,
         faviconURL: nil
@@ -210,8 +199,7 @@ class URLParameterService: WebService {
             pastePromptIntoCurrentPage(prompt)
         } else {
             // New Chat mode: Use URL parameters for all services (no auto-submit)
-            guard case .urlParameter = service.activationMethod,
-                  let config = ServiceConfigurations.config(for: service.id) else { return }
+            guard case .web(let config) = service.backend else { return }
             
             let urlString = config.buildURL(with: prompt)
             print("🔗 \(service.name): Loading URL: \(urlString)")
@@ -425,7 +413,7 @@ class ClaudeService: WebService {
     ///
     /// Note: The replyToAll parameter is ignored for Claude as it always uses paste.
     func executePrompt(_ prompt: String, replyToAll: Bool) {
-        guard case .clipboardPaste(let baseURL) = service.activationMethod else { 
+        guard case .web(let config) = service.backend else { 
             print("❌ [Claude] Not a clipboard paste service")
             return 
         }
@@ -443,11 +431,11 @@ class ClaudeService: WebService {
         print("🌐 [Claude] Current URL: \(currentURL)")
         
         // Check if we need to navigate to Claude
-        let needsNavigation = !replyToAll || !currentURL.hasPrefix(baseURL)
+        let needsNavigation = !replyToAll || !currentURL.hasPrefix(config.homeURL)
         
         if needsNavigation {
-            if let url = URL(string: baseURL) {
-                print("🔗 [Claude] Navigating to: \(baseURL)")
+            if let url = URL(string: config.homeURL) {
+                print("🔗 [Claude] Navigating to: \(config.homeURL)")
                 webView.load(URLRequest(url: url))
                 
                 // Only delay when navigating to a new page
@@ -819,13 +807,19 @@ class ServiceManager: NSObject, ObservableObject {
             
             // Create appropriate WebService implementation based on activation method
             let webService: WebService
-            switch service.activationMethod {
-            case .urlParameter:
-                webService = URLParameterService(webView: webView, service: service)
-                print("📱 Created URLParameterService for: \(service.name)")
-            case .clipboardPaste:
-                webService = ClaudeService(webView: webView, service: service)
-                print("📋 Created ClaudeService for: \(service.name)")
+            switch service.backend {
+            case .web(let config):
+                if service.id == "claude" {
+                    webService = ClaudeService(webView: webView, service: service)
+                    print("📋 Created ClaudeService for: \(service.name)")
+                } else {
+                    webService = URLParameterService(webView: webView, service: service)
+                    print("📱 Created URLParameterService for: \(service.name)")
+                }
+            case .local(let modelPath, let modelName):
+                // TODO: Handle local services when implementing Phase 5
+                print("🏠 Local service not yet supported: \(modelName)")
+                return
             }
             
             // Store references and initialize state
@@ -1099,20 +1093,20 @@ class ServiceManager: NSObject, ObservableObject {
         
         // Categorize services by execution method to prevent clipboard conflicts
         let urlParameterServices = activeServices.filter { service in
-            switch service.activationMethod {
-            case .urlParameter:
-                return true
-            case .clipboardPaste:
+            switch service.backend {
+            case .web(let config):
+                return service.id != "claude"
+            case .local:
                 return false
             }
         }
         
         let clipboardServices = activeServices.filter { service in
-            switch service.activationMethod {
-            case .urlParameter:
+            switch service.backend {
+            case .web(let config):
+                return service.id == "claude"
+            case .local:
                 return false
-            case .clipboardPaste:
-                return true
             }
         }
         

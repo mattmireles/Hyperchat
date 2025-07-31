@@ -87,16 +87,19 @@ class FaviconFetcher {
         }
         
         // Determine base URL for the service
-        let baseURL: String
-        switch service.activationMethod {
-        case .urlParameter(let url, _):
-            baseURL = url
-        case .clipboardPaste(let url):
-            baseURL = url
+        let urlString: String?
+        
+        switch service.backend {
+        case .web(let config):
+            // We can only get a favicon from a web service.
+            urlString = config.homeURL
+        case .local:
+            // Local services don't have web pages, so no favicon.
+            urlString = nil
         }
         
-        guard let url = URL(string: baseURL) else {
-            print("❌ Invalid base URL for \(service.name): \(baseURL)")
+        guard let urlString = urlString,
+              let url = URL(string: urlString) else {
             completion(nil)
             return
         }

@@ -25,6 +25,28 @@
 
 import Foundation
 
+// MARK: - Service Backend Types
+
+/// Defines the backend type for an AI service.
+///
+/// This enum makes explicit the fundamental architectural difference between
+/// web-based services (which use WKWebView) and local inference services 
+/// (which use the InferenceEngine). This clean separation prevents the need
+/// for hacks like mock WebViews and allows each service type to have its
+/// appropriate implementation.
+///
+/// Used by:
+/// - `AIService` struct to specify its backend type
+/// - Service creation logic to determine UI implementation
+/// - ServiceManager to route prompts to appropriate handlers
+public enum ServiceBackend {
+    /// Web-based service using WKWebView with specified URL configuration
+    case web(config: ServiceURLConfig)
+    
+    /// Local inference service using InferenceEngine with specified model
+    case local(modelPath: String, modelName: String)
+}
+
 // MARK: - Service URL Configuration
 
 /// Configuration for building service-specific URLs.
@@ -44,7 +66,7 @@ import Foundation
 /// - baseURL: "https://chatgpt.com"
 /// - queryParam: "q"
 /// - Result: "https://chatgpt.com?q=encoded+query"
-struct ServiceURLConfig {
+public struct ServiceURLConfig: Codable {
     /// URL for initial page load (defaults to baseURL)
     let homeURL: String
     
