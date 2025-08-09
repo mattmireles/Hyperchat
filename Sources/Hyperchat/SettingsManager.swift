@@ -50,7 +50,6 @@ class SettingsManager {
         
         if let encoded = try? JSONEncoder().encode(services) {
             userDefaults.set(encoded, forKey: servicesKey)
-            userDefaults.synchronize() // Force immediate write to disk
             print("💾 SettingsManager.saveServices() - Save completed successfully")
         } else {
             print("❌ SettingsManager.saveServices() - Failed to encode services")
@@ -114,7 +113,6 @@ class SettingsManager {
         set {
             let oldValue = isAnalyticsEnabled
             userDefaults.set(newValue, forKey: analyticsEnabledKey)
-            userDefaults.synchronize() // Force immediate write
             
             // Only post notification if value actually changed
             if oldValue != newValue {
@@ -139,7 +137,6 @@ class SettingsManager {
         }
         set {
             userDefaults.set(newValue, forKey: hasCompletedOnboardingKey)
-            userDefaults.synchronize() // Force immediate write
             print("🎯 SettingsManager: Onboarding completion set to \(newValue)")
         }
     }

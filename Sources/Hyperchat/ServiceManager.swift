@@ -32,7 +32,7 @@ import Combine
 
 /// Defines the timing delays used throughout the service loading and prompt execution.
 /// These values are carefully tuned to balance responsiveness with reliability.
-private enum ServiceTimings {
+enum ServiceTimings {
     /// Delay before pasting into Claude to ensure page is fully loaded.
     /// Claude's React app requires ~1.5 seconds to initialize all JavaScript handlers.
     static let claudePasteDelay: TimeInterval = 1.5
@@ -652,23 +652,23 @@ class ServiceManager: NSObject, ObservableObject {
     
     /// Queue of services waiting to be loaded.
     /// Services are loaded sequentially to prevent WebKit race conditions.
-    private var serviceLoadingQueue: [AIService] = []
+    var serviceLoadingQueue: [AIService] = []
     
     /// ID of the service currently being loaded.
     /// Nil when no service is loading.
-    private var currentlyLoadingService: String? = nil
+    var currentlyLoadingService: String? = nil
     
     /// Whether we're performing a force reload of all services.
     /// Set by reloadAllServices() to ensure fresh page loads.
-    private var isForceReloading: Bool = false
+    var isForceReloading: Bool = false
     
     /// Count of services that have finished loading (successfully or failed).
     /// Used to determine when all services are ready.
-    private var loadedServicesCount: Int = 0
+    var loadedServicesCount: Int = 0
     
     /// Whether we've already notified that all services are loaded.
     /// Prevents duplicate notifications and state updates.
-    private var hasNotifiedAllServicesLoaded: Bool = false
+    var hasNotifiedAllServicesLoaded: Bool = false
     
     // MARK: - Cleanup State
     
@@ -967,111 +967,7 @@ class ServiceManager: NSObject, ObservableObject {
     /// - Navigation delegates fire in predictable order
     ///
     /// - Parameter forceReload: If true, reloads even if already at home URL
-    private func loadNextServiceFromQueue(forceReload: Bool = false) {
-        // Check if we're already loading or if queue is empty
-        guard currentlyLoadingService == nil, !serviceLoadingQueue.isEmpty else {
-            print("⏭️ Skipping loadNextServiceFromQueue - already loading: \(currentlyLoadingService ?? "none"), queue count: \(serviceLoadingQueue.count)")
-            
-            // If queue is empty and we were force reloading, clear the flag
-            if serviceLoadingQueue.isEmpty && isForceReloading {
-                isForceReloading = false
-                print("✅ Force reload completed for all services")
-            }
-            return
-        }
-        
-        // Use isForceReloading flag if no explicit forceReload parameter provided
-        let shouldForceReload = forceReload || isForceReloading
-        
-        // Get the next service to load
-        let service = serviceLoadingQueue.removeFirst()
-        
-        // Get the webView for this service
-        guard let webService = webServices[service.id] else { 
-            print("❌ No webService found for \(service.id)")
-            // Try loading the next one
-            loadNextServiceFromQueue()
-            return 
-        }
-        let webView = webService.webView
-        
-        // Mark which service we're loading
-        currentlyLoadingService = service.id
-        print("🔄 Loading service from queue: \(service.name)")
-        
-        // Load the service
-        loadDefaultPage(for: service, webView: webView, forceReload: shouldForceReload)
-    }
-    
-    private func loadDefaultPage(for service: AIService, webView: WKWebView, forceReload: Bool = false) {
-        // Get the expected home URL for this service
-        let expectedHomeURL: String
-        if let config = ServiceConfigurations.config(for: service.id) {
-            expectedHomeURL = config.homeURL
-        } else if service.id == "claude" {
-            expectedHomeURL = "https://claude.ai"
-        } else {
-            return
-        }
-        
-        // Check if WebView is already at the home URL or loading it
-        if !forceReload {
-            if webView.isLoading {
-                print("⏭️ \(service.name): Skipping default page load - already loading")
-                return
-            }
-            
-            if let currentURL = webView.url?.absoluteString {
-                // Check if already at home URL or has query params
-                if currentURL.hasPrefix(expectedHomeURL) || currentURL.contains("?q=") {
-                    print("⏭️ \(service.name): Skipping default page load - already at correct URL")
-                    return
-                }
-            }
-        } else {
-            print("🔄 \(service.name): Force reloading to home URL")
-            // When force reload is requested, always reload regardless of current URL
-            // This ensures "new chat" button always creates a fresh session
-        }
-        
-        // Update loading state
-        loadingStates[service.id] = true
-        
-        let defaultURL: String
-        
-        // Use ServiceConfiguration for URL parameter services
-        if let config = ServiceConfigurations.config(for: service.id) {
-            defaultURL = config.homeURL
-        } else {
-            // Fallback for services without config (e.g., Claude if not using URL params)
-            switch service.id {
-            case "claude":
-                defaultURL = "https://claude.ai"
-            default:
-                return
-            }
-        }
-        
-        if let url = URL(string: defaultURL) {
-            var request = URLRequest(url: url)
-            // Add headers to prevent loading conflicts
-            request.setValue("no-cache", forHTTPHeaderField: "Cache-Control")
-            // User-Agent is already set on the webView itself, no need to set it here
-            
-            // Add minimal delay to prevent race conditions
-            DispatchQueue.main.asyncAfter(deadline: .now() + 0.01) {
-                // Double-check before loading in case state changed (unless force reloading)
-                if forceReload || (!webView.isLoading && webView.url?.absoluteString.contains("?q=") != true) {
-                    webView.load(request)
-                    
-                    // Log service loads for debugging
-                    if service.id == "perplexity" {
-                        WebViewLogger.shared.log("🔵 Perplexity: Starting default page load - \(defaultURL)", for: "perplexity", type: .info)
-                    }
-                }
-            }
-        }
-    }
+    // moved to LoadingQueue.swift
     
     /// Executes a prompt across all active AI services.
     ///
@@ -1182,7 +1078,7 @@ class ServiceManager: NSObject, ObservableObject {
     ///   - prompt: The user's text to send to AI services
     ///   - replyToAll: If true, pastes into existing chats; if false, creates new chats
     ///   - currentIndex: Current index in the services array (for recursion)
-    private func executeClipboardServicesSequentially(_ services: [AIService], prompt: String, replyToAll: Bool, currentIndex: Int) {
+    func executeClipboardServicesSequentially(_ services: [AIService], prompt: String, replyToAll: Bool, currentIndex: Int) {
         // Base case: all services have been executed
         guard currentIndex < services.count else {
             return
@@ -1229,7 +1125,7 @@ class ServiceManager: NSObject, ObservableObject {
     ///   - prompt: The user's text to send to local services
     ///   - replyToAll: If true, continues existing conversation; if false, starts new conversation
     ///   - currentIndex: Current index in the services array (for recursion)
-    private func executeLocalServicesSequentially(_ services: [AIService], prompt: String, replyToAll: Bool, currentIndex: Int) {
+    func executeLocalServicesSequentially(_ services: [AIService], prompt: String, replyToAll: Bool, currentIndex: Int) {
         // Base case: all services have been executed
         guard currentIndex < services.count else {
             return
@@ -1552,44 +1448,7 @@ extension WKProcessPool {
 
 /// Extension for tracking all ServiceManager instances globally.
 /// Used to coordinate prompt execution across multiple windows.
-extension ServiceManager {
-    /// Array of weak references to all ServiceManager instances.
-    /// Automatically cleaned up when managers are deallocated.
-    private static var allManagers: [WeakServiceManagerWrapper] = []
-    
-    /// Wrapper to hold weak references and prevent retain cycles.
-    private class WeakServiceManagerWrapper {
-        weak var manager: ServiceManager?
-        init(_ manager: ServiceManager) {
-            self.manager = manager
-        }
-    }
-    
-    private func registerManager() {
-        ServiceManager.allManagers.append(WeakServiceManagerWrapper(self))
-        // Clean up nil references
-        ServiceManager.allManagers = ServiceManager.allManagers.filter { $0.manager != nil }
-    }
-    
-    private func getAllServiceManagers() -> [ServiceManager] {
-        ServiceManager.allManagers.compactMap { $0.manager }
-    }
-    
-    private func findServiceId(for webView: WKWebView) -> String? {
-        for (serviceId, webService) in webServices {
-            if webService.webView == webView {
-                return serviceId
-            }
-        }
-        return nil
-    }
-    
-    private func updateLoadingState(for serviceId: String, isLoading: Bool) {
-        DispatchQueue.main.async { [weak self] in
-            self?.loadingStates[serviceId] = isLoading
-        }
-    }
-}
+// moved to Services/ServiceRegistry.swift
 
 // MARK: - WKNavigationDelegate for ServiceManager
 
@@ -1990,25 +1849,7 @@ extension ServiceManager: WKNavigationDelegate {
     /// 2. Update loading state to prevent hanging
     /// 3. Wait for process cleanup
     /// 4. Force reload the crashed service
-    func webViewWebContentProcessDidTerminate(_ webView: WKWebView) {
-        guard let serviceId = findServiceId(for: webView) else { return }
-        
-        print("⚠️ WebView process crashed for service: \(serviceId)")
-        WebViewLogger.shared.log("⚠️ WebView process crashed, attempting recovery", for: serviceId, type: .error)
-        
-        // Mark service as not loading to prevent hanging (thread-safe)
-        updateLoadingState(for: serviceId, isLoading: false)
-        
-        // Reload the service with a delay to allow process cleanup
-        DispatchQueue.main.asyncAfter(deadline: .now() + ServiceTimings.crashRecoveryDelay) { [weak self] in
-            guard let self = self else { return }
-            if let service = self.activeServices.first(where: { $0.id == serviceId }),
-               let webService = self.webServices[serviceId] {
-                self.loadDefaultPage(for: service, webView: webService.webView, forceReload: true)
-                WebViewLogger.shared.log("🔄 WebView recovered from crash", for: serviceId, type: .info)
-            }
-        }
-    }
+    // moved to CrashRecovery.swift
 }
 
 // MARK: - WKUIDelegate for ServiceManager

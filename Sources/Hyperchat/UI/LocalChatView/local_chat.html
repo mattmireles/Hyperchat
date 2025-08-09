@@ -226,6 +226,58 @@
             opacity: 0.8;
         }
 
+        /* Model Finder Buttons */
+        .model-finder-buttons {
+            display: flex;
+            flex-direction: column;
+            gap: 12px;
+            margin-top: 32px;
+        }
+
+        .model-button {
+            padding: 12px 24px;
+            border-radius: 8px;
+            border: none;
+            font-family: inherit;
+            font-size: 14px;
+            font-weight: 500;
+            cursor: pointer;
+            transition: all 0.2s ease;
+            min-width: 200px;
+        }
+
+        .model-button.primary {
+            background: linear-gradient(135deg, 
+                var(--primary-gradient-start), 
+                var(--primary-gradient-mid), 
+                var(--primary-gradient-end)
+            );
+            color: white;
+        }
+
+        .model-button.primary:hover {
+            transform: translateY(-2px);
+            box-shadow: 0 8px 25px rgba(0, 0, 0, 0.2);
+        }
+
+        .model-button.secondary {
+            background: var(--background-secondary);
+            backdrop-filter: blur(10px);
+            border: 1px solid var(--border-color);
+            color: var(--text-primary);
+        }
+
+        .model-button.secondary:hover {
+            background: var(--background-primary);
+            border-color: var(--primary-gradient-end);
+        }
+
+        .model-button:disabled {
+            opacity: 0.5;
+            cursor: not-allowed;
+            transform: none !important;
+        }
+
         /* Markdown Styles */
         .message-content h1, .message-content h2, .message-content h3 {
             margin-top: 16px;
@@ -330,6 +382,16 @@
                 <div class="empty-state-icon">🧠</div>
                 <div class="empty-state-title">Ready to Chat</div>
                 <div class="empty-state-subtitle">Start a conversation with your local AI model</div>
+                
+                <!-- Model Finder Buttons -->
+                <div class="model-finder-buttons">
+                    <button id="add-model-file-button" class="model-button primary">
+                        Add Model from File...
+                    </button>
+                    <button id="find-all-models-button" class="model-button secondary">
+                        Find all models... (advanced)
+                    </button>
+                </div>
             </div>
         </div>
         
@@ -386,6 +448,18 @@
             
             // Handle Enter key (submit) vs Shift+Enter (new line)
             messageInput.addEventListener('keydown', handleKeyDown);
+            
+            // Model finder buttons
+            const addModelFileButton = document.getElementById('add-model-file-button');
+            const findAllModelsButton = document.getElementById('find-all-models-button');
+            
+            if (addModelFileButton) {
+                addModelFileButton.addEventListener('click', handleAddModelFromFile);
+            }
+            
+            if (findAllModelsButton) {
+                findAllModelsButton.addEventListener('click', handleFindAllModels);
+            }
         }
 
         // Auto-resize textarea
@@ -420,6 +494,35 @@
                 e.preventDefault();
                 chatForm.dispatchEvent(new Event('submit'));
             }
+        }
+
+        // Handle "Add Model from File..." button
+        function handleAddModelFromFile() {
+            console.log('Add Model from File clicked');
+            sendToSwift('add_model_from_file', {});
+            
+            // Disable button during operation
+            const button = document.getElementById('add-model-file-button');
+            if (button) {
+                button.disabled = true;
+                button.textContent = 'Opening File Picker...';
+            }
+        }
+
+        // Handle "Find all models... (advanced)" button
+        function handleFindAllModels() {
+            console.log('Find All Models clicked');
+            sendToSwift('find_all_models_advanced', {});
+            
+            // Disable button and show loading state
+            const button = document.getElementById('find-all-models-button');
+            if (button) {
+                button.disabled = true;
+                button.textContent = 'Scanning for models...';
+            }
+            
+            // Show initial loading message
+            showSystemMessage('🔍 Scanning your home directory for .gguf model files... This may take a moment.');
         }
 
         // Display user message
@@ -559,6 +662,103 @@
             
             isGenerating = false;
             currentAssistantMessageId = null;
+        }
+
+        // Show system message (for model operations)
+        function showSystemMessage(messageText) {
+            messageCount++;
+            updateEmptyState();
+            
+            const messageDiv = document.createElement('div');
+            messageDiv.className = 'message assistant';
+            messageDiv.innerHTML = `
+                <div class="message-bubble" style="border-color: #0099ff; background: rgba(0, 153, 255, 0.1);">
+                    <div class="message-content" style="color: #0099ff;">
+                        ${escapeHtml(messageText)}
+                    </div>
+                </div>
+            `;
+            
+            chatHistory.appendChild(messageDiv);
+            scrollToBottom();
+        }
+
+        // Handle search completion callback from Swift
+        function handleFoundModels(modelPaths, scanTime) {
+            console.log('Received model search results:', modelPaths, 'Scan time:', scanTime + 's');
+            
+            // Reset the search button
+            const button = document.getElementById('find-all-models-button');
+            if (button) {
+                button.disabled = false;
+                button.textContent = 'Find all models... (advanced)';
+            }
+            
+            messageCount++;
+            updateEmptyState();
+            
+            const messageDiv = document.createElement('div');
+            messageDiv.className = 'message assistant';
+            
+            if (modelPaths.length === 0) {
+                // No models found
+                messageDiv.innerHTML = `
+                    <div class="message-bubble" style="border-color: #ff9500; background: rgba(255, 149, 0, 0.1);">
+                        <div class="message-content" style="color: #ff9500;">
+                            🔍 No GGUF model files found in your home directory after scanning for ${scanTime} seconds.
+                        </div>
+                    </div>
+                `;
+            } else {
+                // Models found - create clickable list
+                const modelList = modelPaths.map(path => {
+                    const fileName = path.split('/').pop();
+                    return `<li><a href="#" onclick="selectModel('${escapeForAttribute(path)}')">${escapeHtml(fileName)}</a><br><code style="font-size: 11px; opacity: 0.7;">${escapeHtml(path)}</code></li>`;
+                }).join('');
+                
+                messageDiv.innerHTML = `
+                    <div class="message-bubble" style="border-color: #00cc44; background: rgba(0, 204, 68, 0.1);">
+                        <div class="message-content" style="color: #00cc44;">
+                            🎯 Found ${modelPaths.length} model files after scanning for ${scanTime} seconds:
+                            <ul style="margin-top: 12px; margin-left: 20px;">
+                                ${modelList}
+                            </ul>
+                            <p style="margin-top: 12px; font-size: 14px; opacity: 0.8;">Click a model to select it.</p>
+                        </div>
+                    </div>
+                `;
+            }
+            
+            chatHistory.appendChild(messageDiv);
+            scrollToBottom();
+        }
+
+        // Handle search error callback from Swift
+        function handleSearchError(errorMessage) {
+            console.error('Model search error:', errorMessage);
+            
+            // Reset the search button
+            const button = document.getElementById('find-all-models-button');
+            if (button) {
+                button.disabled = false;
+                button.textContent = 'Find all models... (advanced)';
+            }
+            
+            showErrorMessage('Model search failed: ' + errorMessage);
+        }
+
+        // Handle model selection
+        function selectModel(modelPath) {
+            console.log('Selected model:', modelPath);
+            showSystemMessage(`📁 Loading model: ${modelPath.split('/').pop()}...`);
+            
+            // Send selected model back to Swift for loading
+            sendToSwift('load_model_from_path', { path: modelPath });
+        }
+
+        // Utility function to escape strings for HTML attributes
+        function escapeForAttribute(text) {
+            return text.replace(/'/g, '&#39;').replace(/"/g, '&quot;');
         }
 
         // Update empty state visibility

@@ -274,6 +274,8 @@ Here is the step-by-step flow of a typical user interaction:
 - Initializes FloatingButtonManager, PromptWindowController, and OverlayController.
 - Initializes AnalyticsManager for usage tracking (enabled by default, user can disable).
 - Acts as a central listener for key notifications, delegating tasks to the appropriate controller.
+ - Manages activation policy switching between `.accessory` and `.regular` driven by window events, using `switchToRegularMode()` / `switchToAccessoryMode()`.
+ - Builds and refreshes the main menu via `MenuBuilder` (see `Sources/Hyperchat/MenuBuilder.swift`) when in `.regular` mode.
 
 ### 2. FloatingButtonManager (The Greeter)
 
@@ -295,6 +297,7 @@ Here is the step-by-step flow of a typical user interaction:
 - **Creates Window**: It creates a new OverlayWindow.
 - **Creates Controllers**: For each service, it creates a BrowserViewController and registers it with the ServiceManager.
 - **Handoff to Logic**: Crucially, it creates a new, dedicated ServiceManager for that window and then calls serviceManager.executePrompt(prompt).
+ - **Activation Policy**: When the first window is created, it requests the app switch to `.regular` mode; when the last window closes, it switches back to `.accessory`.
 
 ### 5. ServiceManager (The Engine)
 
@@ -320,6 +323,12 @@ Here is the step-by-step flow of a typical user interaction:
 - **Creates WebViews**: Configures process pools, user agents, content scripts, and message handlers
 - **Shared Configuration**: Ensures consistent WebView setup across all services
 - **Memory Optimization**: Uses shared WKProcessPool for all WebViews
+ 
+### MenuBuilder (Main Menu Construction)
+
+- **Job:** Centralizes all AppKit menu construction.
+- **Location:** `Sources/Hyperchat/MenuBuilder.swift`
+- **Interaction:** AppDelegate calls `MenuBuilder.createMainMenu(appDelegate:)` when switching to `.regular` mode and refreshes AI Services via `MenuBuilder.createAIServicesMenu(_:)` upon `.servicesUpdated`.
 
 ### 7. BrowserViewController (The Navigator)
 

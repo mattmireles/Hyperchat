@@ -24,6 +24,7 @@
 /// - Proper cleanup prevents WebKit crashes
 
 import Cocoa
+import AppKit
 import SwiftUI
 import WebKit
 import Combine
@@ -680,11 +681,11 @@ class OverlayController: NSObject, NSWindowDelegate, ObservableObject {
         window.overlayController = self
         windows.append(window)
         
-        // Update activation policy now that we have a window
-        print("🪟 showOverlay: calling updateActivationPolicy")
+        // Switch to regular mode now that we have at least one window
+        print("🪟 showOverlay: switching to regular mode")
         print("🪟 delegate class:", String(describing: appDelegate))
         if let appDelegate = self.appDelegate {
-            appDelegate.updateActivationPolicy(source: "OverlayController.showOverlay")
+            appDelegate.switchToRegularMode()
         }
         
         // Store the window-specific ServiceManager
@@ -755,53 +756,26 @@ class OverlayController: NSObject, NSWindowDelegate, ObservableObject {
         var browserViews: [NSView] = []
         
         for (index, service) in sortedServices.enumerated() {
-            // Handle local services with LocalChatView
-            if case .local(let model) = service.backend {
-                let chatView = LocalChatView(model: model, serviceId: service.id)
-                let hostingController = NSHostingController(rootView: chatView)
+            let isFirstService = index == 0
+            if let bundle = ViewProvider.shared.makeServiceView(
+                for: service,
+                serviceManager: windowServiceManager,
+                isFirstService: isFirstService,
+                appFocusPublisher: self.$isAppFocused.eraseToAnyPublisher()
+            ) {
+                // Append view
+                browserViews.append(bundle.view)
                 
-                let view = hostingController.view
-                view.translatesAutoresizingMaskIntoConstraints = false
-                
-                view.wantsLayer = true
-                view.layer?.cornerRadius = 8
-                view.layer?.masksToBounds = true
-                
-                browserViews.append(view)
-                self.localViewControllers[service.id] = hostingController
-                
-                print("✅ Created LocalChatView for \(service.name)")
-                continue // Skip to the next service in the loop
-            }
-            
-            if let webService = windowServiceManager.webServices[service.id] {
-                let webView = webService.webView
-                let isFirstService = index == 0
-                
-                // Pass app focus publisher to BrowserViewController for proper focus indicator binding
-                let controller = BrowserViewController(
-                    webView: webView, 
-                    service: service, 
-                    isFirstService: isFirstService,
-                    appFocusPublisher: self.$isAppFocused.eraseToAnyPublisher()
-                )
-                browserViewControllers.append(controller)
-                
-                // Get the BrowserView directly - no wrapper container
-                let browserView = controller.view
-                browserView.translatesAutoresizingMaskIntoConstraints = false
-                
-                // Add corner radius styling back to BrowserView since no container
-                browserView.wantsLayer = true
-                browserView.layer?.cornerRadius = 8
-                browserView.layer?.masksToBounds = true
-                
-                browserViews.append(browserView)
-                
-                // Register the controller with ServiceManager for delegate handoff
-                windowServiceManager.browserViewControllers[service.id] = controller
-                
-                print("✅ [DIRECT LAYOUT] Created BrowserView directly for \(service.name)")
+                // Track controllers
+                if let hosting = bundle.localHostingController {
+                    self.localViewControllers[service.id] = hosting
+                    print("✅ Created LocalChatView for \(service.name)")
+                }
+                if let controller = bundle.browserController {
+                    browserViewControllers.append(controller)
+                    windowServiceManager.browserViewControllers[service.id] = controller
+                    print("✅ [DIRECT LAYOUT] Created BrowserView directly for \(service.name)")
+                }
             }
         }
         
@@ -887,10 +861,13 @@ class OverlayController: NSObject, NSWindowDelegate, ObservableObject {
         // Use DispatchQueue.main.async to defer policy update to next run loop
         // This ensures the window is fully closed before evaluating policy
         DispatchQueue.main.async {
-            print("🪟 removeWindow: calling updateActivationPolicy")
+            print("🪟 removeWindow: updating activation policy via canonical methods")
             print("🪟 delegate class:", String(describing: self.appDelegate))
-            if let appDelegate = self.appDelegate {
-                appDelegate.updateActivationPolicy(source: "OverlayController.closeWindow")
+            guard let appDelegate = self.appDelegate else { return }
+            if self.windows.isEmpty {
+                appDelegate.switchToAccessoryMode()
+            } else {
+                appDelegate.switchToRegularMode()
             }
         }
         

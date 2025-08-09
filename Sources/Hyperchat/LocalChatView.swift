@@ -24,6 +24,8 @@
 
 import SwiftUI
 import WebKit
+import AppKit
+import UniformTypeIdentifiers
 
 /// WebView-based local LLM chat interface
 struct LocalChatView: View {
@@ -222,6 +224,14 @@ class WebViewCoordinator: NSObject, ObservableObject, WKScriptMessageHandler, WK
             if let prompt = body["prompt"] as? String {
                 handlePromptFromJavaScript(prompt)
             }
+        case "add_model_from_file":
+            handleAddModelFromFile()
+        case "find_all_models_advanced":
+            handleFindAllModelsAdvanced()
+        case "load_model_from_path":
+            if let path = body["path"] as? String {
+                loadModelFromPath(path)
+            }
         default:
             print("⚠️ Unknown action from JavaScript: \(action)")
         }
@@ -306,6 +316,228 @@ class WebViewCoordinator: NSObject, ObservableObject, WKScriptMessageHandler, WK
         let escapedError = errorMessage.replacingOccurrences(of: "'", with: "\\'")
                                      .replacingOccurrences(of: "\\", with: "\\\\")
         evaluateJavaScript("showErrorMessage('\(escapedError)');")
+    }
+    
+    // MARK: - Model Finder Actions
+    
+    /// Handle "Add Model from File..." button - shows native file picker
+    private func handleAddModelFromFile() {
+        print("🔍 Opening native file picker for model selection")
+        
+        DispatchQueue.main.async {
+            let openPanel = NSOpenPanel()
+            openPanel.allowsMultipleSelection = false
+            openPanel.canChooseDirectories = false
+            openPanel.canChooseFiles = true
+            openPanel.allowedContentTypes = [UTType(filenameExtension: "gguf") ?? UTType.data]
+            openPanel.title = "Select GGUF Model File"
+            openPanel.message = "Choose a GGUF model file to load"
+            
+            let response = openPanel.runModal()
+            
+            if response == .OK, let selectedURL = openPanel.url {
+                print("✅ User selected model file: \(selectedURL.path)")
+                self.handleSelectedModelFile(selectedURL)
+            } else {
+                print("❌ User cancelled file selection")
+                self.resetAddModelButton()
+            }
+        }
+    }
+    
+    /// Handle "Find all models... (advanced)" button - scans file system
+    private func handleFindAllModelsAdvanced() {
+        print("🔍 Starting advanced model scan of home directory")
+        
+        Task.detached {
+            let startTime = Date()
+            var foundModels: [String] = []
+            
+            do {
+                let homeURL = FileManager.default.homeDirectoryForCurrentUser
+                print("📂 Scanning directory: \(homeURL.path)")
+                
+                let resourceKeys: [URLResourceKey] = [.nameKey, .isDirectoryKey, .fileSizeKey]
+                guard let enumerator = FileManager.default.enumerator(
+                    at: homeURL,
+                    includingPropertiesForKeys: resourceKeys,
+                    options: [.skipsPackageDescendants]
+                ) else {
+                    throw NSError(domain: "ModelScan", code: 1, userInfo: [NSLocalizedDescriptionKey: "Could not create file enumerator"])
+                }
+                
+                for case let url as URL in enumerator {
+                    // Check if file has .gguf extension
+                    if url.pathExtension.lowercased() == "gguf" {
+                        foundModels.append(url.path)
+                        print("🎯 Found model: \(url.lastPathComponent)")
+                    }
+                }
+                
+                let scanTime = Date().timeIntervalSince(startTime)
+                print("✅ Scan completed in \(String(format: "%.2f", scanTime))s, found \(foundModels.count) models")
+                
+                DispatchQueue.main.async {
+                    self.handleFoundModels(foundModels, scanTime: scanTime)
+                }
+                
+            } catch {
+                print("❌ Model scan failed: \(error)")
+                DispatchQueue.main.async {
+                    self.sendErrorToJavaScript("Model scan failed: \(error.localizedDescription)")
+                    self.resetFindAllButton()
+                }
+            }
+        }
+    }
+    
+    /// Handle selected model file from file picker
+    private func handleSelectedModelFile(_ url: URL) {
+        let modelPath = url.path
+        let modelName = url.lastPathComponent
+        
+        let message = """
+        📁 Selected model file:
+        
+        **Name:** \(modelName)
+        **Path:** `\(modelPath)`
+        
+        File picker completed instantly! ✨
+        """
+        
+        evaluateJavaScript("showSystemMessage('\(message.replacingOccurrences(of: "'", with: "\\'"))');")
+        resetAddModelButton()
+    }
+    
+    /// Handle results from advanced model scan - send to JavaScript via callback
+    private func handleFoundModels(_ modelPaths: [String], scanTime: TimeInterval) {
+        do {
+            // Serialize model paths to JSON
+            let jsonData = try JSONSerialization.data(withJSONObject: modelPaths, options: [])
+            guard let jsonString = String(data: jsonData, encoding: .utf8) else {
+                throw NSError(domain: "JSONSerialization", code: 1, userInfo: [NSLocalizedDescriptionKey: "Failed to convert JSON data to string"])
+            }
+            
+            // Call JavaScript completion callback with results and timing
+            let javascript = "handleFoundModels(\(jsonString), \(String(format: "%.1f", scanTime)));"
+            evaluateJavaScript(javascript)
+            
+            print("✅ Sent \(modelPaths.count) model paths to JavaScript after \(String(format: "%.1f", scanTime))s scan")
+            
+        } catch {
+            print("❌ Failed to serialize model paths: \(error)")
+            // Fallback to error callback
+            evaluateJavaScript("handleSearchError('Failed to process search results: \(error.localizedDescription)');")
+        }
+    }
+    
+    /// Reset "Add Model from File..." button to original state
+    private func resetAddModelButton() {
+        evaluateJavaScript("""
+            const button = document.getElementById('add-model-file-button');
+            if (button) {
+                button.disabled = false;
+                button.textContent = 'Add Model from File...';
+            }
+        """)
+    }
+    
+    /// Reset "Find all models... (advanced)" button to original state
+    private func resetFindAllButton() {
+        evaluateJavaScript("""
+            const button = document.getElementById('find-all-models-button');
+            if (button) {
+                button.disabled = false;
+                button.textContent = 'Find all models... (advanced)';
+            }
+        """)
+    }
+    
+    // MARK: - Model Loading
+    
+    /// Load a new model from the specified file path
+    private func loadModelFromPath(_ path: String) {
+        print("🔄 Attempting to load model from path: \(path)")
+        
+        let modelName = URL(fileURLWithPath: path).lastPathComponent
+        
+        // Validate file exists
+        guard FileManager.default.fileExists(atPath: path) else {
+            print("❌ Model file not found at path: \(path)")
+            let errorMessage = "Model file not found: \(modelName)"
+            sendSystemMessageToJavaScript(errorMessage, type: "error")
+            return
+        }
+        
+        // Attempt to create new InferenceEngine
+        do {
+            let newEngine = try InferenceEngine(modelPath: path)
+            
+            // Replace the existing engine
+            self.inferenceEngine = newEngine
+            
+            print("✅ Successfully loaded model: \(modelName)")
+            let successMessage = "✅ Model loaded successfully: \(modelName)"
+            sendSystemMessageToJavaScript(successMessage, type: "success")
+            
+        } catch {
+            print("❌ Failed to load model \(modelName): \(error)")
+            let errorMessage = "❌ Failed to load model: \(error.localizedDescription)"
+            sendSystemMessageToJavaScript(errorMessage, type: "error")
+        }
+    }
+    
+    /// Send a system message to JavaScript with optional type styling
+    private func sendSystemMessageToJavaScript(_ message: String, type: String = "info") {
+        let escapedMessage = message.replacingOccurrences(of: "'", with: "\\'")
+                                   .replacingOccurrences(of: "\\", with: "\\\\")
+                                   .replacingOccurrences(of: "\n", with: "\\n")
+                                   .replacingOccurrences(of: "\r", with: "\\r")
+        
+        let borderColor: String
+        let backgroundColor: String
+        let textColor: String
+        
+        switch type {
+        case "success":
+            borderColor = "#00cc44"
+            backgroundColor = "rgba(0, 204, 68, 0.1)"
+            textColor = "#00cc44"
+        case "error":
+            borderColor = "#ff4444"
+            backgroundColor = "rgba(255, 68, 68, 0.1)"
+            textColor = "#ff4444"
+        default: // "info"
+            borderColor = "#0099ff"
+            backgroundColor = "rgba(0, 153, 255, 0.1)"
+            textColor = "#0099ff"
+        }
+        
+        let javascript = """
+            const messageDiv = document.createElement('div');
+            messageDiv.className = 'message assistant';
+            messageDiv.innerHTML = `
+                <div class="message-bubble" style="border-color: \(borderColor); background: \(backgroundColor);">
+                    <div class="message-content" style="color: \(textColor);">
+                        \(escapedMessage)
+                    </div>
+                </div>
+            `;
+            
+            const chatHistory = document.getElementById('chat-history');
+            messageDiv.onclick = function() {
+                this.style.opacity = '0.5';
+                setTimeout(() => this.remove(), 200);
+            };
+            chatHistory.appendChild(messageDiv);
+            
+            // Update message count and scroll
+            messageCount++;
+            updateEmptyState();
+            scrollToBottom();
+        """
+        
+        evaluateJavaScript(javascript)
     }
 }
 

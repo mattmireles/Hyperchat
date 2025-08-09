@@ -7,6 +7,12 @@
 	objects = {
 
 /* Begin PBXBuildFile section */
+        MENUBUILDERFILE000000000001 /* MenuBuilder.swift in Sources */ = {isa = PBXBuildFile; fileRef = MENUBUILDERFILE000000000000 /* MenuBuilder.swift */; };
+        SRBUILD000000000000000001 /* ServiceRegistry.swift in Sources */ = {isa = PBXBuildFile; fileRef = SRFILE000000000000000001 /* ServiceRegistry.swift */; };
+        LQBUILD000000000000000001 /* LoadingQueue.swift in Sources */ = {isa = PBXBuildFile; fileRef = LQFILE000000000000000001 /* LoadingQueue.swift */; };
+        CRBUILD000000000000000001 /* CrashRecovery.swift in Sources */ = {isa = PBXBuildFile; fileRef = CRFILE000000000000000001 /* CrashRecovery.swift */; };
+        PRBUILD000000000000000001 /* PromptRouter.swift in Sources */ = {isa = PBXBuildFile; fileRef = PRFILE000000000000000001 /* PromptRouter.swift */; };
+        VIEWPROVIDERBUILD000000000001 /* ViewProvider.swift in Sources */ = {isa = PBXBuildFile; fileRef = VIEWPROVIDERFILE000000000000 /* ViewProvider.swift */; };
 		3EE13B9B2C4F6B2900A8A61E /* AppDelegate.swift in Sources */ = {isa = PBXBuildFile; fileRef = 3EE13B8E2C4F6B2900A8A61E /* AppDelegate.swift */; };
 		3EE13B9C2C4F6B2900A8A61E /* Assets.xcassets in Resources */ = {isa = PBXBuildFile; fileRef = 3EE13B932C4F6B2900A8A61E /* Assets.xcassets */; };
 		3EE13B9D2C4F6B2900A8A61E /* FloatingButtonManager.swift in Sources */ = {isa = PBXBuildFile; fileRef = 3EE13B8F2C4F6B2900A8A61E /* FloatingButtonManager.swift */; };
@@ -76,6 +82,12 @@
 /* End PBXContainerItemProxy section */
 
 /* Begin PBXFileReference section */
+        MENUBUILDERFILE000000000000 /* MenuBuilder.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = MenuBuilder.swift; sourceTree = "<group>"; };
+        VIEWPROVIDERFILE000000000000 /* ViewProvider.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ViewProvider.swift; sourceTree = "<group>"; };
+        SRFILE000000000000000001 /* ServiceRegistry.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; name = ServiceRegistry.swift; path = Services/ServiceRegistry.swift; sourceTree = "<group>"; };
+        LQFILE000000000000000001 /* LoadingQueue.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; name = LoadingQueue.swift; path = Services/LoadingQueue.swift; sourceTree = "<group>"; };
+        CRFILE000000000000000001 /* CrashRecovery.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; name = CrashRecovery.swift; path = Services/CrashRecovery.swift; sourceTree = "<group>"; };
+        PRFILE000000000000000001 /* PromptRouter.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; name = PromptRouter.swift; path = Services/PromptRouter.swift; sourceTree = "<group>"; };
 		3EE13B8B2C4F6B2900A8A61E /* Hyperchat.app */ = {isa = PBXFileReference; explicitFileType = wrapper.application; includeInIndex = 0; path = Hyperchat.app; sourceTree = BUILT_PRODUCTS_DIR; };
 		3EE13B8E2C4F6B2900A8A61E /* AppDelegate.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = AppDelegate.swift; sourceTree = "<group>"; };
 		3EE13B8F2C4F6B2900A8A61E /* FloatingButtonManager.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = FloatingButtonManager.swift; sourceTree = "<group>"; };
@@ -192,9 +204,14 @@
 		3EE13B8D2C4F6B2900A8A61E /* Sources/Hyperchat */ = {
 			isa = PBXGroup;
 			children = (
+				SRFILE000000000000000001 /* ServiceRegistry.swift */,
+				LQFILE000000000000000001 /* LoadingQueue.swift */,
+				CRFILE000000000000000001 /* CrashRecovery.swift */,
+				PRFILE000000000000000001 /* PromptRouter.swift */,
 				BE47472E2E3C1E740037641C /* local_chat.html */,
 				BEBF453E2E3B18F700D2CCA1 /* common */,
 				BEA4CA3E2E1BB07D00F810E4 /* ClaudeLoginAlertController.swift */,
+				VIEWPROVIDERFILE000000000000 /* ViewProvider.swift */,
 				BEB355C02E18A6F4000164A8 /* UI/ButtonState.swift */,
 				BEB355C12E18A6F4000164A8 /* UI/GradientToolbarButton.swift */,
 				BEB355C22E18A6F4000164A8 /* UI/BrowserView.swift */,
@@ -217,14 +234,15 @@
 				3EE13BA82C4F6B2900A8A61E /* ServiceConfiguration.swift */,
 				LM001002LOCALMODEL001234 /* LocalModel.swift */,
 				MM001002MODELMANAG001234 /* ModelManager.swift */,
-				EBF9B55FCC48AA0BC1F8AABD /* SpaceDetector.swift */,
-				BEE13BA92C4F6B2900A8A61E /* WebViewLogger.swift */,
+                EBF9B55FCC48AA0BC1F8AABD /* SpaceDetector.swift */,
+                BEE13BA92C4F6B2900A8A61E /* WebViewLogger.swift */,
 				BEE13BB12C4F6B2900A8A61E /* AutoInstaller.swift */,
 				EB2CF06672284D57B0FCBCA6 /* FaviconFetcher.swift */,
 				INFENGINE2E3AFEB6009A84CC /* InferenceEngine.swift */,
 				ANIMATIONHELPERS2E3AFEB6009A84CC /* UI/Components/AnimationHelpers.swift */,
 				3EE13BB52C4F6B2900A8A61E /* SettingsManager.swift */,
 				3EE13BB72C4F6B2900A8A61E /* SettingsWindowController.swift */,
+                MENUBUILDERFILE000000000000 /* MenuBuilder.swift */,
 				3EE13BB32C4F6B2900A8A61E /* Orbitron-Bold.ttf */,
 			);
 			path = Sources/Hyperchat;
@@ -433,6 +451,12 @@
 			isa = PBXSourcesBuildPhase;
 			buildActionMask = 2147483647;
 			files = (
+				SRBUILD000000000000000001 /* ServiceRegistry.swift in Sources */,
+				LQBUILD000000000000000001 /* LoadingQueue.swift in Sources */,
+				CRBUILD000000000000000001 /* CrashRecovery.swift in Sources */,
+				PRBUILD000000000000000001 /* PromptRouter.swift in Sources */,
+				MENUBUILDERFILE000000000001 /* MenuBuilder.swift in Sources */,
+				VIEWPROVIDERBUILD000000000001 /* ViewProvider.swift in Sources */,
 				BE36BC2B2E3AFEB6009A84CC /* LocalChatView.swift in Sources */,
 				3EE13B9B2C4F6B2900A8A61E /* AppDelegate.swift in Sources */,
 				B037998FCEB2498C9615DFBE /* AnalyticsManager.swift in Sources */,
