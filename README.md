@@ -295,7 +295,10 @@ Here is the step-by-step flow of a typical user interaction:
 - **Interaction:**
 - **Receives Notification**: The AppDelegate catches the .showOverlay notification from the PromptWindowController and calls overlayController.showOverlay(with: prompt).
 - **Creates Window**: It creates a new OverlayWindow.
-- **Creates Controllers**: For each service, it creates a BrowserViewController and registers it with the ServiceManager.
+- **Creates Service Views**: Uses `ViewProvider` to build the correct UI for each service.
+  - `.local` → `NSHostingController(LocalChatView)`
+  - `.web` → `BrowserViewController` wrapping the `WKWebView` provided by `ServiceManager`
+  - Registers created `BrowserViewController` instances with the `ServiceManager` for navigation handoff
 - **Handoff to Logic**: Crucially, it creates a new, dedicated ServiceManager for that window and then calls serviceManager.executePrompt(prompt).
  - **Activation Policy**: When the first window is created, it requests the app switch to `.regular` mode; when the last window closes, it switches back to `.accessory`.
 
@@ -310,6 +313,12 @@ Here is the step-by-step flow of a typical user interaction:
 - **Backend-Aware Execution**: Routes prompts based on ServiceBackend type:
   - **`.web` Services**: Creates URLParameterService or ClaudeService implementations
   - **`.local` Services**: Handled by OverlayController with LocalChatView integration
+- **Internals (Post-refactor)**:
+  - `Sources/Hyperchat/Services/ServiceRegistry.swift`: Global tracking and lookups (`getAllServiceManagers()`, `findServiceId(for:)`, loading state updates)
+  - `Sources/Hyperchat/Services/LoadingQueue.swift`: Sequential loading and default page logic (`loadNextServiceFromQueue`, `loadDefaultPage`)
+  - `Sources/Hyperchat/Services/CrashRecovery.swift`: WebView crash handling (`webViewWebContentProcessDidTerminate`)
+  - `Sources/Hyperchat/Services/PromptRouter.swift`: Small routing helpers (focus refocus timing)
+  - Public API remains the same to the rest of the app
 - **Prompt Execution Methods**:
   - **URLParameterService (Google, Perplexity, etc.)**: Constructs URLs with query parameters
   - **ClaudeService**: Uses JavaScriptProvider for clipboard paste automation
@@ -325,6 +334,15 @@ Here is the step-by-step flow of a typical user interaction:
 - **Memory Optimization**: Uses shared WKProcessPool for all WebViews
  
 ### MenuBuilder (Main Menu Construction)
+### ViewProvider (The View Factory)
+
+- **Job:** Centralizes service view creation to keep `OverlayController` lean.
+- **Location:** `Sources/Hyperchat/ViewProvider.swift`
+- **Interaction:** Given an `AIService` and the window's `ServiceManager`, returns either:
+  - `NSHostingController(LocalChatView).view` for `.local` services
+  - `BrowserViewController.view` for `.web` services using the pre-created `WKWebView` from `ServiceManager`
+  - Applies consistent appearance (corner radius, constraints-ready)
+
 
 - **Job:** Centralizes all AppKit menu construction.
 - **Location:** `Sources/Hyperchat/MenuBuilder.swift`
